@@ -49,7 +49,7 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 - 当前固件由 PlaygroundOS `SystemKernel` 编排，显示、控制台、Wi-Fi 和现有页面已拆分为独立 Service/App 模块。
 - DisplayService 使用 320×240 RGB565 TFT_eSprite 离屏画布，优先分配到 PSRAM，完整绘制后一次推送；串口状态每 10 秒低频输出。
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
-- 当前交互仍以 USB 键盘控制台为主，不要求外接业务按键；ServerService 已支持可配置的主动 TCP 诊断连接，手机式服务器设置界面和认证控制协议仍待后续。
+- USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和 ACK/STATE，手机式服务器设置界面与认证控制协议仍待后续。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。
 
 ## 5. 开发纪律

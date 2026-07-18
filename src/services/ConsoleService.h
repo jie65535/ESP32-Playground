@@ -10,11 +10,11 @@ public:
 
     void begin(Stream& io);
     bool poll(AppCommand& command);
+    static bool parseLine(const String& line, AppCommand& command);
     static void printHelp(Print& output);
 
 private:
     Stream* io_ = nullptr;
     String buffer_;
 
-    bool parseLine(const String& line, AppCommand& command) const;
 };

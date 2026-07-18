@@ -43,7 +43,7 @@ python tools/capture_screen.py --port COM3 --output captures/home.png
 
 控制台的 `1/2/3` 可直接跳页，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 PSRAM 中的原始 RGB565 画布到 PNG/Windows 剪贴板。方向键和回车只是可选便利，`Q` 退出控制台。固件也接受 `wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
 
-局域网 TCP 诊断服务器（当前只接收 HELLO/heartbeat，并发送 PING）：
+局域网 TCP 控制台服务器：接收 HELLO/heartbeat，发送 PING，并可在交互提示符中发送白名单命令：
 
 ```powershell
 python tools/pgos_server.py --listen 0.0.0.0 --port 19000
@@ -56,6 +56,8 @@ server set 192.168.1.4 19000
 server on
 server status
 ```
+
+服务器连接后可直接输入 `up`、`down`、`ok`、`status`、`page system`、`page display` 或 `page network`。设备返回 ACK；`status` 还会返回结构化 STATE。Wi-Fi 密码、清除凭据等敏感命令不会通过 TCP 执行。
 
 ## 文档入口
 

@@ -39,9 +39,13 @@ python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 - HELLO：通过，包含 device_id、固件版本和设备 IP
 - heartbeat：通过，包含 uptime、IP、RSSI 和 free heap
 - PING/PONG：通过
+- 远程白名单命令：`page display` 通过并返回 `ACK 1 OK accepted`
+- 状态请求：`status` 通过并返回 `STATE`，包含当前 App、Wi-Fi 状态、IP、RSSI 和 heap
+- 敏感命令：`wifi clear` 被拒绝，返回 `ACK 3 ERROR command_not_allowed`
+- 输入路由：USB CDC 与 TCP 均进入同一个有界 `InputRouter`
 - 设备状态：`server state=connected`，重连次数初次连接为 0
 - 断开服务器：设备进入退避并尝试重连；测试结束后执行 `server off` 保留目标但停止重试
 
 ## 安全边界
 
-当前链路只用于局域网诊断，没有认证、TLS 或远程 shell。下一阶段增加正式 Session/ControlProtocol 前，不接受任意系统命令。
+当前链路没有认证或 TLS；只接受硬编码白名单中的导航、页面和状态命令，不接受任意系统命令。下一阶段继续补充正式 Session、控制权和配对/token。

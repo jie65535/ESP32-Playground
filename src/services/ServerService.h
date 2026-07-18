@@ -22,6 +22,10 @@ public:
     ServerSnapshot snapshot() const;
     const char* stateName() const;
     void printStatus(Print& output) const;
+    bool pollCommand(uint32_t& requestId, String& commandLine);
+    void sendAck(uint32_t requestId, bool ok, const char* message);
+    void sendState(uint32_t requestId, const char* appName,
+                   const WifiSnapshot& wifi);
 
 private:
     static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 5000;
@@ -44,6 +48,9 @@ private:
     uint32_t messageCount_ = 0;
     uint8_t backoffStep_ = 0;
     String receiveBuffer_;
+    bool commandPending_ = false;
+    uint32_t pendingRequestId_ = 0;
+    String pendingCommandLine_;
 
     void closeClient();
     void attemptConnect(uint32_t nowMs, const WifiSnapshot& wifi);

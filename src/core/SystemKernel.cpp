@@ -44,6 +44,24 @@ bool isServerCommand(AppCommandType type) {
     }
 }
 
+bool isRemoteAllowed(AppCommandType type) {
+    switch (type) {
+        case AppCommandType::Previous:
+        case AppCommandType::Next:
+        case AppCommandType::Activate:
+        case AppCommandType::PageSystem:
+        case AppCommandType::PageDisplay:
+        case AppCommandType::PageNetwork:
+        case AppCommandType::ColorTest:
+        case AppCommandType::Status:
+        case AppCommandType::WifiStatus:
+        case AppCommandType::ServerStatus:
+            return true;
+        default:
+            return false;
+    }
+}
+
 }  // namespace
 
 SystemKernel::SystemKernel()
@@ -84,11 +102,31 @@ void SystemKernel::loop() {
     const uint32_t nowMs = millis();
     AppCommand command;
     while (console_.poll(command)) {
-        handleCommand(command);
+        if (!inputRouter_.push(command, InputSource::Usb)) {
+            Serial.println(F("[input] USB command dropped: queue full"));
+        }
     }
 
     wifi_.tick(nowMs);
     server_.tick(nowMs, wifi_.snapshot());
+
+    uint32_t requestId = 0;
+    String remoteLine;
+    while (server_.pollCommand(requestId, remoteLine)) {
+        AppCommand remoteCommand;
+        if (!ConsoleService::parseLine(remoteLine, remoteCommand)) {
+            server_.sendAck(requestId, false, "parse_failed");
+        } else if (!inputRouter_.push(remoteCommand, InputSource::Tcp,
+                                      requestId)) {
+            server_.sendAck(requestId, false, "input_queue_full");
+        }
+    }
+
+    RoutedCommand routed;
+    while (inputRouter_.poll(routed)) {
+        handleCommand(routed);
+    }
+
     appManager_.tick(nowMs);
     if (redrawRequested_ || nowMs - lastRenderMs_ >= RENDER_INTERVAL_MS) {
         lastRenderMs_ = nowMs;
@@ -110,7 +148,14 @@ void SystemKernel::loop() {
     }
 }
 
-void SystemKernel::handleCommand(const AppCommand& command) {
+bool SystemKernel::handleCommand(const RoutedCommand& routed) {
+    const AppCommand& command = routed.command;
+    if (routed.source == InputSource::Tcp && !isRemoteAllowed(command.type)) {
+        server_.sendAck(routed.requestId, false, "command_not_allowed");
+        return false;
+    }
+
+    bool handled = true;
     switch (command.type) {
         case AppCommandType::PageSystem:
             appManager_.activate(AppId::SystemInfo);
@@ -138,6 +183,7 @@ void SystemKernel::handleCommand(const AppCommand& command) {
             Serial.print(F("unknown command: "));
             Serial.println(command.value);
             ConsoleService::printHelp(Serial);
+            handled = false;
             break;
         default:
             if (isWifiCommand(command.type) || isServerCommand(command.type)) {
@@ -149,6 +195,14 @@ void SystemKernel::handleCommand(const AppCommand& command) {
             break;
     }
     requestRedraw();
+    if (routed.source == InputSource::Tcp) {
+        server_.sendAck(routed.requestId, handled, handled ? "accepted" : "unknown");
+        if (handled && command.type == AppCommandType::Status) {
+            server_.sendState(routed.requestId, appManager_.currentName(),
+                              wifi_.snapshot());
+        }
+    }
+    return handled;
 }
 
 void SystemKernel::printStatus() {

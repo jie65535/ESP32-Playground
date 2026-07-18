@@ -53,6 +53,19 @@ struct AppCommand {
     int32_t number = -1;
 };
 
+enum class InputSource : uint8_t {
+    Usb,
+    Tcp,
+    Ble,
+    Local,
+};
+
+struct RoutedCommand {
+    AppCommand command;
+    InputSource source = InputSource::Usb;
+    uint32_t requestId = 0;
+};
+
 enum class WifiState : uint8_t {
     Disabled,
     NoCredentials,

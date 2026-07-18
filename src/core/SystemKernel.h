@@ -5,6 +5,7 @@
 #include "apps/NetworkSettingsApp.h"
 #include "apps/SystemInfoApp.h"
 #include "core/AppManager.h"
+#include "core/InputRouter.h"
 #include "services/ConsoleService.h"
 #include "services/DisplayService.h"
 #include "services/ServerService.h"
@@ -23,6 +24,7 @@ private:
     ConsoleService console_;
     AppContext context_;
     AppManager appManager_;
+    InputRouter inputRouter_;
     SystemInfoApp systemInfoApp_;
     DisplayTestApp displayTestApp_;
     NetworkSettingsApp networkSettingsApp_;
@@ -31,7 +33,7 @@ private:
     uint32_t lastStatusMs_ = 0;
     bool redrawRequested_ = true;
 
-    void handleCommand(const AppCommand& command);
+    bool handleCommand(const RoutedCommand& routed);
     void printStatus();
     void requestRedraw();
 };

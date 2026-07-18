@@ -49,7 +49,7 @@ bool ConsoleService::poll(AppCommand& command) {
     return false;
 }
 
-bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) const {
+bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
     String line = rawLine;
     line.trim();
     String lower = line;

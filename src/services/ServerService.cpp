@@ -185,6 +185,49 @@ void ServerService::printStatus(Print& output) const {
     output.println();
 }
 
+bool ServerService::pollCommand(uint32_t& requestId, String& commandLine) {
+    if (!commandPending_) {
+        return false;
+    }
+    requestId = pendingRequestId_;
+    commandLine = pendingCommandLine_;
+    commandPending_ = false;
+    pendingCommandLine_ = "";
+    return true;
+}
+
+void ServerService::sendAck(uint32_t requestId, bool ok, const char* message) {
+    if (!client_.connected()) {
+        return;
+    }
+    client_.print(F("ACK "));
+    client_.print(requestId);
+    client_.print(ok ? F(" OK ") : F(" ERROR "));
+    client_.println(message == nullptr ? "" : message);
+    messageCount_++;
+}
+
+void ServerService::sendState(uint32_t requestId, const char* appName,
+                              const WifiSnapshot& wifi) {
+    if (!client_.connected()) {
+        return;
+    }
+    client_.print(F("STATE "));
+    client_.print(requestId);
+    client_.print(F(" {\"app\":\""));
+    client_.print(appName == nullptr ? "unknown" : appName);
+    client_.print(F("\",\"wifi_state\":\""));
+    client_.print(wifi.state == WifiState::Connected ? "connected" : "other");
+    client_.print(F("\",\"ip\":\""));
+    client_.print(wifi.ip);
+    client_.print(F("\",\"rssi\":"));
+    client_.print(wifi.rssi);
+    client_.print(F(",\"heap\":"));
+    client_.print(ESP.getFreeHeap());
+    client_.println(F("}"));
+    messageCount_++;
+}
+
 void ServerService::closeClient() {
     if (client_.connected()) {
         client_.stop();
@@ -262,6 +305,31 @@ void ServerService::readIncoming() {
             if (receiveBuffer_ == "PING") {
                 client_.println(F("PONG"));
                 messageCount_++;
+            } else if (receiveBuffer_.startsWith("CMD ")) {
+                const String payload = receiveBuffer_.substring(4);
+                const int separator = payload.indexOf(' ');
+                if (separator <= 0 || commandPending_) {
+                    sendAck(0, false, commandPending_ ? "busy" : "bad_command");
+                } else {
+                    const String requestText = payload.substring(0, separator);
+                    bool valid = !requestText.isEmpty();
+                    for (size_t index = 0; index < requestText.length(); ++index) {
+                        if (requestText[index] < '0' || requestText[index] > '9') {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    if (!valid) {
+                        sendAck(0, false, "bad_request_id");
+                    } else {
+                        pendingRequestId_ = requestText.toInt();
+                        pendingCommandLine_ = payload.substring(separator + 1);
+                        commandPending_ = !pendingCommandLine_.isEmpty();
+                        if (!commandPending_) {
+                            sendAck(pendingRequestId_, false, "empty_command");
+                        }
+                    }
+                }
             } else if (!receiveBuffer_.isEmpty()) {
                 log_->print(F("[server] rx "));
                 log_->println(receiveBuffer_);
