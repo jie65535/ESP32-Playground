@@ -34,16 +34,18 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 ## 随后：PGOS Studio 媒体与工具能力
 
 - UDP 19003 / mDNS 服务发现：设备发现 Studio、Studio beacon 唤醒设备重连，并以持久化 `server_id` 防止误连。
-- 镜像帧率、吞吐和丢帧统计。
+- 镜像 FPS、应用层吞吐和控制 RTT 已加入；丢帧统计待增加。
 - 脏矩形或轻量压缩、截图和录像。
 - 电脑画面到设备 `RenderSurface` 的受控反向推送。
 - 音频上/下行实验与设备专属调试面板。
 - 保持 GUI 只依赖通用输入与能力协商，不为每个设备页面增加快捷入口。
 
-## 随后：系统监视器
+## 当前：基础系统监视器
 
-- 设备端新增可滚动 System Monitor 页面，显示 Heap/PSRAM/Flash/文件系统占用、温度（若硬件支持）和 Wi-Fi/控制通道指标。
-- CPU 利用率采用 FreeRTOS idle/runtime 采样，不用 loop 次数伪造；先验证双核统计口径，再对外显示百分比。
+- 设备端 System 页面已升级为可滚动监视器，显示主循环占用、Heap/最低水位、PSRAM、固件/OTA Flash 和任务数。
+- 当前 CPU 字段明确表示主循环 duty，不冒充双核总 CPU；完整 FreeRTOS idle/runtime 统计需要切换可配置的 ESP-IDF/Arduino 构建后再加入。
+- 主循环末尾增加 1 ms 调度让步，让 idle/Wi-Fi 系统任务获得稳定运行窗口。
+- 文件系统占用、温度（若硬件支持）和 Wi-Fi/控制通道历史曲线继续后补。
 - Studio 复用同一份结构化快照，提供历史曲线；监视器本身不能阻塞镜像、音频和控制输入。
 
 ## 后续：局域网 HTTP/JSON

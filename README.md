@@ -87,6 +87,7 @@ python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 - [实验记录：显示亮度与自动息屏](docs/experiments/006_display_settings.md)
 - [实验记录：声音设置与 ES8311 最小播放](docs/experiments/007_sound_settings.md)
 - [实验记录：PGOS Studio 与无线屏幕镜像](docs/experiments/008_pgos_studio_mirror.md)
+- [实验记录：运行时监视与 TCP 命令队列](docs/experiments/009_runtime_monitor.md)
 - [可复用经验知识库](docs/knowledge/README.md)
 - [厂商原始资料说明](docs/vendor/README.md)
 

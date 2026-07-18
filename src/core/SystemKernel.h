@@ -15,6 +15,7 @@
 #include "services/DisplayService.h"
 #include "services/ServerService.h"
 #include "services/MirrorService.h"
+#include "services/RuntimeMonitorService.h"
 #include "services/WifiService.h"
 #include "ui/UiRuntime.h"
 
@@ -33,6 +34,7 @@ private:
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
+    RuntimeMonitorService runtime_;
     AppContext context_;
     AppManager appManager_;
     InputRouter inputRouter_;

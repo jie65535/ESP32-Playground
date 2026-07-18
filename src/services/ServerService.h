@@ -11,7 +11,8 @@ public:
     static constexpr uint16_t DEFAULT_PORT = 19000;
 
     void begin(Print& log);
-    void tick(uint32_t nowMs, const WifiSnapshot& wifi);
+    void tick(uint32_t nowMs, const WifiSnapshot& wifi,
+              const RuntimeSnapshot& runtime);
 
     bool setTarget(const String& host, uint32_t port);
     void setEnabled(bool enabled);
@@ -28,6 +29,7 @@ public:
                    const WifiSnapshot& wifi);
 
 private:
+    static constexpr uint8_t COMMAND_QUEUE_SIZE = 8;
     static constexpr uint32_t HEARTBEAT_INTERVAL_MS = 5000;
     static constexpr uint32_t INITIAL_RETRY_DELAY_MS = 1000;
     static constexpr uint32_t MAX_RETRY_DELAY_MS = 30000;
@@ -48,15 +50,23 @@ private:
     uint32_t messageCount_ = 0;
     uint8_t backoffStep_ = 0;
     String receiveBuffer_;
-    bool commandPending_ = false;
-    uint32_t pendingRequestId_ = 0;
-    String pendingCommandLine_;
+    struct PendingCommand {
+        uint32_t requestId = 0;
+        String line;
+    };
+    PendingCommand commandQueue_[COMMAND_QUEUE_SIZE];
+    uint8_t commandHead_ = 0;
+    uint8_t commandTail_ = 0;
+    uint8_t commandCount_ = 0;
 
     void closeClient();
+    bool enqueueCommand(uint32_t requestId, const String& commandLine);
+    void clearCommandQueue();
     void attemptConnect(uint32_t nowMs, const WifiSnapshot& wifi);
     void scheduleRetry(uint32_t nowMs, const char* reason);
     void sendHello(const WifiSnapshot& wifi);
-    void sendHeartbeat(const WifiSnapshot& wifi);
+    void sendHeartbeat(const WifiSnapshot& wifi,
+                       const RuntimeSnapshot& runtime);
     void readIncoming();
     String deviceId() const;
 };

@@ -150,3 +150,17 @@ struct MirrorSnapshot {
     String host;
     String lastError;
 };
+
+struct RuntimeSnapshot {
+    uint8_t mainLoopBusyPercent = 0;
+    uint32_t mainLoopWorkUs = 0;
+    uint32_t freeHeap = 0;
+    uint32_t heapSize = 0;
+    uint32_t minimumFreeHeap = 0;
+    uint32_t freePsram = 0;
+    uint32_t psramSize = 0;
+    uint32_t flashSize = 0;
+    uint32_t sketchSize = 0;
+    uint32_t freeSketchSpace = 0;
+    uint32_t taskCount = 0;
+};

@@ -33,6 +33,10 @@ Wi-Fi 入网稳定后，USB 控制台的命令层可以复用为无线控制台�
 
 当前已加入第一版 `ServerService`：服务器地址、端口和启用状态保存在 `server` NVS namespace；`server set <host> <port>` 保存目标并自动启用连接，设备主动 TCP 连接服务器，发送 `PGOS/1 HELLO` 和周期 heartbeat，接收 `PING` 并回复 `PONG`。USB 与 TCP 命令共同进入有界 `InputRouter`；TCP 允许导航、页面、状态和受控吞吐测试白名单，返回 ACK/STATE，敏感 Wi-Fi/服务器配置命令被拒绝。电脑端日常使用 `tools/pgos_studio.py`，协议诊断继续使用无依赖的 `tools/pgos_server.py`，默认监听 TCP 19000。Studio 内置 19001 吞吐接收端，显示控制 RTT 与上下行 Mbps；当前尚未加入认证和 TLS，不作为通用远程 shell。
 
+TCP 收包层使用 8 项有界命令队列，并在完整解析 `CMD <request_id> <command>` 后入队。队列满时必须使用原始 request ID 返回 `ACK <id> ERROR busy`，不能返回无法关联的固定 ID 0；随后再进入 16 项 `InputRouter` 队列。快速方向键输入因此可以按序确认，只有真实背压时才明确拒绝。
+
+交互模式禁用 Arduino-ESP32 默认的 `WIFI_PS_MIN_MODEM`，避免控制 RTT 出现约 100 ms 的省电唤醒延迟；代价是 Wi-Fi 功耗上升。未来电池模式应把低延迟/省电作为显式电源策略，而不是隐式切换。
+
 独立的 `BenchmarkService` 使用 TCP 19001 测量固定字节流，不与控制通道混用。PGOS Studio 已内置非阻塞测速接收端，命令行仍可使用 `tools/pgos_benchmark.py`；设备命令为 `bench upload <bytes>`、`bench download <bytes>`、`bench status` 和 `bench cancel`。
 
 `MirrorService` 使用 TCP 19002（控制端口 + 2）发送 `PGMF` 二进制帧，帧负载为 320×240 RGB565BE shadow framebuffer。镜像默认关闭，由已连接的 PGOS Studio 通过白名单命令临时打开，不写入 NVS；控制会话不可用时镜像 socket 关闭。第一版发送完整帧并限制单轮发送预算，优先验证链路、颜色和交互延迟，再优化脏矩形与压缩。

@@ -21,7 +21,7 @@ void WifiService::begin(Print& log) {
         return;
     }
 
-    WiFi.mode(WIFI_STA);
+    configureStationMode();
     if (ssid_.isEmpty()) {
         state_ = WifiState::NoCredentials;
         log.println(F("[wifi] no saved credentials; use wifi scan to configure"));
@@ -47,7 +47,7 @@ void WifiService::tick(uint32_t nowMs) {
             scanRetryAtMs_ = 0;
             if (scanRadioResetPending_) {
                 WiFi.mode(WIFI_OFF);
-                WiFi.mode(WIFI_STA);
+                configureStationMode();
                 scanRadioResetPending_ = false;
             }
             startScanAttempt(nowMs);
@@ -111,7 +111,7 @@ void WifiService::setEnabled(bool enabled) {
         lastError_ = "";
         log_->println(F("[wifi] off; scanning and auto-connect disabled"));
     } else {
-        WiFi.mode(WIFI_STA);
+        configureStationMode();
         backoffStep_ = 0;
         lastError_ = "";
         state_ = ssid_.isEmpty() ? WifiState::NoCredentials : WifiState::Ready;
@@ -312,7 +312,7 @@ void WifiService::startConnect(uint32_t nowMs) {
         state_ = WifiState::NoCredentials;
         return;
     }
-    WiFi.mode(WIFI_STA);
+    configureStationMode();
     WiFi.begin(ssid_.c_str(), password_.c_str());
     connectStartedMs_ = nowMs;
     state_ = WifiState::Connecting;
@@ -346,7 +346,7 @@ void WifiService::startScanAttempt(uint32_t nowMs) {
     if (previous >= 0) {
         WiFi.scanDelete();
     }
-    WiFi.mode(WIFI_STA);
+    configureStationMode();
     const int16_t result = WiFi.scanNetworks(true, true, false, 600);
     if (result == WIFI_SCAN_RUNNING) {
         log_->print(F("[wifi] scan started (non-blocking), attempt="));
@@ -356,6 +356,15 @@ void WifiService::startScanAttempt(uint32_t nowMs) {
     } else {
         handleScanFailure(nowMs, "scan could not start");
     }
+}
+
+void WifiService::configureStationMode() {
+    WiFi.mode(WIFI_STA);
+    // This device is primarily an interactive, externally powered
+    // development board. Disable modem sleep to avoid 100 ms-class latency
+    // spikes on the TCP control channel; a battery-oriented profile can
+    // restore WIFI_PS_MIN_MODEM later.
+    WiFi.setSleep(false);
 }
 
 void WifiService::handleScanFailure(uint32_t nowMs, const char* reason) {

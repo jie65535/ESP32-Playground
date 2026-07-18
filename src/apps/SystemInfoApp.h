@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/App.h"
+#include "ui/UiRuntime.h"
 
 class SystemInfoApp final : public IApp {
 public:
@@ -14,10 +15,11 @@ public:
     void onUpdateView(AppContext& context) override;
 
 private:
+    static constexpr uint8_t ITEM_COUNT = 5;
+
     uint32_t nowMs_ = 0;
     lv_obj_t* root_ = nullptr;
-    lv_obj_t* uptimeValue_ = nullptr;
-    lv_obj_t* heapValue_ = nullptr;
-    lv_obj_t* psramValue_ = nullptr;
-    lv_obj_t* flashValue_ = nullptr;
+    UiCard cards_[ITEM_COUNT];
+    uint8_t selected_ = 0;
+    int8_t renderedSelected_ = -1;
 };

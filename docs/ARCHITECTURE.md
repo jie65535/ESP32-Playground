@@ -70,6 +70,7 @@ public:
 - `ConsoleService`：命令注册、帮助和 USB/无线传输适配。
 - `ServerService`：UDP/mDNS 发现、手工地址、TCP 会话和心跳。
 - `MirrorService`：由上位机控制的临时 framebuffer 上行通道，不持久化功能开关。
+- `RuntimeMonitorService`：采样主循环 duty、Heap/PSRAM、Flash/OTA 和任务数；不读取或修改具体 App 状态。
 - `TimeService`：单调时钟、NTP 和时区。
 - `AudioService`：ES8311 与 I²S、音量、反馈音和试听；需要实时性时可拥有独立任务。
 

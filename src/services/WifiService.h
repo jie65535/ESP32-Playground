@@ -60,6 +60,7 @@ private:
     bool scanRadioResetPending_ = false;
 
     void startConnect(uint32_t nowMs);
+    void configureStationMode();
     void scheduleReconnect(uint32_t nowMs, const char* reason);
     void startScanAttempt(uint32_t nowMs);
     void handleScanFailure(uint32_t nowMs, const char* reason);

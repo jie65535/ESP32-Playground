@@ -114,7 +114,7 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
-      context_{display_, audio_, wifi_, server_, Serial, ui_},
+      context_{display_, audio_, wifi_, server_, Serial, ui_, runtime_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
@@ -128,6 +128,7 @@ void SystemKernel::setup() {
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
+    runtime_.begin(Serial);
 
     if (uiReady_) {
         appManager_.registerApp(systemInfoApp_);
@@ -159,6 +160,7 @@ void SystemKernel::setup() {
 }
 
 void SystemKernel::loop() {
+    runtime_.beginLoop();
     const uint32_t nowMs = millis();
     AppCommand command;
     while (console_.poll(command)) {
@@ -168,7 +170,7 @@ void SystemKernel::loop() {
     }
 
     wifi_.tick(nowMs);
-    server_.tick(nowMs, wifi_.snapshot());
+    server_.tick(nowMs, wifi_.snapshot(), runtime_.snapshot());
     mirror_.tick(nowMs, wifi_.snapshot(), server_.snapshot(), display_);
     benchmark_.tick(nowMs);
     audio_.tick(nowMs);
@@ -224,9 +226,12 @@ void SystemKernel::loop() {
             benchmark_.printStatus(Serial);
             display_.printStatus(Serial);
             audio_.printStatus(Serial);
+            runtime_.printStatus(Serial);
         }
     }
     ui_.tick();
+    runtime_.endLoop();
+    delay(1);
 }
 
 bool SystemKernel::handleCommand(const RoutedCommand& routed) {
@@ -364,6 +369,7 @@ void SystemKernel::printStatus() {
     benchmark_.printStatus(Serial);
     display_.printStatus(Serial);
     audio_.printStatus(Serial);
+    runtime_.printStatus(Serial);
 }
 
 void SystemKernel::requestRedraw() {

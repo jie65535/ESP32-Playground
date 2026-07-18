@@ -205,12 +205,16 @@ class PgosStudio(QMainWindow):
         self.ip_value = QLabel("--")
         self.rssi_value = QLabel("--")
         self.heap_value = QLabel("--")
+        self.cpu_value = QLabel("--")
+        self.psram_value = QLabel("--")
         values = (
             ("状态", self.connection_value),
             ("设备", self.device_value),
             ("IP", self.ip_value),
             ("RSSI", self.rssi_value),
             ("Heap", self.heap_value),
+            ("Main CPU", self.cpu_value),
+            ("PSRAM", self.psram_value),
         )
         for row, (name, value) in enumerate(values):
             label = QLabel(name)
@@ -387,9 +391,15 @@ class PgosStudio(QMainWindow):
             QMessageBox.warning(self, "PGOS Studio", message)
             return
         if not self.bench_server.listen(address, port + 1):
+            self.benchmark_value.setText("测速端口不可用")
             self.append_log(
                 f"测速端口 {port + 1} 监听失败：{self.bench_server.errorString()}",
                 force=True,
+            )
+            QMessageBox.warning(
+                self,
+                "PGOS Studio",
+                f"测速端口 {port + 1} 无法监听。请关闭其他测速服务器后重启 Studio。",
             )
         mirror_port = port + 2
         mirror_address = QHostAddress(self.listen_edit.text().strip())
@@ -770,6 +780,10 @@ class PgosStudio(QMainWindow):
             self.rssi_value.setText(f"{payload['rssi']} dBm")
         if payload.get("heap") is not None:
             self.heap_value.setText(f"{int(payload['heap']) // 1024} KiB")
+        if payload.get("main_loop_busy") is not None:
+            self.cpu_value.setText(f"{int(payload['main_loop_busy'])}%")
+        if payload.get("free_psram") is not None:
+            self.psram_value.setText(f"{int(payload['free_psram']) // 1024} KiB free")
         app = payload.get("app")
         if app:
             self.statusBar().showMessage(f"设备在线 · 当前页面：{app}")

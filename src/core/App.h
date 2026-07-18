@@ -9,6 +9,7 @@ class DisplayService;
 class AudioService;
 class WifiService;
 class ServerService;
+class RuntimeMonitorService;
 class UiRuntime;
 
 struct AppContext {
@@ -18,6 +19,7 @@ struct AppContext {
     ServerService& server;
     Stream& console;
     UiRuntime& ui;
+    RuntimeMonitorService& runtime;
 };
 
 class IApp {

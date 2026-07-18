@@ -1,0 +1,78 @@
+#include "services/RuntimeMonitorService.h"
+
+#include <esp_timer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+void RuntimeMonitorService::begin(Print& log) {
+    log_ = &log;
+    windowStartedUs_ = esp_timer_get_time();
+    sampleResources(millis());
+    if (log_ != nullptr) {
+        log_->println(F("[runtime] monitor ready; main-loop duty is sampled"));
+    }
+}
+
+void RuntimeMonitorService::beginLoop() {
+    loopStartedUs_ = esp_timer_get_time();
+    if (windowStartedUs_ == 0) {
+        windowStartedUs_ = loopStartedUs_;
+    }
+}
+
+void RuntimeMonitorService::endLoop() {
+    const uint64_t nowUs = esp_timer_get_time();
+    if (loopStartedUs_ != 0 && nowUs >= loopStartedUs_) {
+        snapshot_.mainLoopWorkUs = static_cast<uint32_t>(
+            min<uint64_t>(nowUs - loopStartedUs_, UINT32_MAX));
+        windowBusyUs_ += nowUs - loopStartedUs_;
+    }
+
+    const uint64_t windowUs = nowUs - windowStartedUs_;
+    if (windowUs >= 1000000U) {
+        const uint64_t busy = min<uint64_t>(windowBusyUs_, windowUs);
+        snapshot_.mainLoopBusyPercent = static_cast<uint8_t>(
+            min<uint64_t>(100U, busy * 100U / windowUs));
+        windowStartedUs_ = nowUs;
+        windowBusyUs_ = 0;
+    }
+
+    const uint32_t nowMs = millis();
+    if (nowMs - lastResourceSampleMs_ >= 500U) {
+        sampleResources(nowMs);
+    }
+}
+
+RuntimeSnapshot RuntimeMonitorService::snapshot() const {
+    return snapshot_;
+}
+
+void RuntimeMonitorService::printStatus(Print& output) const {
+    output.print(F("[runtime] main_loop="));
+    output.print(snapshot_.mainLoopBusyPercent);
+    output.print(F("% work_us="));
+    output.print(snapshot_.mainLoopWorkUs);
+    output.print(F(" heap="));
+    output.print(snapshot_.freeHeap);
+    output.print('/');
+    output.print(snapshot_.heapSize);
+    output.print(F(" psram="));
+    output.print(snapshot_.freePsram);
+    output.print('/');
+    output.print(snapshot_.psramSize);
+    output.print(F(" tasks="));
+    output.println(snapshot_.taskCount);
+}
+
+void RuntimeMonitorService::sampleResources(uint32_t nowMs) {
+    lastResourceSampleMs_ = nowMs;
+    snapshot_.freeHeap = ESP.getFreeHeap();
+    snapshot_.heapSize = ESP.getHeapSize();
+    snapshot_.minimumFreeHeap = ESP.getMinFreeHeap();
+    snapshot_.freePsram = ESP.getFreePsram();
+    snapshot_.psramSize = ESP.getPsramSize();
+    snapshot_.flashSize = ESP.getFlashChipSize();
+    snapshot_.sketchSize = ESP.getSketchSize();
+    snapshot_.freeSketchSpace = ESP.getFreeSketchSpace();
+    snapshot_.taskCount = uxTaskGetNumberOfTasks();
+}

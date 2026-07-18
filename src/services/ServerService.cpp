@@ -32,7 +32,8 @@ void ServerService::begin(Print& log) {
     log_->println();
 }
 
-void ServerService::tick(uint32_t nowMs, const WifiSnapshot& wifi) {
+void ServerService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
+                         const RuntimeSnapshot& runtime) {
     if (!enabled_) {
         return;
     }
@@ -57,7 +58,7 @@ void ServerService::tick(uint32_t nowMs, const WifiSnapshot& wifi) {
     state_ = ServerState::Connected;
     readIncoming();
     if (nowMs >= nextHeartbeatMs_) {
-        sendHeartbeat(wifi);
+        sendHeartbeat(wifi, runtime);
         nextHeartbeatMs_ = nowMs + HEARTBEAT_INTERVAL_MS;
     }
 }
@@ -189,13 +190,16 @@ void ServerService::printStatus(Print& output) const {
 }
 
 bool ServerService::pollCommand(uint32_t& requestId, String& commandLine) {
-    if (!commandPending_) {
+    if (commandCount_ == 0) {
         return false;
     }
-    requestId = pendingRequestId_;
-    commandLine = pendingCommandLine_;
-    commandPending_ = false;
-    pendingCommandLine_ = "";
+    PendingCommand& pending = commandQueue_[commandHead_];
+    requestId = pending.requestId;
+    commandLine = pending.line;
+    pending = PendingCommand{};
+    commandHead_ = static_cast<uint8_t>(
+        (commandHead_ + 1U) % COMMAND_QUEUE_SIZE);
+    commandCount_--;
     return true;
 }
 
@@ -235,6 +239,30 @@ void ServerService::closeClient() {
     if (client_.connected()) {
         client_.stop();
     }
+    clearCommandQueue();
+}
+
+bool ServerService::enqueueCommand(uint32_t requestId,
+                                   const String& commandLine) {
+    if (commandCount_ >= COMMAND_QUEUE_SIZE) {
+        return false;
+    }
+    PendingCommand& pending = commandQueue_[commandTail_];
+    pending.requestId = requestId;
+    pending.line = commandLine;
+    commandTail_ = static_cast<uint8_t>(
+        (commandTail_ + 1U) % COMMAND_QUEUE_SIZE);
+    commandCount_++;
+    return true;
+}
+
+void ServerService::clearCommandQueue() {
+    for (PendingCommand& pending : commandQueue_) {
+        pending = PendingCommand{};
+    }
+    commandHead_ = 0;
+    commandTail_ = 0;
+    commandCount_ = 0;
 }
 
 void ServerService::attemptConnect(uint32_t nowMs, const WifiSnapshot& wifi) {
@@ -285,7 +313,8 @@ void ServerService::sendHello(const WifiSnapshot& wifi) {
     messageCount_++;
 }
 
-void ServerService::sendHeartbeat(const WifiSnapshot& wifi) {
+void ServerService::sendHeartbeat(const WifiSnapshot& wifi,
+                                  const RuntimeSnapshot& runtime) {
     client_.print(F("{\"type\":\"heartbeat\",\"device_id\":\""));
     client_.print(deviceId());
     client_.print(F("\",\"uptime_ms\":"));
@@ -296,6 +325,14 @@ void ServerService::sendHeartbeat(const WifiSnapshot& wifi) {
     client_.print(wifi.rssi);
     client_.print(F(",\"heap\":"));
     client_.print(ESP.getFreeHeap());
+    client_.print(F(",\"main_loop_busy\":"));
+    client_.print(runtime.mainLoopBusyPercent);
+    client_.print(F(",\"min_free_heap\":"));
+    client_.print(runtime.minimumFreeHeap);
+    client_.print(F(",\"free_psram\":"));
+    client_.print(runtime.freePsram);
+    client_.print(F(",\"tasks\":"));
+    client_.print(runtime.taskCount);
     client_.print(F("}\n"));
     messageCount_++;
 }
@@ -311,8 +348,19 @@ void ServerService::readIncoming() {
             } else if (receiveBuffer_.startsWith("CMD ")) {
                 const String payload = receiveBuffer_.substring(4);
                 const int separator = payload.indexOf(' ');
-                if (separator <= 0 || commandPending_) {
-                    sendAck(0, false, commandPending_ ? "busy" : "bad_command");
+                if (separator <= 0) {
+                    String requestText = payload;
+                    requestText.trim();
+                    bool valid = !requestText.isEmpty();
+                    for (size_t index = 0; index < requestText.length(); ++index) {
+                        if (requestText[index] < '0' ||
+                            requestText[index] > '9') {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    sendAck(valid ? requestText.toInt() : 0, false,
+                            valid ? "empty_command" : "bad_command");
                 } else {
                     const String requestText = payload.substring(0, separator);
                     bool valid = !requestText.isEmpty();
@@ -325,11 +373,13 @@ void ServerService::readIncoming() {
                     if (!valid) {
                         sendAck(0, false, "bad_request_id");
                     } else {
-                        pendingRequestId_ = requestText.toInt();
-                        pendingCommandLine_ = payload.substring(separator + 1);
-                        commandPending_ = !pendingCommandLine_.isEmpty();
-                        if (!commandPending_) {
-                            sendAck(pendingRequestId_, false, "empty_command");
+                        const uint32_t requestId = requestText.toInt();
+                        const String commandLine =
+                            payload.substring(separator + 1);
+                        if (commandLine.isEmpty()) {
+                            sendAck(requestId, false, "empty_command");
+                        } else if (!enqueueCommand(requestId, commandLine)) {
+                            sendAck(requestId, false, "busy");
                         }
                     }
                 }
