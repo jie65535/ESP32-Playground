@@ -50,9 +50,10 @@ python tools/playground_console.py --port COMx --wifi-setup
 
 - 测试日期：2026-07-18
 - 开发板/USB：ES3N28P / R8N16，COM3
-- 路由器频段：未配置家庭凭据；扫描仅验证 2.4 GHz Station 能力
-- 扫描网络数：25；第一次内部 6 秒窗口不足导致失败，放宽到约 12 秒后异步扫描通过
-- DHCP IP、RSSI：待输入凭据后验证
-- 断线与自动重连：待成功入网后验证
-- 屏幕：网络页显示 `no credentials`、SSID/IP/RSSI 占位、Retry=0 和 `scan ready: 25 network(s)`
-- 结论：USB 命令、NVS 空配置启动、非阻塞扫描、屏幕/USB 状态快照已通过；连接和重连待用户通过隐藏输入配置后继续。
+- 路由器频段：2.4 GHz Station
+- 扫描网络数：25（后续重复扫描曾得到 22）；第一次内部 6 秒窗口不足导致失败，放宽到约 12 秒并加入重试后通过
+- DHCP IP、RSSI：192.168.1.6，-18 dBm；电脑计划作为服务器的地址为 192.168.1.4
+- 屏幕：网络页显示 `connected`、DHCP IP、RSSI 和 Retry=0
+- 连接截图：`captures/playground-20260718-180517.png`，网络页显示 `connected`、DHCP IP `192.168.1.6`、RSSI `-18 dBm`、Retry=0。
+- 断线与自动重连：待人为断开路由器或关闭 Wi‑Fi 后验证
+- 结论：USB 命令、NVS 空配置启动、非阻塞扫描、屏幕/USB 状态快照和家庭 Wi‑Fi 入网已通过；下一步可把 192.168.1.4 作为局域网服务器测试目标。
