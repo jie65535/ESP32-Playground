@@ -66,7 +66,7 @@ lv_obj_t* SoundSettingsApp::onCreateView(AppContext& context) {
     root_ = context.ui.createPageRoot("SOUND / AUDIO", "Sound");
 
     rows_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_VOLUME_MAX,
-                                     "Volume", "phone-style loudness curve");
+                                     "Volume", "small-speaker loudness curve");
     rows_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_BELL,
                                      "Feedback sound", "Short navigation tone");
     rows_[2] = context.ui.createCard(root_, 158, LV_SYMBOL_PLAY,

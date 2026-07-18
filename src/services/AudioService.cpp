@@ -30,30 +30,36 @@ struct VolumeCurvePoint {
     int16_t gainHalfDb;
 };
 
-// AOSP-inspired speaker curve. ES8311 register 0x32 uses 0.5 dB steps,
-// with 0xBF representing 0 dB. Keeping the top at 0 dB avoids the codec's
-// optional +32 dB digital boost while preserving a phone-like progression.
-constexpr VolumeCurvePoint PHONE_VOLUME_CURVE[] = {
-    {1, -116},   // -58.0 dB
-    {20, -80},   // -40.0 dB
+// Small-speaker curve built from the AOSP shape, with the lower range lifted
+// so this board's speaker remains audible below 30%. ES8311 register 0x32
+// uses 0.5 dB steps, with 0xBF representing 0 dB. The top stays at 0 dB to
+// avoid the codec's optional +32 dB digital boost.
+constexpr VolumeCurvePoint SMALL_SPEAKER_VOLUME_CURVE[] = {
+    {1, -90},    // -45.0 dB
+    {10, -80},   // -40.0 dB
+    {20, -64},   // -32.0 dB
+    {30, -50},   // -25.0 dB
+    {40, -44},   // -22.0 dB
+    {50, -38},   // -19.0 dB
     {60, -34},   // -17.0 dB
     {100, 0},    //   0.0 dB
 };
 
 int16_t gainHalfDbForVolumePercent(uint8_t percent) {
     if (percent == 0) {
-        return PHONE_VOLUME_CURVE[0].gainHalfDb;
+        return SMALL_SPEAKER_VOLUME_CURVE[0].gainHalfDb;
     }
 
     for (size_t index = 1;
-         index < sizeof(PHONE_VOLUME_CURVE) / sizeof(PHONE_VOLUME_CURVE[0]);
+         index < sizeof(SMALL_SPEAKER_VOLUME_CURVE) /
+                     sizeof(SMALL_SPEAKER_VOLUME_CURVE[0]);
          ++index) {
-        const VolumeCurvePoint& upper = PHONE_VOLUME_CURVE[index];
+        const VolumeCurvePoint& upper = SMALL_SPEAKER_VOLUME_CURVE[index];
         if (percent > upper.percent) {
             continue;
         }
 
-        const VolumeCurvePoint& lower = PHONE_VOLUME_CURVE[index - 1];
+        const VolumeCurvePoint& lower = SMALL_SPEAKER_VOLUME_CURVE[index - 1];
         const int32_t percentOffset = percent - lower.percent;
         const int32_t percentSpan = upper.percent - lower.percent;
         const int32_t gainSpan = upper.gainHalfDb - lower.gainHalfDb;
@@ -62,8 +68,9 @@ int16_t gainHalfDbForVolumePercent(uint8_t percent) {
             (percentOffset * gainSpan + percentSpan / 2) / percentSpan);
     }
 
-    return PHONE_VOLUME_CURVE[
-        sizeof(PHONE_VOLUME_CURVE) / sizeof(PHONE_VOLUME_CURVE[0]) - 1]
+    return SMALL_SPEAKER_VOLUME_CURVE[
+        sizeof(SMALL_SPEAKER_VOLUME_CURVE) /
+            sizeof(SMALL_SPEAKER_VOLUME_CURVE[0]) - 1]
         .gainHalfDb;
 }
 
@@ -198,7 +205,7 @@ void AudioService::printStatus(Print& output) const {
     output.print(ready_ ? F("ready") : F("unavailable"));
     output.print(F(" volume="));
     output.print(volumePercent_);
-    output.print(F("% curve=phone"));
+    output.print(F("% curve=small-speaker"));
     if (volumePercent_ == 0) {
         output.print(F(" gain=mute"));
     } else {
