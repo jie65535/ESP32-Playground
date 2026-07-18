@@ -49,6 +49,13 @@ VALID_COMMANDS = (
     "wifi toggle",
     "wifi wizard",
     "wifi wizard cancel",
+    "server status",
+    "server on",
+    "server off",
+    "server toggle",
+    "server connect",
+    "server clear",
+    "server help",
 )
 
 CAPTURE_ACTION = "__capture_screenshot__"
@@ -228,7 +235,12 @@ def normalize_commands(commands: Iterable[str]) -> list[str]:
         if lower_value in VALID_COMMANDS:
             normalized.append(lower_value)
             continue
-        prefixes = ("wifi select ", "wifi ssid ", "wifi password ")
+        prefixes = (
+            "wifi select ",
+            "wifi ssid ",
+            "wifi password ",
+            "server set ",
+        )
         prefix = next((item for item in prefixes if lower_value.startswith(item)), None)
         if prefix is None or not value[len(prefix):]:
             raise ValueError(f"unsupported command: {command}")

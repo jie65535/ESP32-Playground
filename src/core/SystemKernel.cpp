@@ -28,16 +28,33 @@ bool isWifiCommand(AppCommandType type) {
     }
 }
 
+bool isServerCommand(AppCommandType type) {
+    switch (type) {
+        case AppCommandType::ServerSet:
+        case AppCommandType::ServerStatus:
+        case AppCommandType::ServerOn:
+        case AppCommandType::ServerOff:
+        case AppCommandType::ServerToggle:
+        case AppCommandType::ServerConnect:
+        case AppCommandType::ServerClear:
+        case AppCommandType::ServerHelp:
+            return true;
+        default:
+            return false;
+    }
+}
+
 }  // namespace
 
 SystemKernel::SystemKernel()
-    : context_{display_, wifi_, Serial}, appManager_(context_) {}
+    : context_{display_, wifi_, server_, Serial}, appManager_(context_) {}
 
 void SystemKernel::setup() {
     Serial.begin(SERIAL_BAUD);
     delay(50);
     display_.begin();
     wifi_.begin(Serial);
+    server_.begin(Serial);
     console_.begin(Serial);
 
     appManager_.registerApp(systemInfoApp_);
@@ -71,6 +88,7 @@ void SystemKernel::loop() {
     }
 
     wifi_.tick(nowMs);
+    server_.tick(nowMs, wifi_.snapshot());
     appManager_.tick(nowMs);
     if (redrawRequested_ || nowMs - lastRenderMs_ >= RENDER_INTERVAL_MS) {
         lastRenderMs_ = nowMs;
@@ -87,6 +105,7 @@ void SystemKernel::loop() {
             Serial.print(F(" psram="));
             Serial.println(ESP.getFreePsram());
             wifi_.printStatus(Serial);
+            server_.printStatus(Serial);
         }
     }
 }
@@ -121,7 +140,7 @@ void SystemKernel::handleCommand(const AppCommand& command) {
             ConsoleService::printHelp(Serial);
             break;
         default:
-            if (isWifiCommand(command.type)) {
+            if (isWifiCommand(command.type) || isServerCommand(command.type)) {
                 appManager_.activate(AppId::NetworkSettings);
                 appManager_.handleCommand(command);
             } else {

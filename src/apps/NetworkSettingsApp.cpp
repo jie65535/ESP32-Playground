@@ -1,6 +1,7 @@
 #include "apps/NetworkSettingsApp.h"
 
 #include "services/DisplayService.h"
+#include "services/ServerService.h"
 #include "services/WifiService.h"
 
 namespace {
@@ -116,6 +117,32 @@ void NetworkSettingsApp::onCommand(const AppCommand& command,
             context.console.println(F("       wifi select <index> | wifi ssid <name>"));
             context.console.println(F("       wifi password <value> | wifi open"));
             context.console.println(F("       wifi status | wifi reconnect | wifi clear"));
+            break;
+        case AppCommandType::ServerSet:
+            context.server.setTarget(command.value, command.number);
+            break;
+        case AppCommandType::ServerStatus:
+            context.server.printStatus(context.console);
+            break;
+        case AppCommandType::ServerOn:
+            context.server.setEnabled(true);
+            break;
+        case AppCommandType::ServerOff:
+            context.server.setEnabled(false);
+            break;
+        case AppCommandType::ServerToggle:
+            context.server.toggleEnabled();
+            break;
+        case AppCommandType::ServerConnect:
+            context.server.connectNow();
+            break;
+        case AppCommandType::ServerClear:
+            context.server.clearTarget();
+            break;
+        case AppCommandType::ServerHelp:
+            context.console.println(F("Server: server set <host> <port>"));
+            context.console.println(F("        server status | server on | server off"));
+            context.console.println(F("        server connect | server clear"));
             break;
         default:
             break;

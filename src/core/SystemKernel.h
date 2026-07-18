@@ -7,6 +7,7 @@
 #include "core/AppManager.h"
 #include "services/ConsoleService.h"
 #include "services/DisplayService.h"
+#include "services/ServerService.h"
 #include "services/WifiService.h"
 
 class SystemKernel {
@@ -18,6 +19,7 @@ public:
 private:
     DisplayService display_;
     WifiService wifi_;
+    ServerService server_;
     ConsoleService console_;
     AppContext context_;
     AppManager appManager_;

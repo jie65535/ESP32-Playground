@@ -61,6 +61,7 @@ class ConsoleMappingTests(unittest.TestCase):
                     "wifi select 2",
                     "wifi ssid HomeNet",
                     "wifi password AbCd1234",
+                    "server set 192.168.1.4 19000",
                 ]
             ),
             [
@@ -69,6 +70,7 @@ class ConsoleMappingTests(unittest.TestCase):
                 "wifi select 2",
                 "wifi ssid HomeNet",
                 "wifi password AbCd1234",
+                "server set 192.168.1.4 19000",
             ],
         )
         self.assertEqual(

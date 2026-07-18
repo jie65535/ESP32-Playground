@@ -37,6 +37,14 @@ enum class AppCommandType : uint8_t {
     WifiWizard,
     WifiWizardCancel,
     WifiHelp,
+    ServerSet,
+    ServerStatus,
+    ServerOn,
+    ServerOff,
+    ServerToggle,
+    ServerConnect,
+    ServerClear,
+    ServerHelp,
 };
 
 struct AppCommand {
@@ -62,5 +70,24 @@ struct WifiSnapshot {
     int32_t rssi = 0;
     uint32_t reconnectCount = 0;
     int16_t scanCount = -1;
+    String lastError;
+};
+
+enum class ServerState : uint8_t {
+    Disabled,
+    NoTarget,
+    WaitingWifi,
+    Connecting,
+    Connected,
+    Backoff,
+};
+
+struct ServerSnapshot {
+    bool enabled = false;
+    ServerState state = ServerState::Disabled;
+    String host;
+    uint16_t port = 19000;
+    uint32_t reconnectCount = 0;
+    uint32_t messageCount = 0;
     String lastError;
 };

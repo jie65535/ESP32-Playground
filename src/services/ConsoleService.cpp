@@ -95,6 +95,20 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) const
         command.type = AppCommandType::WifiWizardCancel;
     } else if (lower == "wifi help") {
         command.type = AppCommandType::WifiHelp;
+    } else if (lower == "server status") {
+        command.type = AppCommandType::ServerStatus;
+    } else if (lower == "server on") {
+        command.type = AppCommandType::ServerOn;
+    } else if (lower == "server off") {
+        command.type = AppCommandType::ServerOff;
+    } else if (lower == "server toggle") {
+        command.type = AppCommandType::ServerToggle;
+    } else if (lower == "server connect") {
+        command.type = AppCommandType::ServerConnect;
+    } else if (lower == "server clear") {
+        command.type = AppCommandType::ServerClear;
+    } else if (lower == "server help") {
+        command.type = AppCommandType::ServerHelp;
     } else if (lower.startsWith("wifi select ")) {
         String argument = line.substring(12);
         argument.trim();
@@ -113,6 +127,24 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) const
         command.value = line.substring(14);
     } else if (lower == "wifi open") {
         command.type = AppCommandType::WifiOpen;
+    } else if (lower.startsWith("server set ")) {
+        String argument = line.substring(11);
+        const int separator = argument.lastIndexOf(' ');
+        if (separator <= 0) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            const String host = argument.substring(0, separator);
+            const String port = argument.substring(separator + 1);
+            if (host.isEmpty() || !isUnsignedInteger(port)) {
+                command.type = AppCommandType::Unknown;
+                command.value = line;
+            } else {
+                command.type = AppCommandType::ServerSet;
+                command.value = host;
+                command.number = port.toInt();
+            }
+        }
     } else if (!line.isEmpty()) {
         command.type = AppCommandType::Unknown;
         command.value = line;
@@ -127,4 +159,6 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("          wifi password <password> | wifi open"));
     output.println(F("          wifi status | wifi reconnect | wifi clear"));
     output.println(F("          wifi on | wifi off | wifi toggle | wifi wizard"));
+    output.println(F("Server:   server set <host> <port> | server status"));
+    output.println(F("          server on | server off | server connect | server clear"));
 }

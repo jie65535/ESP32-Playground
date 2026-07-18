@@ -6,10 +6,12 @@
 
 class DisplayService;
 class WifiService;
+class ServerService;
 
 struct AppContext {
     DisplayService& display;
     WifiService& wifi;
+    ServerService& server;
     Stream& console;
 };
 
