@@ -29,7 +29,7 @@ void SystemInfoApp::onTick(uint32_t nowMs, AppContext&) {
 
 lv_obj_t* SystemInfoApp::onCreateView(AppContext& context) {
     root_ = context.ui.createPageRoot("DEVICE / SYSTEM", "System",
-                                      "The board behind PlaygroundOS  /  B returns");
+                                      "The board behind PlaygroundOS");
 
     UiCard identity = context.ui.createCard(
         root_, 76, LV_SYMBOL_SETTINGS, "ESP32-S3",

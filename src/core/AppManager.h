@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/App.h"
+#include "ui/UiRuntime.h"
 
 class AppManager {
 public:
@@ -11,7 +12,8 @@ public:
     void handleCommand(const AppCommand& command);
     void tick(uint32_t nowMs);
     void render();
-    bool activate(AppId id);
+    bool activate(AppId id,
+                  UiPageTransition transition = UiPageTransition::Forward);
     AppId currentId() const;
     const char* currentName() const;
 

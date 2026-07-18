@@ -81,10 +81,25 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持�
 ```text
 采集输入/服务事件 → AppManager 路由 → 当前 App 更新视图 → lv_timer_handler → 局部 flush
 
-导航语义遵循手机式分层：Launcher 接收四方向键移动应用选择，`Confirm` 进入应用；进入前台应用后，四方向键只交给当前应用处理，不再跨应用切换；`Backspace/Back` 返回 Launcher，`Home` 仍表示直接回到桌面。调试控制台仍可使用 `page system` 等显式命令直达页面。
+导航语义遵循手机式分层：Launcher 接收方向键移动应用选择，`Confirm` 进入应用；进入前台应用后，方向键只交给当前应用处理，不再跨应用切换；`Backspace/Back` 返回 Launcher，`Home` 仍表示直接回到桌面。调试控制台仍可使用 `page system` 等显式命令直达页面。
 ```
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
+
+页面转场区分进入和返回：进入前台应用使用 `Forward`（新页面从右侧进入），返回 Launcher 使用 `Backward`（桌面从左侧进入、当前应用向右退出）。遥测刷新不能调用页面转场，也不能重播焦点动画。
+
+### Peak 项目的可迁移经验
+
+Peak 的 6050 固件实际安装的功能页主要是 `SystemInfos` 和 `Scene3D`，数量并不多；值得迁移的是机制而不是页面数量：
+
+- `PageManager` 的 Push/Pop 页面栈，让返回语义天然对应上一级页面，而不是硬编码跳到某个应用。
+- `PageBase` 的 Load/Appear/Disappear/Unload 生命周期，把周期任务、订阅和资源释放绑定到页面生命周期。
+- `SystemInfos` 的焦点分组、滚动信息卡和 overshoot 过渡，适合 PGOS 的无触摸按键操作。
+- `AccountBroker` 把 HAL 数据发布给页面，PGOS 对应的方向是 Service snapshot + App view 更新，避免页面直接读硬件。
+- `ResourcePool` 和状态栏图标体系，适合未来统一管理字体、图标、BLE/SD/电池/网络状态。
+- `Scene3D` 说明“硬件实验也是 App”，但它应在传感器或图形实验完成后再加入注册表，不能先放一个无数据的占位页面。
+
+PGOS 暂不复制 Peak 的高优先级 LVGL 任务、旧版页面缓存实现和硬件相关代码；当前单主循环、单前台 App、显式 Service 所有权更适合 Vibe Coding 和逐项真机验证。
 
 事件使用小型枚举/结构体和有界队列，避免跨模块共享可变全局状态。服务回调只入队，不直接调用应用和 UI。
 

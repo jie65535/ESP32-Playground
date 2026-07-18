@@ -18,6 +18,12 @@ struct UiCard {
     lv_coord_t focusedWidth = 296;
 };
 
+enum class UiPageTransition : uint8_t {
+    Forward,
+    Backward,
+    None,
+};
+
 class UiRuntime {
 public:
     explicit UiRuntime(DisplayService& display);
@@ -38,7 +44,8 @@ public:
                              const char* value, int16_t y,
                              lv_obj_t** valueLabel = nullptr);
 
-    void replacePage(lv_obj_t* page);
+    void replacePage(lv_obj_t* page,
+                     UiPageTransition transition = UiPageTransition::Forward);
     lv_obj_t* currentPage() const;
 
     void updateStatus(const WifiSnapshot& wifi, const ServerSnapshot& server,

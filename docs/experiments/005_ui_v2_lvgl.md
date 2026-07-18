@@ -19,7 +19,7 @@
 - 深色背景、暖橙强调色、灰色次要信息和统一的 22px 状态栏。
 - 桌面使用图标卡片；当前焦点卡片会进行位置/宽度 overshoot 动画。
 - 网络、系统页的状态卡在遥测刷新时不再重复播放焦点动画；动画只用于用户选择或页面切换。
-- 导航采用手机式分层：桌面四方向移动应用选择，Enter 进入；应用内方向键由当前应用处理，Backspace 返回桌面。
+- 导航采用手机式分层：桌面方向键移动应用选择，Enter 进入；应用内方向键由当前应用处理，Backspace 返回桌面。
 - Wi-Fi 扫描使用列表行，SSID、RSSI 和选择状态在屏幕上显示；密码仍只通过隐藏 USB 控制台输入。
 - 页面转场由 `UiRuntime` 统一处理，应用不直接触摸屏幕总线。
 
@@ -40,7 +40,7 @@ python tools/capture_screen.py --port COM3 --output captures/pgos_ui_v2_final.pn
 真机结果：
 
 - 桌面、焦点移动、Display、System、Network 页面截图通过。
-- 二维桌面导航通过：Right+Enter 进入 Color Lab，应用内 Down 不会切换到下一应用，Back 返回桌面。
+- 分层导航通过：Right+Enter 进入 Color Lab，应用内 Down 不会切换到下一应用，Back 返回桌面。
 - Wi-Fi 仍为 `connected`，IP `192.168.1.6`，RSSI 约 `-16 dBm`，重连次数 0。
 - TCP 目标 `192.168.1.4:19000` 配置保留，控制服务关闭时状态栏显示 `TCP OFF`。
 - Wi-Fi 扫描页显示非阻塞扫描状态，扫描列表显示 SSID 和 RSSI。
@@ -49,7 +49,6 @@ python tools/capture_screen.py --port COM3 --output captures/pgos_ui_v2_final.pn
 截图：
 
 - [UI v2 桌面](../../captures/pgos_ui_v2_final.png)
-- [二维导航桌面](../../captures/pgos_ui_v2_grid_navigation.png)
 - [UI v2 网络页](../../captures/pgos_ui_v2_network_final.png)
 - [UI v2 Wi-Fi 扫描中](../../captures/pgos_ui_v2_wifi_scanning.png)
 - [UI v2 Wi-Fi 列表](../../captures/pgos_ui_v2_wifi_selection.png)

@@ -41,7 +41,7 @@ void AppManager::render() {
     }
 }
 
-bool AppManager::activate(AppId id) {
+bool AppManager::activate(AppId id, UiPageTransition transition) {
     for (uint8_t index = 0; index < appCount_; ++index) {
         if (apps_[index]->id() != id) {
             continue;
@@ -55,7 +55,7 @@ bool AppManager::activate(AppId id) {
         currentIndex_ = index;
         apps_[currentIndex_]->onEnter(context_);
         lv_obj_t* page = apps_[currentIndex_]->onCreateView(context_);
-        context_.ui.replacePage(page);
+        context_.ui.replacePage(page, transition);
         active_ = true;
         apps_[currentIndex_]->onUpdateView(context_);
         return true;

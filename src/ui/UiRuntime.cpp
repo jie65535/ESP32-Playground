@@ -194,7 +194,7 @@ lv_obj_t* UiRuntime::createValueRow(lv_obj_t* parent, const char* labelText,
     return value;
 }
 
-void UiRuntime::replacePage(lv_obj_t* page) {
+void UiRuntime::replacePage(lv_obj_t* page, UiPageTransition transition) {
     if (page == nullptr) {
         return;
     }
@@ -207,17 +207,26 @@ void UiRuntime::replacePage(lv_obj_t* page) {
     previousPage_ = activePage_;
     activePage_ = page;
 
-    if (previousPage_ == nullptr) {
+    if (previousPage_ == nullptr || transition == UiPageTransition::None) {
         lv_obj_set_x(page, 0);
+        if (transition == UiPageTransition::None && previousPage_ != nullptr) {
+            lv_obj_delete(previousPage_);
+            previousPage_ = nullptr;
+        }
         return;
     }
 
-    lv_obj_set_x(page, DisplayService::SCREEN_WIDTH);
+    const bool backward = transition == UiPageTransition::Backward;
+    lv_obj_set_x(page, backward ? -DisplayService::SCREEN_WIDTH
+                                : DisplayService::SCREEN_WIDTH);
 
     lv_anim_t animation;
     lv_anim_init(&animation);
     lv_anim_set_var(&animation, page);
-    lv_anim_set_values(&animation, DisplayService::SCREEN_WIDTH, 0);
+    lv_anim_set_values(&animation,
+                       backward ? -DisplayService::SCREEN_WIDTH
+                                 : DisplayService::SCREEN_WIDTH,
+                       0);
     lv_anim_set_duration(&animation, 220);
     lv_anim_set_path_cb(&animation, lv_anim_path_ease_out);
     lv_anim_set_exec_cb(&animation, setObjX);
@@ -228,7 +237,7 @@ void UiRuntime::replacePage(lv_obj_t* page) {
     lv_anim_t oldAnimation;
     lv_anim_init(&oldAnimation);
     lv_anim_set_var(&oldAnimation, previousPage_);
-    lv_anim_set_values(&oldAnimation, 0, -24);
+    lv_anim_set_values(&oldAnimation, 0, backward ? 24 : -24);
     lv_anim_set_duration(&oldAnimation, 220);
     lv_anim_set_path_cb(&oldAnimation, lv_anim_path_ease_in);
     lv_anim_set_exec_cb(&oldAnimation, setObjX);

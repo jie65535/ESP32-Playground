@@ -268,7 +268,7 @@ void NetworkSettingsApp::buildHeader(AppContext& context,
 void NetworkSettingsApp::buildInactive(AppContext& context,
                                        const WifiSnapshot& snapshot) {
     buildHeader(context, "NETWORK / RADIO", "Connectivity",
-                "Enter toggles Wi-Fi  /  W opens setup  /  B returns");
+                "Wi-Fi station and wireless console");
 
     const String title = snapshot.ssid.isEmpty()
                              ? String("Wi-Fi Station")
@@ -312,7 +312,7 @@ void NetworkSettingsApp::buildScanning(AppContext& context) {
 
 void NetworkSettingsApp::buildSelection(AppContext& context) {
     buildHeader(context, "NETWORK / SETUP", "Choose a network",
-                "Arrow keys move  /  Enter selects  /  B returns");
+                "Nearby 2.4 GHz networks");
     const int16_t count = context.wifi.scanCount();
     for (uint8_t row = 0; row < VISIBLE_ROWS; ++row) {
         const int16_t index = windowStart_ + row;
@@ -349,7 +349,7 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
 
 void NetworkSettingsApp::buildPassword(AppContext& context) {
     buildHeader(context, "NETWORK / SETUP", "Network selected",
-                "Password entry stays on USB  /  B returns");
+                "Credential entry continues on the trusted USB console");
     const String ssid = shorten(context.wifi.selectedSsid(), 28);
     UiCard selected = context.ui.createCard(root_, 84, LV_SYMBOL_WIFI,
                                             ssid.c_str(), "credential required");

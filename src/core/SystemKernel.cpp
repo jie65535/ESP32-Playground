@@ -175,7 +175,7 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
     switch (command.type) {
         case AppCommandType::Back:
         case AppCommandType::Home:
-            appManager_.activate(AppId::Launcher);
+            appManager_.activate(AppId::Launcher, UiPageTransition::Backward);
             break;
         case AppCommandType::PageSystem:
             appManager_.activate(AppId::SystemInfo);
