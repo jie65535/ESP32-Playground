@@ -77,6 +77,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageDisplaySettings;
     } else if (lower == "page sound") {
         command.type = AppCommandType::PageSound;
+    } else if (lower == "page rgb") {
+        command.type = AppCommandType::PageRgb;
     } else if (lower == "page console") {
         command.type = AppCommandType::PageConsole;
     } else if (lower == "page network") {
@@ -201,7 +203,7 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
 void ConsoleService::printHelp(Print& output) {
     output.println(F("Commands: up | down | left | right | ok | back | home"));
     output.println(F("         page system | page display | page settings | page sound"));
-    output.println(F("         page console | page network"));
+    output.println(F("         page rgb | page console | page network"));
     output.println(F("          color_test | screenshot | status | help"));
     output.println(F("Wi-Fi:    wifi scan | wifi select <index> | wifi ssid <name>"));
     output.println(F("          wifi password <password> | wifi open"));

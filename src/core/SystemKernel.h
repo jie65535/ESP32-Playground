@@ -3,6 +3,7 @@
 #include "apps/DisplayTestApp.h"
 #include "apps/DisplaySettingsApp.h"
 #include "apps/SoundSettingsApp.h"
+#include "apps/RgbSettingsApp.h"
 #include "apps/ConsoleSettingsApp.h"
 #include "apps/LauncherApp.h"
 #include "apps/NetworkSettingsApp.h"
@@ -13,6 +14,7 @@
 #include "services/BenchmarkService.h"
 #include "services/AudioService.h"
 #include "services/DisplayService.h"
+#include "services/RgbService.h"
 #include "services/ServerService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
@@ -29,6 +31,7 @@ private:
     DisplayService display_;
     UiRuntime ui_;
     AudioService audio_;
+    RgbService rgb_;
     WifiService wifi_;
     ServerService server_;
     MirrorService mirror_;
@@ -42,6 +45,7 @@ private:
     DisplayTestApp displayTestApp_;
     DisplaySettingsApp displaySettingsApp_;
     SoundSettingsApp soundSettingsApp_;
+    RgbSettingsApp rgbSettingsApp_;
     ConsoleSettingsApp consoleSettingsApp_;
     NetworkSettingsApp networkSettingsApp_;
     LauncherApp launcherApp_;

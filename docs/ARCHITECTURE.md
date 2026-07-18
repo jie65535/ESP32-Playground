@@ -22,7 +22,7 @@ SystemKernel / AppManager
        ├── Storage / SettingsStore
        ├── WiFi / BLE
        ├── Console / Server / MirrorTransport
-       └── Audio / Time
+       └── Audio / RGB / Time
 ```
 
 依赖只能向下：应用不能互相包含，UI 不直接调用 `WiFi`/`Preferences`，网络回调不能直接绘屏，服务也不依赖具体应用。
@@ -73,6 +73,7 @@ public:
 - `RuntimeMonitorService`：采样主循环 duty、Heap/PSRAM、Flash/OTA 和任务数；不读取或修改具体 App 状态。
 - `TimeService`：单调时钟、NTP 和时区。
 - `AudioService`：ES8311 与 I²S、音量、反馈音和试听；需要实时性时可拥有独立任务。
+- `RgbService`：GPIO42 板载 WS2812 的电源、颜色和非阻塞灯效状态机；应用只修改参数，不直接发送 RMT 波形。
 
 Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备只需要保存目标服务器主机/IP + 控制端口，并在网络恢复后自动重连；镜像、画面推送、音频流和录制属于上位机能力，不在设备设置中复制一套开关。
 

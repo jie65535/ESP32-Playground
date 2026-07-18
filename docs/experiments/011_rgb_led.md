@@ -1,0 +1,65 @@
+# 实验 011：板载 RGB LED 灯光应用
+
+> 日期：2026-07-19  
+> 状态：固件构建与主机测试通过，等待真机灯效确认
+
+## 目标
+
+- 验证 ES3N28P 板载 WS2812 与 GPIO42 基线。
+- 把 RGB 做成独立系统服务，而不是在页面或 `main` 中直接写时序。
+- 灯效必须非阻塞，不影响 LVGL、Wi-Fi、镜像或音频。
+- 提供一个符合现有手机式导航的可滚动 RGB Light App。
+
+## 实现
+
+`RgbService` 使用 Arduino-ESP32 自带的 RMT `neopixelWrite()` 发送单颗 WS2812 的
+GRB 数据，不增加第三方库。一次发送约 30µs；颜色没有变化时不重复发送。
+
+默认行为：
+
+- 上电关闭，避免启动时产生强光。
+- 默认效果为 Rainbow、亮度 40%、速度 Normal。
+- 设置只在当前运行会话中保存，第一版不写 NVS。
+- 离开 RGB Light 页面后灯效继续运行；服务生命周期不依赖页面生命周期。
+
+页面提供五个设置：
+
+1. Power：灯光开关。
+2. Effect：Solid、Breathe、Rainbow、Heartbeat、Sparkle。
+3. Palette：Cyan、Violet、Rose、Amber、Green、Blue、White。
+4. Brightness：10%、25%、40%、60%、80%、100%。
+5. Speed：Slow、Normal、Fast。
+
+上下移动焦点，左右调整，回车执行当前设置；Backspace/Back 返回桌面。呼吸、彩虹
+和心跳使用 `millis()` 相位推进，Sparkle 使用有界伪随机亮度，不调用长时间 `delay()`。
+
+## 构建与测试
+
+```powershell
+pio run -e playground
+python -m unittest discover -s tools/tests -q
+python -m py_compile tools/playground_console.py tools/pgos_studio.py
+```
+
+构建结果：
+
+- RAM：53292 / 327680 bytes（16.3%）。
+- Flash：1170205 / 6553600 bytes（17.9%）。
+- Python：13 项测试通过。
+
+烧录和打开页面：
+
+```powershell
+pio run -e playground -t upload --upload-port COM3
+python tools/playground_console.py --port COM3 --command "page rgb"
+```
+
+## 真机待测
+
+- Power On 后板载 LED 是否立即显示默认彩虹。
+- 七种调色板的 RGB 顺序是否正确，尤其是红/绿是否互换。
+- 10%～100% 亮度是否有足够可用范围，100% 白色是否引起供电或 Wi-Fi 异常。
+- 五种灯效在 Slow/Normal/Fast 下是否连续、无明显卡顿。
+- 灯效运行时页面动画、无线控制、镜像和音频是否仍正常。
+
+真机确认后再决定是否增加 NVS 持久化、通知灯语义、音乐律动或从上位机推送灯光场景。

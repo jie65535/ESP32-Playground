@@ -45,6 +45,10 @@ class ConsoleMappingTests(unittest.TestCase):
             "page console",
         )
         self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "7")),
+            "page rgb",
+        )
+        self.assertEqual(
             CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "c")),
             "color_test",
         )

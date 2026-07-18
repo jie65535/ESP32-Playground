@@ -59,6 +59,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageDisplay:
         case AppCommandType::PageDisplaySettings:
         case AppCommandType::PageSound:
+        case AppCommandType::PageRgb:
         case AppCommandType::PageConsole:
         case AppCommandType::PageNetwork:
         case AppCommandType::ColorTest:
@@ -116,7 +117,7 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
-      context_{display_, audio_, wifi_, server_, Serial, ui_, runtime_},
+      context_{display_, audio_, rgb_, wifi_, server_, Serial, ui_, runtime_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
@@ -125,6 +126,7 @@ void SystemKernel::setup() {
     display_.begin();
     uiReady_ = ui_.begin();
     audio_.begin(Serial);
+    rgb_.begin(Serial);
     wifi_.begin(Serial);
     server_.begin(Serial);
     mirror_.begin(Serial);
@@ -137,6 +139,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(displayTestApp_);
         appManager_.registerApp(displaySettingsApp_);
         appManager_.registerApp(soundSettingsApp_);
+        appManager_.registerApp(rgbSettingsApp_);
         appManager_.registerApp(consoleSettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(launcherApp_);
@@ -196,6 +199,7 @@ void SystemKernel::loop() {
     runtime_.recordStage(
         RuntimeMonitorService::Stage::Audio,
         static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    rgb_.tick(nowMs);
     stageStartedUs = esp_timer_get_time();
     display_.tick(nowMs);
     runtime_.recordStage(
@@ -252,6 +256,7 @@ void SystemKernel::loop() {
             benchmark_.printStatus(Serial);
             display_.printStatus(Serial);
             audio_.printStatus(Serial);
+            rgb_.printStatus(Serial);
             runtime_.printStatus(Serial);
         }
     }
@@ -292,6 +297,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageSound:
             appManager_.activate(AppId::SoundSettings);
+            break;
+        case AppCommandType::PageRgb:
+            appManager_.activate(AppId::RgbSettings);
             break;
         case AppCommandType::PageConsole:
             appManager_.activate(AppId::ConsoleSettings);
@@ -406,6 +414,7 @@ void SystemKernel::printStatus() {
     benchmark_.printStatus(Serial);
     display_.printStatus(Serial);
     audio_.printStatus(Serial);
+    rgb_.printStatus(Serial);
     runtime_.printStatus(Serial);
 }
 

@@ -31,6 +31,8 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 
 声音基座已加入最小实验：ES8311/I²S 播放固定 1 kHz 反馈音，声音页支持音量、交互反馈音开关和试听；默认音量 60%、反馈音关闭，初始化失败时页面仍可显示并报告 unavailable。
 
+RGB 基座已加入最小实验：`RgbService` 通过 GPIO42/RMT 驱动板载 WS2812，默认关闭且不写入 NVS；RGB Light App 可调电源、灯效、基色、亮度和速度，静态、呼吸、彩虹、心跳和闪烁均由非阻塞状态机运行，离开页面后仍可继续作为后台灯光服务。
+
 ## 随后：PGOS Studio 媒体与工具能力
 
 - UDP 19003 / mDNS 服务发现：设备发现 Studio、Studio beacon 唤醒设备重连，并以持久化 `server_id` 防止误连。
@@ -63,7 +65,7 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 
 按一次只探索一个外设或协议：
 
-- RGB 和按键
+- 实体按键
 - ES8311 播放
 - 麦克风采集
 - I²C 扫描和 PCF8563
