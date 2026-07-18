@@ -314,6 +314,7 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
     buildHeader(context, "NETWORK / SETUP", "Choose a network",
                 "Nearby 2.4 GHz networks");
     const int16_t count = context.wifi.scanCount();
+    lv_obj_t* selectedItem = nullptr;
     for (uint8_t row = 0; row < VISIBLE_ROWS; ++row) {
         const int16_t index = windowStart_ + row;
         if (index >= count) {
@@ -334,6 +335,9 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
         lv_obj_set_style_border_width(item, selected ? 1 : 0, 0);
         lv_obj_set_style_border_color(item, context.ui.accent(), 0);
         lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE);
+        if (selected) {
+            selectedItem = item;
+        }
 
         context.ui.createLabel(item, selected ? ">" : "", 7, 2, 12,
                                context.ui.accent());
@@ -345,6 +349,7 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
             item, signal.c_str(), 274, 2, 12, context.ui.muted());
         lv_obj_align(signalLabel, LV_ALIGN_RIGHT_MID, -7, 0);
     }
+    context.ui.centerFocused(root_, selectedItem);
 }
 
 void NetworkSettingsApp::buildPassword(AppContext& context) {

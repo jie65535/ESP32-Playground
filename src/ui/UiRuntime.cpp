@@ -8,31 +8,6 @@ namespace {
 
 constexpr uint32_t STATUS_UPDATE_INTERVAL_MS = 250;
 
-const char* wifiStateName(WifiState state) {
-    switch (state) {
-        case WifiState::Disabled: return "OFF";
-        case WifiState::NoCredentials: return "SETUP";
-        case WifiState::Ready: return "READY";
-        case WifiState::Scanning: return "SCAN";
-        case WifiState::Connecting: return "LINK";
-        case WifiState::Connected: return "ONLINE";
-        case WifiState::Backoff: return "RETRY";
-        default: return "?";
-    }
-}
-
-const char* serverStateName(ServerState state) {
-    switch (state) {
-        case ServerState::Disabled: return "OFF";
-        case ServerState::NoTarget: return "TARGET";
-        case ServerState::WaitingWifi: return "WIFI";
-        case ServerState::Connecting: return "LINK";
-        case ServerState::Connected: return "ONLINE";
-        case ServerState::Backoff: return "RETRY";
-        default: return "?";
-    }
-}
-
 }  // namespace
 
 UiRuntime::UiRuntime(DisplayService& display) : display_(display) {}
@@ -104,12 +79,14 @@ lv_obj_t* UiRuntime::createPageRoot(const char* eyebrow, const char* title,
     lv_obj_set_pos(root, 0, 22);
     lv_obj_set_style_bg_color(root, background(), 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(root, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(root, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_pad_bottom(root, 72, 0);
 
-    createLabel(root, eyebrow, 16, 10, 12, accent());
-    createLabel(root, title, 16, 27, 24, text());
+    (void)eyebrow;
+    createLabel(root, title, 16, 12, 24, text());
     if (subtitle != nullptr) {
-        createLabel(root, subtitle, 17, 57, 12, muted());
+        createLabel(root, subtitle, 17, 43, 12, muted());
     }
     return root;
 }
@@ -170,6 +147,43 @@ void UiRuntime::setCardFocused(UiCard& card, bool focused, bool animated) {
         lv_obj_set_width(card.root,
                          focused ? card.focusedWidth : card.normalWidth);
     }
+}
+
+void UiRuntime::centerFocused(lv_obj_t* scrollable, lv_obj_t* focused,
+                              bool animated) {
+    if (scrollable == nullptr || focused == nullptr) {
+        return;
+    }
+
+    lv_obj_update_layout(scrollable);
+    lv_area_t viewportArea;
+    lv_area_t focusedArea;
+    lv_obj_get_coords(scrollable, &viewportArea);
+    lv_obj_get_coords(focused, &focusedArea);
+
+    const int32_t current = lv_obj_get_scroll_y(scrollable);
+    const int32_t viewportCenter =
+        (viewportArea.y1 + viewportArea.y2) / 2 + 18;
+    const int32_t focusedCenter = (focusedArea.y1 + focusedArea.y2) / 2;
+    int32_t target = current + focusedCenter - viewportCenter;
+    const int32_t minimum = current - lv_obj_get_scroll_top(scrollable);
+    const int32_t maximum = current + lv_obj_get_scroll_bottom(scrollable);
+    target = max(minimum, min(target, maximum));
+
+    lv_anim_delete(scrollable, setObjScrollY);
+    if (!animated || target == current) {
+        lv_obj_scroll_to_y(scrollable, target, LV_ANIM_OFF);
+        return;
+    }
+
+    lv_anim_t animation;
+    lv_anim_init(&animation);
+    lv_anim_set_var(&animation, scrollable);
+    lv_anim_set_values(&animation, current, target);
+    lv_anim_set_duration(&animation, 240);
+    lv_anim_set_path_cb(&animation, lv_anim_path_ease_out);
+    lv_anim_set_exec_cb(&animation, setObjScrollY);
+    lv_anim_start(&animation);
 }
 
 lv_obj_t* UiRuntime::createLabel(lv_obj_t* parent, const char* textValue,
@@ -250,35 +264,37 @@ lv_obj_t* UiRuntime::currentPage() const {
 
 void UiRuntime::updateStatus(const WifiSnapshot& wifi,
                              const ServerSnapshot& server, uint32_t nowMs) {
-    if (!ready_ || statusWifi_ == nullptr ||
+    if (!ready_ || statusWifiIcon_ == nullptr ||
         nowMs - lastStatusMs_ < STATUS_UPDATE_INTERVAL_MS) {
         return;
     }
     lastStatusMs_ = nowMs;
 
-    String wifiText = "WiFi ";
-    if (wifi.state == WifiState::Connected) {
-        wifiText += wifi.rssi;
+    const bool wifiVisible = wifi.state != WifiState::Disabled &&
+                             wifi.state != WifiState::NoCredentials;
+    if (wifiVisible) {
+        lv_obj_clear_flag(statusWifiIcon_, LV_OBJ_FLAG_HIDDEN);
+        lv_color_t wifiColor = muted();
+        if (wifi.state == WifiState::Connected) {
+            wifiColor = wifi.rssi >= -60 ? text()
+                        : wifi.rssi >= -75 ? muted()
+                                           : dim();
+        }
+        lv_obj_set_style_text_color(
+            statusWifiIcon_, wifiColor, 0);
     } else {
-        wifiText += wifiStateName(wifi.state);
+        lv_obj_add_flag(statusWifiIcon_, LV_OBJ_FLAG_HIDDEN);
     }
-    lv_label_set_text(statusWifi_, wifiText.c_str());
-    lv_obj_set_style_text_color(statusWifi_,
-                                wifi.state == WifiState::Connected ? text()
-                                                                  : muted(),
-                                0);
 
-    String serverText = server.state == ServerState::Connected
-                            ? String("TCP ON")
-                            : String("TCP ") + serverStateName(server.state);
-    lv_label_set_text(statusServer_, serverText.c_str());
-    lv_obj_set_style_text_color(statusServer_,
-                                server.state == ServerState::Connected ? accent()
-                                                                       : muted(),
-                                0);
-
-    String memoryText = String(ESP.getFreeHeap() / 1024U) + "K";
-    lv_label_set_text(statusMemory_, memoryText.c_str());
+    const bool serverVisible = server.state != ServerState::Disabled;
+    if (serverVisible) {
+        lv_obj_clear_flag(statusServerIcon_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(
+            statusServerIcon_,
+            server.state == ServerState::Connected ? accent() : muted(), 0);
+    } else {
+        lv_obj_add_flag(statusServerIcon_, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 lv_color_t UiRuntime::background() const {
@@ -345,6 +361,10 @@ void UiRuntime::setObjWidth(void* object, int32_t value) {
     lv_obj_set_width(static_cast<lv_obj_t*>(object), value);
 }
 
+void UiRuntime::setObjScrollY(void* object, int32_t value) {
+    lv_obj_scroll_to_y(static_cast<lv_obj_t*>(object), value, LV_ANIM_OFF);
+}
+
 void UiRuntime::onPageTransitionFinished(lv_anim_t* animation) {
     auto* runtime = static_cast<UiRuntime*>(animation->user_data);
     if (runtime != nullptr) {
@@ -401,10 +421,9 @@ void UiRuntime::createStatusBar() {
     lv_obj_set_style_bg_opa(line, LV_OPA_COVER, 0);
 
     createLabel(statusBar_, "PGOS", 10, 3, 14, text());
-    statusWifi_ = createLabel(statusBar_, "WiFi SETUP", 78, 4, 11, muted());
-    statusServer_ = createLabel(statusBar_, "TCP OFF", 166, 4, 11, muted());
-    statusMemory_ = createLabel(statusBar_, "--", 252, 4, 10, dim());
-    lv_obj_set_width(statusMemory_, 58);
-    lv_label_set_long_mode(statusMemory_, LV_LABEL_LONG_CLIP);
-    lv_obj_align(statusMemory_, LV_ALIGN_RIGHT_MID, -8, -1);
+    statusWifiIcon_ = createLabel(statusBar_, LV_SYMBOL_WIFI, 80, 2, 16,
+                                  muted());
+    lv_obj_add_flag(statusWifiIcon_, LV_OBJ_FLAG_HIDDEN);
+    statusServerIcon_ = createLabel(statusBar_, LV_SYMBOL_UPLOAD, 116, 2, 16,
+                                    muted());
 }

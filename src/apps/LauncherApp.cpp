@@ -9,7 +9,8 @@ const char* itemName(uint8_t index) {
         case 0: return "System";
         case 1: return "Color Lab";
         case 2: return "Display";
-        case 3: return "Connectivity";
+        case 3: return "Sound";
+        case 4: return "Connectivity";
         default: return "Unknown";
     }
 }
@@ -19,7 +20,8 @@ const char* itemDescription(uint8_t index) {
         case 0: return "memory, silicon and runtime";
         case 1: return "display and visual experiments";
         case 2: return "brightness and screen timeout";
-        case 3: return "Wi-Fi, IP and TCP console";
+        case 3: return "volume and interaction feedback";
+        case 4: return "Wi-Fi, IP and TCP console";
         default: return "";
     }
 }
@@ -29,7 +31,8 @@ const char* itemSymbol(uint8_t index) {
         case 0: return LV_SYMBOL_SETTINGS;
         case 1: return LV_SYMBOL_IMAGE;
         case 2: return LV_SYMBOL_EYE_OPEN;
-        case 3: return LV_SYMBOL_WIFI;
+        case 3: return LV_SYMBOL_VOLUME_MAX;
+        case 4: return LV_SYMBOL_WIFI;
         default: return LV_SYMBOL_LIST;
     }
 }
@@ -39,7 +42,8 @@ AppId itemApp(uint8_t index) {
         case 0: return AppId::SystemInfo;
         case 1: return AppId::DisplayTest;
         case 2: return AppId::DisplaySettings;
-        case 3: return AppId::NetworkSettings;
+        case 3: return AppId::SoundSettings;
+        case 4: return AppId::NetworkSettings;
         default: return AppId::Count;
     }
 }
@@ -81,18 +85,11 @@ void LauncherApp::onCommand(const AppCommand& command, AppContext&) {
 void LauncherApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* LauncherApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("PLAYGROUND / HOME", "Applications",
-                                      "Explore the board, one experiment at a time");
+    root_ = context.ui.createPageRoot("PLAYGROUND / HOME", "Applications");
     for (uint8_t index = 0; index < ITEM_COUNT; ++index) {
-        const int16_t y = 74 + static_cast<int16_t>(index) * 36;
         cards_[index] = context.ui.createCard(
-            root_, y,
+            root_, 58 + static_cast<int16_t>(index) * 50,
             itemSymbol(index), itemName(index), itemDescription(index));
-        lv_obj_set_size(cards_[index].root, 280, 34);
-        lv_obj_set_size(cards_[index].icon, 26, 26);
-        lv_obj_set_pos(cards_[index].icon, 7, 4);
-        lv_obj_set_pos(cards_[index].title, 45, 3);
-        lv_obj_set_pos(cards_[index].subtitle, 46, 19);
     }
     return root_;
 }
@@ -104,6 +101,7 @@ void LauncherApp::onUpdateView(AppContext& context) {
     for (uint8_t index = 0; index < ITEM_COUNT; ++index) {
         context.ui.setCardFocused(cards_[index], index == selected_);
     }
+    context.ui.centerFocused(root_, cards_[selected_].root);
     renderedSelection_ = static_cast<int8_t>(selected_);
 }
 

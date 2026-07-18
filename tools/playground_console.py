@@ -42,6 +42,7 @@ VALID_COMMANDS = (
     "page system",
     "page display",
     "page settings",
+    "page sound",
     "page network",
     "wifi scan",
     "wifi status",
@@ -74,6 +75,7 @@ SHORTCUTS = {
     "2": "page display",
     "3": "page network",
     "4": "page settings",
+    "5": "page sound",
     "c": "color_test",
     "r": "status",
     "h": "help",
@@ -277,7 +279,7 @@ def list_ports() -> list[str]:
 def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
-    print("  1/0 system   2 color lab   3 network   4 display settings")
+    print("  1/0 system   2 color lab   3 network   4 display   5 sound")
     print("  Backspace back   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")
     print("  Desktop: arrows move, Enter opens; apps keep their own controls")

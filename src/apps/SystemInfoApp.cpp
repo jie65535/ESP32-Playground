@@ -28,20 +28,19 @@ void SystemInfoApp::onTick(uint32_t nowMs, AppContext&) {
 }
 
 lv_obj_t* SystemInfoApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("DEVICE / SYSTEM", "System",
-                                      "The board behind PlaygroundOS");
+    root_ = context.ui.createPageRoot("DEVICE / SYSTEM", "System");
 
     UiCard identity = context.ui.createCard(
-        root_, 76, LV_SYMBOL_SETTINGS, "ESP32-S3",
+        root_, 58, LV_SYMBOL_SETTINGS, "ESP32-S3",
         "ES3N28P  /  R8N16  /  240 MHz");
     identity.normalX = 12;
     identity.normalWidth = 296;
     context.ui.setCardFocused(identity, false, false);
 
-    context.ui.createValueRow(root_, "UPTIME", "--", 126, &uptimeValue_);
-    context.ui.createValueRow(root_, "FREE HEAP", "--", 148, &heapValue_);
-    context.ui.createValueRow(root_, "FREE PSRAM", "--", 170, &psramValue_);
-    context.ui.createValueRow(root_, "FLASH", "--", 192, &flashValue_);
+    context.ui.createValueRow(root_, "UPTIME", "--", 108, &uptimeValue_);
+    context.ui.createValueRow(root_, "FREE HEAP", "--", 130, &heapValue_);
+    context.ui.createValueRow(root_, "FREE PSRAM", "--", 152, &psramValue_);
+    context.ui.createValueRow(root_, "FLASH", "--", 174, &flashValue_);
     return root_;
 }
 

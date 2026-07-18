@@ -66,12 +66,11 @@ void DisplaySettingsApp::onCommand(const AppCommand& command,
 void DisplaySettingsApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* DisplaySettingsApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("DISPLAY / SYSTEM", "Display",
-                                      "Brightness and power behavior");
+    root_ = context.ui.createPageRoot("DISPLAY / SYSTEM", "Display");
 
-    rows_[0] = context.ui.createCard(root_, 78, LV_SYMBOL_EYE_OPEN,
+    rows_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_EYE_OPEN,
                                      "Brightness", "Backlight intensity");
-    rows_[1] = context.ui.createCard(root_, 128, LV_SYMBOL_POWER,
+    rows_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_POWER,
                                      "Screen timeout", "Idle backlight timer");
 
     for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
@@ -110,6 +109,7 @@ void DisplaySettingsApp::onUpdateView(AppContext& context) {
         for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
             context.ui.setCardFocused(rows_[index], index == selected_);
         }
+        context.ui.centerFocused(root_, rows_[selected_].root);
         renderedSelected_ = static_cast<int8_t>(selected_);
     }
 

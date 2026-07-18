@@ -6,12 +6,14 @@
 #include <lvgl.h>
 
 class DisplayService;
+class AudioService;
 class WifiService;
 class ServerService;
 class UiRuntime;
 
 struct AppContext {
     DisplayService& display;
+    AudioService& audio;
     WifiService& wifi;
     ServerService& server;
     Stream& console;

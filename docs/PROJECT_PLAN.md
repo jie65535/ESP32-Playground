@@ -26,6 +26,8 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 
 显示设置基座已加入：GPIO45 使用 PWM 控制背光亮度，空闲计时只关闭背光而不停止系统服务；亮度和息屏时间保存到独立 NVS namespace，并由 Display App 修改。
 
+声音基座已加入最小实验：ES8311/I²S 播放固定 1 kHz 反馈音，声音页支持音量、交互反馈音开关和试听；默认音量 60%、反馈音关闭，初始化失败时页面仍可显示并报告 unavailable。
+
 ## 随后：局域网 HTTP/JSON
 
 - ESP32 提供 `/api/v1/status` 和 `/api/v1/telemetry`。

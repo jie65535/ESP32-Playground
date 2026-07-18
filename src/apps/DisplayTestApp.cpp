@@ -41,8 +41,7 @@ void DisplayTestApp::onCommand(const AppCommand& command, AppContext&) {
 void DisplayTestApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("DISPLAY / ILI9341", "Color Lab",
-                                      "A compact RGB565 display experiment");
+    root_ = context.ui.createPageRoot("DISPLAY / ILI9341", "Color Lab");
     modeLabel_ = context.ui.createLabel(root_, "BALANCED RGB565", 206, 14, 11,
                                         context.ui.muted());
 
@@ -52,7 +51,7 @@ lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
         lv_obj_t* swatch = lv_obj_create(root_);
         lv_obj_remove_style_all(swatch);
         lv_obj_set_size(swatch, 88, 42);
-        lv_obj_set_pos(swatch, 16 + column * 100, 82 + row * 50);
+        lv_obj_set_pos(swatch, 16 + column * 100, 60 + row * 50);
         lv_obj_set_style_radius(swatch, 9, 0);
         lv_obj_set_style_bg_color(swatch, lv_color_hex(SWATCH_COLORS[index]), 0);
         lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);
@@ -64,9 +63,9 @@ lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
         swatches_[index] = swatch;
     }
 
-    context.ui.createLabel(root_, "BGR + inversion on", 18, 187, 12,
+    context.ui.createLabel(root_, "BGR + inversion on", 18, 165, 12,
                            context.ui.muted());
-    context.ui.createLabel(root_, "320 x 240  /  40 MHz SPI", 168, 187, 12,
+    context.ui.createLabel(root_, "320 x 240  /  40 MHz SPI", 168, 165, 12,
                            context.ui.text());
     return root_;
 }

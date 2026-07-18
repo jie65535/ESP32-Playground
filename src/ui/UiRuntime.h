@@ -37,6 +37,8 @@ public:
     UiCard createCard(lv_obj_t* parent, int16_t y, const char* symbol,
                       const char* title, const char* subtitle);
     void setCardFocused(UiCard& card, bool focused, bool animated = true);
+    void centerFocused(lv_obj_t* scrollable, lv_obj_t* focused,
+                       bool animated = true);
 
     lv_obj_t* createLabel(lv_obj_t* parent, const char* text, int16_t x,
                           int16_t y, uint16_t fontSize, lv_color_t color);
@@ -68,9 +70,8 @@ private:
     uint8_t* drawBuffer_ = nullptr;
     lv_display_t* lvDisplay_ = nullptr;
     lv_obj_t* statusBar_ = nullptr;
-    lv_obj_t* statusWifi_ = nullptr;
-    lv_obj_t* statusServer_ = nullptr;
-    lv_obj_t* statusMemory_ = nullptr;
+    lv_obj_t* statusWifiIcon_ = nullptr;
+    lv_obj_t* statusServerIcon_ = nullptr;
     lv_obj_t* activePage_ = nullptr;
     lv_obj_t* previousPage_ = nullptr;
     uint32_t lastTickMs_ = 0;
@@ -81,6 +82,7 @@ private:
                              uint8_t* pixels);
     static void setObjX(void* object, int32_t value);
     static void setObjWidth(void* object, int32_t value);
+    static void setObjScrollY(void* object, int32_t value);
     static void onPageTransitionFinished(lv_anim_t* animation);
 
     void createStatusBar();

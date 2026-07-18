@@ -62,7 +62,7 @@ public:
 
 服务拥有硬件和协议状态，向应用暴露小接口与只读快照：
 
-- `DisplayService`：TFT、PSRAM framebuffer、亮度和截图。
+- `DisplayService`：TFT、PSRAM framebuffer、PWM 亮度、息屏和截图。
 - `InputService`：USB 键盘、未来实体键和网络输入，统一转换为 Up/Down/Left/Right/Confirm/Back/Text。
 - `SettingsStore`：NVS schema、版本迁移和写入频率控制。
 - `WifiService`：开关、扫描、凭据、连接、重连、IP/RSSI。
@@ -70,7 +70,7 @@ public:
 - `ConsoleService`：命令注册、帮助和 USB/无线传输适配。
 - `ServerService`：UDP/mDNS 发现、手工地址、TCP 会话和心跳。
 - `TimeService`：单调时钟、NTP 和时区。
-- `AudioService`：ES8311 与 I²S；需要实时性时可拥有独立任务。
+- `AudioService`：ES8311 与 I²S、音量、反馈音和试听；需要实时性时可拥有独立任务。
 
 Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持“自动发现列表”和“手动输入主机/IP + 端口”，与手机网络设置的交互一致。
 
@@ -86,7 +86,7 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持�
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
 
-页面转场区分进入和返回：进入前台应用使用 `Forward`（新页面从右侧进入），返回 Launcher 使用 `Backward`（桌面从左侧进入、当前应用向右退出）。遥测刷新不能调用页面转场，也不能重播焦点动画。
+页面转场区分进入和返回：进入前台应用使用 `Forward`（新页面从右侧进入），返回 Launcher 使用 `Backward`（桌面从左侧进入、当前应用向右退出）。所有页面根节点都是纵向滚动视口，焦点切换时由 `UiRuntime::centerFocused` 计算夹紧后的目标位置，用 ease-out 动画把项目拉向视口中心；顶部/底部不足半屏时保持边界，不制造空白。遥测刷新不能调用页面转场，也不能重播焦点动画。
 
 ### Peak 项目的可迁移经验
 
@@ -146,6 +146,8 @@ TransportAdapter → SessionManager → ControlProtocol → InputRouter → AppM
 `InputRouter` 把本地键、USB 控制台、Wi-Fi 和 BLE 输入转换为同一种 `AppEvent`，再按优先级和焦点交给系统快捷键、桌面或前台应用。所有来源都带 `source/session` 元数据，便于权限、去重和调试。
 
 `StatePublisher` 反向发布结构化状态。手机 App 通常渲染自己的原生界面，而不是持续接收 320×240 framebuffer；截图/画面流只作为调试、镜像或特定游戏模式。这样 BLE 低带宽链路也能高效操作。
+
+TCP 高带宽链路可以在未来增加独立 `BulkData` 通道：设备向电脑发送 RGB565 关键帧/脏矩形实现无线镜像，或由电脑把受限尺寸的 RGB565 帧发送到设备专用 `RenderSurface` 实现投屏。控制命令、状态、日志和画面数据必须分帧并分别流控，不能让大帧阻塞输入队列、LVGL tick 或 OTA/调试连接；USB CDC 继续只承担烧录和备用维护，不作为唯一控制链路。
 
 ## FreeRTOS 使用策略
 

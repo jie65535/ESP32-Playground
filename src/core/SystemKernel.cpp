@@ -56,6 +56,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageSystem:
         case AppCommandType::PageDisplay:
         case AppCommandType::PageDisplaySettings:
+        case AppCommandType::PageSound:
         case AppCommandType::PageNetwork:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
@@ -101,7 +102,7 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
-      context_{display_, wifi_, server_, Serial, ui_},
+      context_{display_, audio_, wifi_, server_, Serial, ui_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
@@ -109,6 +110,7 @@ void SystemKernel::setup() {
     delay(50);
     display_.begin();
     uiReady_ = ui_.begin();
+    audio_.begin(Serial);
     wifi_.begin(Serial);
     server_.begin(Serial);
     benchmark_.begin(Serial);
@@ -118,6 +120,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(systemInfoApp_);
         appManager_.registerApp(displayTestApp_);
         appManager_.registerApp(displaySettingsApp_);
+        appManager_.registerApp(soundSettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
@@ -153,6 +156,7 @@ void SystemKernel::loop() {
     wifi_.tick(nowMs);
     server_.tick(nowMs, wifi_.snapshot());
     benchmark_.tick(nowMs);
+    audio_.tick(nowMs);
     display_.tick(nowMs);
     ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), nowMs);
 
@@ -178,7 +182,10 @@ void SystemKernel::loop() {
             requestRedraw();
             continue;
         }
-        handleCommand(routed);
+        const bool handled = handleCommand(routed);
+        if (handled && isWakeOnlyCommand(routed.command.type)) {
+            audio_.playFeedback();
+        }
     }
 
     appManager_.tick(nowMs);
@@ -200,6 +207,7 @@ void SystemKernel::loop() {
             server_.printStatus(Serial);
             benchmark_.printStatus(Serial);
             display_.printStatus(Serial);
+            audio_.printStatus(Serial);
         }
     }
     ui_.tick();
@@ -226,6 +234,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageDisplaySettings:
             appManager_.activate(AppId::DisplaySettings);
+            break;
+        case AppCommandType::PageSound:
+            appManager_.activate(AppId::SoundSettings);
             break;
         case AppCommandType::PageNetwork:
             appManager_.activate(AppId::NetworkSettings);
@@ -310,6 +321,7 @@ void SystemKernel::printStatus() {
     server_.printStatus(Serial);
     benchmark_.printStatus(Serial);
     display_.printStatus(Serial);
+    audio_.printStatus(Serial);
 }
 
 void SystemKernel::requestRedraw() {
