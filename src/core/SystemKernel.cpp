@@ -304,7 +304,10 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             appManager_.handleCommand(command);
             break;
         case AppCommandType::Screenshot:
+            display_.setCaptureEnabled(true);
+            ui_.refreshNow();
             display_.writeScreenshot(Serial);
+            display_.setCaptureEnabled(mirror_.snapshot().connected);
             break;
         case AppCommandType::Status:
             printStatus();

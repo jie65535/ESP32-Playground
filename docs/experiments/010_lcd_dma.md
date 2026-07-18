@@ -30,6 +30,8 @@ LVGL 绘制、网络和其它主循环工作重叠。
 - shadow framebuffer 暂时保留，维持现有完整帧镜像和 USB 截图协议。
 - 官方库修复已真机确认，现已恢复非阻塞 flush：一个 draw buffer 由 DMA 发送时，
   LVGL 使用另一个 buffer 渲染下一块区域；一帧最后一次 DMA 完成后再释放 SPI 事务。
+- shadow 只在镜像 socket 已连接或截图明确请求时更新；镜像关闭时 copy 阶段退出
+  显示热路径。新镜像连接会强制一次全屏 LVGL redraw，完成 keyframe 后才发送。
 
 ## shadow framebuffer 的后续边界
 
@@ -47,9 +49,11 @@ LVGL 和 ILI9341 GRAM 已经负责正常显示的保留式刷新，shadow 不再
 
 - `pio run -e playground`：通过。
 - `python -m unittest discover tools\\tests`：13 项通过。
-- 构建资源：RAM 52300 / 327680 bytes（16.0%）；Flash 1153753 / 6553600 bytes（17.6%）。
+- 构建资源：RAM 52540 / 327680 bytes（16.0%）；Flash 1154237 / 6553600 bytes（17.6%）。
 - 启动日志出现 `[display] SPI DMA enabled` 和 `[display] async flush enabled`。
 - 官方库修复前，shadow/网络镜像持续更新但实体 LCD 只保留旧 GRAM 画面；升级后恢复。
 - 非阻塞双缓冲下页面动画 `ui` 从约 65 ms 降至约 39 ms，下降约 40%，实体屏幕
   肉眼可见更流畅；SPI 仍约 31 ms，符合 40 MHz 物理线速边界。
 - 页面颜色、区域刷新、进入/返回动画与状态栏均正常。
+- 镜像关闭时动画 `copy` 稳定为约 0 ms；镜像开启时自动生成当前画面的完整
+  keyframe，USB 按需截图也能捕获当前画面。

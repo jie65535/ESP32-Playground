@@ -95,6 +95,30 @@ bool DisplayService::noteActivity(uint32_t nowMs) {
     return woke;
 }
 
+void DisplayService::setCaptureEnabled(bool enabled) {
+    if (captureEnabled_ == enabled) {
+        return;
+    }
+
+    captureEnabled_ = enabled;
+    captureDirtyRowsRemaining_ = enabled ? SCREEN_HEIGHT : 0;
+    if (enabled) {
+        memset(captureDirtyRows_, 0, sizeof(captureDirtyRows_));
+        /* Force a complete LVGL redraw so a newly connected mirror gets a
+         * coherent keyframe instead of a partly stale shadow buffer. */
+        lv_obj_invalidate(lv_screen_active());
+        lv_obj_invalidate(lv_layer_top());
+    }
+}
+
+bool DisplayService::captureEnabled() const {
+    return captureEnabled_;
+}
+
+bool DisplayService::captureReady() const {
+    return captureEnabled_ && captureDirtyRowsRemaining_ == 0;
+}
+
 DisplayService::FlushMetrics DisplayService::flushMetrics() const {
     return lastFlushMetrics_;
 }
@@ -264,15 +288,20 @@ bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
     const size_t screenWidth = SCREEN_WIDTH;
 
     const uint16_t* colors = reinterpret_cast<const uint16_t*>(pixels);
-    const uint64_t copyStartedUs = esp_timer_get_time();
-    for (int32_t row = 0; row < height; ++row) {
-        const uint16_t* source = colors + row * width;
-        uint16_t* target = shadow_ +
-                           static_cast<size_t>(y1 + row) * screenWidth + x1;
-        memcpy(target, source, static_cast<size_t>(width) * sizeof(uint16_t));
+    if (captureEnabled_) {
+        const uint64_t copyStartedUs = esp_timer_get_time();
+        for (int32_t row = 0; row < height; ++row) {
+            const uint16_t* source = colors + row * width;
+            uint16_t* target = shadow_ +
+                               static_cast<size_t>(y1 + row) * screenWidth + x1;
+            memcpy(target, source, static_cast<size_t>(width) * sizeof(uint16_t));
+        }
+        activeFlushMetrics_.copyUs += static_cast<uint32_t>(
+            min<uint64_t>(esp_timer_get_time() - copyStartedUs, UINT32_MAX));
+        if (x1 == 0 && x2 == SCREEN_WIDTH - 1) {
+            markCaptureRows(y1, y2);
+        }
     }
-    activeFlushMetrics_.copyUs += static_cast<uint32_t>(
-        min<uint64_t>(esp_timer_get_time() - copyStartedUs, UINT32_MAX));
 
     if (asyncFlushEnabled_) {
         if (dmaPending_) {
@@ -309,6 +338,22 @@ bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
         finishFlushFrame();
     }
     return false;
+}
+
+void DisplayService::markCaptureRows(int32_t y1, int32_t y2) {
+    if (!captureEnabled_ || captureDirtyRowsRemaining_ == 0 ||
+        y1 > y2) {
+        return;
+    }
+    for (int32_t row = max<int32_t>(0, y1);
+         row <= min<int32_t>(SCREEN_HEIGHT - 1, y2); ++row) {
+        if (!captureDirtyRows_[row]) {
+            captureDirtyRows_[row] = true;
+            if (captureDirtyRowsRemaining_ > 0) {
+                captureDirtyRowsRemaining_--;
+            }
+        }
+    }
 }
 
 void DisplayService::writeScreenshot(Stream& output) {

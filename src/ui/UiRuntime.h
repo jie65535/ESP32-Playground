@@ -30,6 +30,7 @@ public:
 
     bool begin();
     void tick();
+    void refreshNow();
     void pollDisplayFlush();
     bool ready() const;
 

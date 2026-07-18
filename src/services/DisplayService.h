@@ -25,6 +25,9 @@ public:
     void pushBacklightOn();
     void tick(uint32_t nowMs);
     bool noteActivity(uint32_t nowMs);
+    void setCaptureEnabled(bool enabled);
+    bool captureEnabled() const;
+    bool captureReady() const;
     FlushMetrics flushMetrics() const;
     bool initDma();
     bool dmaEnabled() const;
@@ -68,6 +71,9 @@ private:
     bool screenshotInProgress_ = false;
     bool backlightArmed_ = false;
     bool screenOff_ = false;
+    bool captureEnabled_ = false;
+    uint16_t captureDirtyRowsRemaining_ = 0;
+    bool captureDirtyRows_[SCREEN_HEIGHT] = {};
     bool preferencesReady_ = false;
     bool settingsDirty_ = false;
     uint8_t brightnessPercent_ = DEFAULT_BRIGHTNESS_PERCENT;
@@ -88,4 +94,5 @@ private:
     void saveSettings();
     void completeDmaTransfer();
     void finishFlushFrame();
+    void markCaptureRows(int32_t y1, int32_t y2);
 };

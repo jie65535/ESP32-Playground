@@ -20,6 +20,9 @@ ESP32 BenchmarkService ─ TCP 19001 ─> PGOS Studio 吞吐接收端
 ESP32 MirrorService  ── TCP 19002 ──> PGOS Studio RGB565 镜像
 ```
 
+显示端仅在镜像 socket 已连接时维护 shadow framebuffer；断开镜像后不再为完整帧
+协议支付每次 LVGL flush 的 PSRAM 拷贝成本。连接建立时先强制完整 keyframe。
+
 PGOS Studio 的界面只提供语义输入，不保存页面清单，也不提供应用深链接。`page ...` 命令继续保留在 USB 控制台和协议诊断工具中。
 
 ## 镜像帧格式

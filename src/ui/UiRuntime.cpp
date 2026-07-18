@@ -87,6 +87,13 @@ void UiRuntime::tick() {
     lv_timer_handler();
 }
 
+void UiRuntime::refreshNow() {
+    if (!ready_ || lvDisplay_ == nullptr) {
+        return;
+    }
+    lv_refr_now(lvDisplay_);
+}
+
 void UiRuntime::pollDisplayFlush() {
     if (!ready_ || !asyncFlush_ || lvDisplay_ == nullptr) {
         return;

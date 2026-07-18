@@ -30,6 +30,7 @@ void MirrorService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
                          const ServerSnapshot& server,
                          DisplayService& display) {
     if (!enabled_ || frameBuffer_ == nullptr) {
+        display.setCaptureEnabled(false);
         closeClient();
         return;
     }
@@ -40,16 +41,19 @@ void MirrorService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
                 : static_cast<uint16_t>(server.port + 2U);
     if (host_.isEmpty() || wifi.state != WifiState::Connected ||
         server.state != ServerState::Connected) {
+        display.setCaptureEnabled(false);
         closeClient();
         return;
     }
 
     if (!client_.connected()) {
+        display.setCaptureEnabled(false);
         if (static_cast<int32_t>(nowMs - nextAttemptMs_) < 0) {
             return;
         }
         closeClient();
         if (!client_.connect(host_.c_str(), port_, CONNECT_TIMEOUT_MS)) {
+            display.setCaptureEnabled(false);
             scheduleRetry(nowMs, "connect failed");
             return;
         }
@@ -65,6 +69,12 @@ void MirrorService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
             log_->print(':');
             log_->println(port_);
         }
+    }
+
+    display.setCaptureEnabled(true);
+    if (!display.captureReady()) {
+        nextFrameMs_ = nowMs + 50U;
+        return;
     }
 
     if (stage_ == SendStage::Idle &&
