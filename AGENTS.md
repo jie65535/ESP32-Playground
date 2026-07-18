@@ -1,8 +1,8 @@
 # ESP32 Playground 新对话交接说明
 
-> 最后更新：2026-07-18
+> 最后更新：2026-07-19
 > 工作目录：`G:\MCU\ESP32Playground`
-> 当前阶段：PGOS UI v2 / LVGL 9.5 与网络应用基座
+> 当前阶段：PGOS 应用基座 / LCD DMA / PGOS Studio / 板载 RGB
 
 ## 1. 项目定位
 
@@ -47,13 +47,19 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 
 - 已创建 PlatformIO `playground` 环境。
 - 当前固件由 PlaygroundOS `SystemKernel` 编排，显示、控制台、Wi-Fi 和现有页面已拆分为独立 Service/App 模块。
-- DisplayService 使用 LVGL 9.5 的 40 行 RGB565 局部缓冲，并在 PSRAM 中维护 320×240 RGB565 shadow framebuffer；背光首帧保护和 RGB565BE 截图协议继续保留，串口状态每 10 秒低频输出。
-- `UiRuntime` 统一管理 LVGL 显示驱动、主题、22px 状态栏、页面转场和焦点卡片；Launcher、System、Color Lab、Display Settings、Sound、Network 已迁移到 retained-mode 页面。
+- DisplayService 使用 LVGL 9.5 的两块 320×40 内部 DMA-capable RGB565 缓冲和异步 SPI DMA；TFT_eSPI 固定到 `83d4d16`，修复 ESP32-S3 DMA 首帧后冻结问题。40MHz 全屏 SPI 实测约 31ms，页面动画 `ui` 从约 65ms 降到约 39ms。
+- 320×240 PSRAM shadow framebuffer 只在无线镜像已连接或 USB 截图明确请求时更新；镜像关闭时 copy 热路径约为 0ms，新镜像连接先强制完整 keyframe。
+- `UiRuntime` 统一管理 LVGL 显示驱动、主题、22px 状态栏、页面转场和焦点卡片；Launcher、System、Color Lab、Display Settings、Sound、RGB Light、Console、Connectivity 已迁移到 retained-mode 页面。
 - DisplayService 使用 GPIO45 LEDC PWM 控制背光，提供亮度、空闲息屏、活动唤醒和 `pgos_display` NVS 持久化；默认 100% / Never，第一次导航输入只唤醒屏幕而不误操作页面。
 - 页面根节点是纵向滚动视口，焦点项使用非线性滚动自动靠近视口中心；状态栏使用波纹 Wi-Fi 图标和服务连接图标，不把诊断数值挤进顶栏。
 - AudioService 使用已验证的 ES8311/I²S 方向，提供音量、反馈音、试听和 `pgos_audio` NVS 持久化；音量采用小扬声器校准的分段 dB 曲线并在 0 dB 封顶，Sound 页面在音频硬件不可用时降级显示。
+- RgbService 使用 Arduino-ESP32 RMT 在 GPIO42 驱动板载 WS2812，提供 Solid/Breathe/Rainbow/Heartbeat/Sparkle；呼吸与心跳使用 10ms smoothstep 渐变。Power 不持久化，Effect/Palette/Brightness/Speed 保存到 `pgos_rgb`，750ms 合并写入。重启实测恢复 `Breathe / Violet / 50% / Fast`，同时保持 `state=off`。
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
-- USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和 ACK/STATE，手机式服务器设置界面与认证控制协议仍待后续。
+- USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和带请求号 ACK/STATE。
+- PGOS Studio 已提供无线四方向/确认/返回/Home、运行状态、RTT、上下行吞吐测试和 TCP 19002 屏幕镜像；当前镜像仍发送完整 RGB565 帧，下一步是 keyframe + dirty rectangles。
+- System 页面已提供主循环 duty、Heap/最低水位、PSRAM、Flash/OTA、任务数和各阶段耗时；这里的 CPU 指标是主循环 duty，不冒充双核总 CPU。
+- 当前分支 `dev`，最新锚点 `3a52924 rgb: persist light preferences without power state`；构建 RAM 53308 / 327680 bytes，Flash 1170989 / 6553600 bytes，Python 13 项测试通过。
+- 曾尝试“原生 FSPI + 80MHz”组合，真机出现花屏且实体屏停止刷新，已立即恢复 40MHz HSPI。该组合不得作为默认配置；后续若重测必须一次只改变一个变量。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。
 
 ## 5. 开发纪律
@@ -67,13 +73,13 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 
 ## 6. 下一步
 
-1. 在当前样机上继续确认 LVGL UI v2 的页面转场、焦点动画、截图和长时间稳定性。
-2. 把统一输入语义扩展到实体按键/编码器，并增加受控的文本输入页面。
-3. 增加 NTP 状态显示，并保持网络任务非阻塞。
-4. 验证 ServerService 到电脑的 TCP HELLO/heartbeat/PING 链路和 UI 状态同步。
-5. 设计 HTTP/JSON 状态接口、控制权和局域网认证，不把 TCP 控制台升级成任意远程 shell。
+1. 让用户复测 `3073e00` 之后 Breathe/Heartbeat 的 10ms smoothstep 渐变是否足够丝滑，并确认七种颜色顺序、100% 白色与长期稳定性。
+2. 把镜像协议从固定 153600-byte 完整帧升级为首次 keyframe + dirty rectangles，由 Studio 在主机端合成画面。
+3. 增加 UDP/mDNS 服务发现，减少手工配置 Studio 地址，同时保留持久化服务器身份和安全边界。
+4. 增加 NTP 状态显示，并保持网络任务非阻塞。
+5. 把统一输入语义扩展到实体按键/编码器，并增加受控的文本输入页面。
 6. 为游戏和高频实验建立独立 RenderSurface，避免破坏系统 Shell 的 LVGL 所有权。
-7. 再逐项探索 RGB、音频、麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
+7. 再逐项探索麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
 
 ## 7. 已迁移的通用资产
 

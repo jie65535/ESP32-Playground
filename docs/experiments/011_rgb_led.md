@@ -1,7 +1,7 @@
 # 实验 011：板载 RGB LED 灯光应用
 
 > 日期：2026-07-19  
-> 状态：固件构建与主机测试通过，等待真机灯效确认
+> 状态：固件烧录、板载 LED 与 NVS 重启恢复已验证；平滑曲线待用户复测
 
 ## 目标
 
@@ -44,10 +44,10 @@ python -m unittest discover -s tools/tests -q
 python -m py_compile tools/playground_console.py tools/pgos_studio.py
 ```
 
-构建结果：
+当前构建结果：
 
-- RAM：53292 / 327680 bytes（16.3%）。
-- Flash：1170205 / 6553600 bytes（17.9%）。
+- RAM：53308 / 327680 bytes（16.3%）。
+- Flash：1170989 / 6553600 bytes（17.9%）。
 - Python：13 项测试通过。
 
 烧录和打开页面：
@@ -57,12 +57,21 @@ pio run -e playground -t upload --upload-port COM3
 python tools/playground_console.py --port COM3 --command "page rgb"
 ```
 
-## 真机待测
+## 真机验证
 
-- Power On 后板载 LED 是否立即显示默认彩虹。
+- GPIO42/RMT 能实际驱动板载 WS2812；用户已观察到灯光和不同亮度变化。
+- 第一版二次三角波的亮度渐变被用户判断为不够丝滑；`3073e00` 改为 10ms
+  smoothstep 呼吸/心跳曲线并已烧录，最终观感待下次继续确认。
+- `3a52924` 增加 `pgos_rgb` 持久化。真机设置为
+  `Breathe / Violet / 50% / Fast`，等待 750ms 后重新烧录/重启，状态完整恢复。
+- 同一次重启后 `state=off`、RGB 输出为 `0,0,0`，证明 Power 没有被持久化。
+- 验证时 Wi-Fi 与 ServerService 仍保持连接，未观察到 RGB 更新导致链路失效。
+
+## 仍待观察
+
 - 七种调色板的 RGB 顺序是否正确，尤其是红/绿是否互换。
 - 10%～100% 亮度是否有足够可用范围，100% 白色是否引起供电或 Wi-Fi 异常。
-- 五种灯效在 Slow/Normal/Fast 下是否连续、无明显卡顿。
+- smoothstep 后五种灯效在 Slow/Normal/Fast 下是否连续、无明显阶梯感。
 - 灯效运行时页面动画、无线控制、镜像和音频是否仍正常。
 
 真机确认后再决定是否增加通知灯语义、音乐律动或从上位机推送灯光场景。
