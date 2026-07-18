@@ -47,6 +47,10 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 - 主循环末尾增加 1 ms 调度让步，让 idle/Wi-Fi 系统任务获得稳定运行窗口。
 - 文件系统占用、温度（若硬件支持）和 Wi-Fi/控制通道历史曲线继续后补。
 - Studio 复用同一份结构化快照，提供历史曲线；监视器本身不能阻塞镜像、音频和控制输入。
+- LCD 异步 DMA flush 进入真机实验：用内部双缓冲把约 33 ms SPI 线速时间与 LVGL
+  绘制重叠，失败时自动回退同步刷新。
+- shadow framebuffer 当前只为完整帧镜像和截图保留；后续迁移到 keyframe + dirty
+  rectangles，并用 LVGL snapshot 处理低频按需截图。
 
 ## 后续：局域网 HTTP/JSON
 

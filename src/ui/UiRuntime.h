@@ -30,6 +30,7 @@ public:
 
     bool begin();
     void tick();
+    void pollDisplayFlush();
     bool ready() const;
 
     lv_obj_t* createPageRoot(const char* eyebrow, const char* title,
@@ -68,6 +69,7 @@ private:
 
     DisplayService& display_;
     uint8_t* drawBuffer_ = nullptr;
+    uint8_t* drawBuffer2_ = nullptr;
     lv_display_t* lvDisplay_ = nullptr;
     lv_obj_t* statusBar_ = nullptr;
     lv_obj_t* statusWifiIcon_ = nullptr;
@@ -77,9 +79,11 @@ private:
     uint32_t lastTickMs_ = 0;
     uint32_t lastStatusMs_ = 0;
     bool ready_ = false;
+    bool asyncFlush_ = false;
 
     static void displayFlush(lv_display_t* display, const lv_area_t* area,
                              uint8_t* pixels);
+    static void displayFlushWait(lv_display_t* display);
     static void setObjX(void* object, int32_t value);
     static void setObjWidth(void* object, int32_t value);
     static void setObjScrollY(void* object, int32_t value);

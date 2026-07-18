@@ -255,7 +255,7 @@ void SystemKernel::loop() {
             runtime_.printStatus(Serial);
         }
     }
-    display_.beginFlushMetrics();
+    ui_.pollDisplayFlush();
     stageStartedUs = esp_timer_get_time();
     ui_.tick();
     const DisplayService::FlushMetrics flushMetrics = display_.flushMetrics();

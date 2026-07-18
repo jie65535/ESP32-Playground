@@ -25,8 +25,13 @@ public:
     void pushBacklightOn();
     void tick(uint32_t nowMs);
     bool noteActivity(uint32_t nowMs);
-    void beginFlushMetrics();
     FlushMetrics flushMetrics() const;
+    bool initDma();
+    bool dmaEnabled() const;
+    void setAsyncFlushEnabled(bool enabled);
+    bool asyncFlushEnabled() const;
+    bool finishDmaIfReady();
+    void waitForDma();
 
     uint8_t brightnessPercent() const;
     void setBrightnessPercent(uint8_t percent);
@@ -36,7 +41,7 @@ public:
     void printStatus(Print& output) const;
 
     /* Called by the LVGL display driver. */
-    void flush(const lv_area_t& area, const uint8_t* pixels);
+    bool flush(const lv_area_t& area, const uint8_t* pixels, bool lastArea);
 
     /* The framebuffer export format remains RGB565BE for the host tools. */
     void writeScreenshot(Stream& output);
@@ -66,9 +71,17 @@ private:
     uint32_t screenTimeoutSeconds_ = DEFAULT_TIMEOUT_SECONDS;
     uint32_t lastActivityMs_ = 0;
     uint32_t settingsSaveDueMs_ = 0;
-    FlushMetrics flushMetrics_;
+    FlushMetrics activeFlushMetrics_;
+    FlushMetrics lastFlushMetrics_;
+    bool dmaEnabled_ = false;
+    bool asyncFlushEnabled_ = false;
+    bool dmaPending_ = false;
+    bool dmaPendingLast_ = false;
+    uint64_t dmaStartedUs_ = 0;
 
     void holdBacklightOff();
     void applyBacklight();
     void saveSettings();
+    void completeDmaTransfer();
+    void finishFlushFrame();
 };

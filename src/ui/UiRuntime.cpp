@@ -23,9 +23,26 @@ bool UiRuntime::begin() {
                               DRAW_BUFFER_LINES;
     const size_t bufferBytes = pixelCount * sizeof(uint16_t);
     drawBuffer_ = static_cast<uint8_t*>(heap_caps_malloc(
-        bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (drawBuffer_ == nullptr) {
-        drawBuffer_ = static_cast<uint8_t*>(malloc(bufferBytes));
+        bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
+    drawBuffer2_ = static_cast<uint8_t*>(heap_caps_malloc(
+        bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
+    if (drawBuffer_ != nullptr && drawBuffer2_ != nullptr) {
+        asyncFlush_ = display_.initDma();
+    }
+    if (!asyncFlush_) {
+        if (drawBuffer2_ != nullptr) {
+            heap_caps_free(drawBuffer2_);
+            drawBuffer2_ = nullptr;
+        }
+        if (drawBuffer_ != nullptr) {
+            heap_caps_free(drawBuffer_);
+            drawBuffer_ = nullptr;
+        }
+        drawBuffer_ = static_cast<uint8_t*>(heap_caps_malloc(
+            bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        if (drawBuffer_ == nullptr) {
+            drawBuffer_ = static_cast<uint8_t*>(malloc(bufferBytes));
+        }
     }
     if (drawBuffer_ == nullptr) {
         Serial.println(F("[ui] LVGL draw buffer allocation failed"));
@@ -41,8 +58,12 @@ bool UiRuntime::begin() {
     lv_display_set_color_format(lvDisplay_, LV_COLOR_FORMAT_RGB565);
     lv_display_set_user_data(lvDisplay_, &display_);
     lv_display_set_flush_cb(lvDisplay_, displayFlush);
-    lv_display_set_buffers(lvDisplay_, drawBuffer_, nullptr, bufferBytes,
+    display_.setAsyncFlushEnabled(asyncFlush_);
+    lv_display_set_buffers(lvDisplay_, drawBuffer_, drawBuffer2_, bufferBytes,
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
+    if (asyncFlush_) {
+        lv_display_set_flush_wait_cb(lvDisplay_, displayFlushWait);
+    }
 
     lv_obj_t* screen = lv_screen_active();
     lv_obj_remove_style_all(screen);
@@ -64,6 +85,15 @@ void UiRuntime::tick() {
     lv_tick_inc(now - lastTickMs_);
     lastTickMs_ = now;
     lv_timer_handler();
+}
+
+void UiRuntime::pollDisplayFlush() {
+    if (!ready_ || !asyncFlush_ || lvDisplay_ == nullptr) {
+        return;
+    }
+    if (display_.finishDmaIfReady()) {
+        lv_display_flush_ready(lvDisplay_);
+    }
 }
 
 bool UiRuntime::ready() const {
@@ -368,9 +398,21 @@ void UiRuntime::displayFlush(lv_display_t* lvDisplay, const lv_area_t* area,
     auto* display = static_cast<DisplayService*>(
         lv_display_get_user_data(lvDisplay));
     if (display != nullptr && pixels != nullptr) {
-        display->flush(*area, pixels);
+        if (!display->flush(*area, pixels,
+                            lv_display_flush_is_last(lvDisplay))) {
+            lv_display_flush_ready(lvDisplay);
+        }
+    } else {
+        lv_display_flush_ready(lvDisplay);
     }
-    lv_display_flush_ready(lvDisplay);
+}
+
+void UiRuntime::displayFlushWait(lv_display_t* lvDisplay) {
+    auto* display = static_cast<DisplayService*>(
+        lv_display_get_user_data(lvDisplay));
+    if (display != nullptr) {
+        display->waitForDma();
+    }
 }
 
 void UiRuntime::setObjX(void* object, int32_t value) {

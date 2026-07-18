@@ -95,12 +95,67 @@ bool DisplayService::noteActivity(uint32_t nowMs) {
     return woke;
 }
 
-void DisplayService::beginFlushMetrics() {
-    flushMetrics_ = FlushMetrics{};
+DisplayService::FlushMetrics DisplayService::flushMetrics() const {
+    return lastFlushMetrics_;
 }
 
-DisplayService::FlushMetrics DisplayService::flushMetrics() const {
-    return flushMetrics_;
+bool DisplayService::initDma() {
+    if (dmaEnabled_) {
+        return true;
+    }
+    dmaEnabled_ = display_.initDMA();
+    Serial.println(dmaEnabled_ ? F("[display] SPI DMA enabled")
+                               : F("[display] SPI DMA unavailable"));
+    return dmaEnabled_;
+}
+
+bool DisplayService::dmaEnabled() const {
+    return dmaEnabled_;
+}
+
+void DisplayService::setAsyncFlushEnabled(bool enabled) {
+    asyncFlushEnabled_ = enabled && dmaEnabled_;
+    Serial.println(asyncFlushEnabled_ ? F("[display] async flush enabled")
+                                      : F("[display] sync flush enabled"));
+}
+
+bool DisplayService::asyncFlushEnabled() const {
+    return asyncFlushEnabled_;
+}
+
+bool DisplayService::finishDmaIfReady() {
+    if (!dmaPending_ || display_.dmaBusy()) {
+        return false;
+    }
+
+    display_.endWrite();
+    completeDmaTransfer();
+    return true;
+}
+
+void DisplayService::waitForDma() {
+    if (!dmaPending_) {
+        return;
+    }
+
+    display_.dmaWait();
+    display_.endWrite();
+    completeDmaTransfer();
+}
+
+void DisplayService::completeDmaTransfer() {
+    dmaPending_ = false;
+    activeFlushMetrics_.transferUs += static_cast<uint32_t>(min<uint64_t>(
+        esp_timer_get_time() - dmaStartedUs_, UINT32_MAX));
+    if (dmaPendingLast_) {
+        finishFlushFrame();
+    }
+    dmaPendingLast_ = false;
+}
+
+void DisplayService::finishFlushFrame() {
+    lastFlushMetrics_ = activeFlushMetrics_;
+    activeFlushMetrics_ = FlushMetrics{};
 }
 
 uint8_t DisplayService::brightnessPercent() const {
@@ -157,18 +212,19 @@ void DisplayService::printStatus(Print& output) const {
     output.print(F(" backlight="));
     output.print(screenOff_ ? F("off") : F("on"));
     output.print(F(" flush_us spi="));
-    output.print(flushMetrics_.transferUs);
+    output.print(lastFlushMetrics_.transferUs);
     output.print(F(" copy="));
-    output.print(flushMetrics_.copyUs);
+    output.print(lastFlushMetrics_.copyUs);
     output.print(F(" areas="));
-    output.print(flushMetrics_.areas);
+    output.print(lastFlushMetrics_.areas);
     output.print(F(" pixels="));
-    output.println(flushMetrics_.pixels);
+    output.println(lastFlushMetrics_.pixels);
 }
 
-void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
+bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
+                           bool lastArea) {
     if (!ready_ || pixels == nullptr || screenshotInProgress_) {
-        return;
+        return false;
     }
 
     int32_t x1 = area.x1;
@@ -181,7 +237,7 @@ void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
     if (x2 >= SCREEN_WIDTH) x2 = SCREEN_WIDTH - 1;
     if (y2 >= SCREEN_HEIGHT) y2 = SCREEN_HEIGHT - 1;
     if (x1 > x2 || y1 > y2) {
-        return;
+        return false;
     }
 
     const int32_t width = x2 - x1 + 1;
@@ -196,8 +252,28 @@ void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
                            static_cast<size_t>(y1 + row) * screenWidth + x1;
         memcpy(target, source, static_cast<size_t>(width) * sizeof(uint16_t));
     }
-    flushMetrics_.copyUs += static_cast<uint32_t>(
+    activeFlushMetrics_.copyUs += static_cast<uint32_t>(
         min<uint64_t>(esp_timer_get_time() - copyStartedUs, UINT32_MAX));
+
+    if (asyncFlushEnabled_) {
+        if (dmaPending_) {
+            waitForDma();
+        }
+
+        lv_draw_sw_rgb565_swap(const_cast<uint8_t*>(pixels),
+                               static_cast<uint32_t>(width * height));
+        dmaStartedUs_ = esp_timer_get_time();
+        display_.startWrite();
+        display_.setAddrWindow(x1, y1, width, height);
+        display_.pushPixelsDMA(
+            const_cast<uint16_t*>(reinterpret_cast<const uint16_t*>(pixels)),
+            static_cast<uint32_t>(width * height));
+        dmaPending_ = true;
+        dmaPendingLast_ = lastArea;
+        activeFlushMetrics_.pixels += static_cast<uint32_t>(width * height);
+        activeFlushMetrics_.areas++;
+        return true;
+    }
 
     const uint64_t transferStartedUs = esp_timer_get_time();
     display_.startWrite();
@@ -205,10 +281,14 @@ void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
     display_.pushColors(const_cast<uint16_t*>(colors),
                          width * height, true);
     display_.endWrite();
-    flushMetrics_.transferUs += static_cast<uint32_t>(
+    activeFlushMetrics_.transferUs += static_cast<uint32_t>(
         min<uint64_t>(esp_timer_get_time() - transferStartedUs, UINT32_MAX));
-    flushMetrics_.pixels += static_cast<uint32_t>(width * height);
-    flushMetrics_.areas++;
+    activeFlushMetrics_.pixels += static_cast<uint32_t>(width * height);
+    activeFlushMetrics_.areas++;
+    if (lastArea) {
+        finishFlushFrame();
+    }
+    return false;
 }
 
 void DisplayService::writeScreenshot(Stream& output) {
