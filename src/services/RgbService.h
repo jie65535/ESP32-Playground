@@ -54,7 +54,8 @@ public:
 
 private:
     static constexpr uint8_t RGB_PIN = 42;
-    static constexpr uint32_t FRAME_INTERVAL_MS = 20;
+    static constexpr uint32_t FRAME_INTERVAL_MS = 10;
+    static constexpr uint8_t BRIGHTNESS_RAMP_STEP_PERCENT = 3;
 
     Print* log_ = nullptr;
     bool ready_ = false;
@@ -63,6 +64,7 @@ private:
     RgbEffect effect_ = RgbEffect::Rainbow;
     uint8_t colorIndex_ = 0;
     uint8_t brightnessPercent_ = 40;
+    uint8_t appliedBrightnessPercent_ = 40;
     uint8_t speedIndex_ = 1;
     uint8_t outputRed_ = 0;
     uint8_t outputGreen_ = 0;

@@ -40,6 +40,7 @@ void RgbService::tick(uint32_t nowMs) {
     }
 
     if (!enabled_) {
+        appliedBrightnessPercent_ = brightnessPercent_;
         if (dirty_ || outputRed_ != 0 || outputGreen_ != 0 ||
             outputBlue_ != 0) {
             dirty_ = false;
@@ -49,7 +50,9 @@ void RgbService::tick(uint32_t nowMs) {
     }
 
     uint32_t intervalMs = FRAME_INTERVAL_MS;
-    if (effect_ == RgbEffect::Solid) {
+    const bool brightnessRamping =
+        appliedBrightnessPercent_ != brightnessPercent_;
+    if (effect_ == RgbEffect::Solid && !brightnessRamping) {
         intervalMs = UINT32_MAX;
     } else if (effect_ == RgbEffect::Sparkle) {
         intervalMs = SPARKLE_INTERVALS_MS[speedIndex_];
@@ -60,6 +63,19 @@ void RgbService::tick(uint32_t nowMs) {
 
     dirty_ = false;
     lastFrameMs_ = nowMs;
+    if (appliedBrightnessPercent_ < brightnessPercent_) {
+        appliedBrightnessPercent_ = static_cast<uint8_t>(min<int16_t>(
+            brightnessPercent_,
+            appliedBrightnessPercent_ + BRIGHTNESS_RAMP_STEP_PERCENT));
+    } else if (appliedBrightnessPercent_ > brightnessPercent_) {
+        appliedBrightnessPercent_ = static_cast<uint8_t>(
+            appliedBrightnessPercent_ > BRIGHTNESS_RAMP_STEP_PERCENT &&
+                    appliedBrightnessPercent_ -
+                            BRIGHTNESS_RAMP_STEP_PERCENT >
+                        brightnessPercent_
+                ? appliedBrightnessPercent_ - BRIGHTNESS_RAMP_STEP_PERCENT
+                : brightnessPercent_);
+    }
     render(nowMs);
 }
 
@@ -215,7 +231,13 @@ void RgbService::render(uint32_t nowMs) {
             const uint16_t phase = static_cast<uint16_t>(
                 (elapsedMs % periodMs) * 512U / periodMs);
             const uint16_t triangle = phase <= 255U ? phase : 511U - phase;
-            const uint16_t eased = (triangle * triangle + 255U) / 255U;
+            /* Smoothstep gives both ends of the breathing curve a zero
+             * slope, unlike the previous quadratic triangle which visibly
+             * changed speed at the peak. */
+            const uint32_t numerator = static_cast<uint32_t>(triangle) *
+                                       triangle * (765U - 2U * triangle);
+            const uint16_t eased = static_cast<uint16_t>(
+                numerator / (255U * 255U));
             effectScale = static_cast<uint8_t>(12U + eased * 243U / 255U);
             break;
         }
@@ -250,7 +272,7 @@ void RgbService::render(uint32_t nowMs) {
     }
 
     const uint16_t masterScale = static_cast<uint16_t>(
-        effectScale * brightnessPercent_ / 100U);
+        effectScale * appliedBrightnessPercent_ / 100U);
     writeOutput(scale8(red, masterScale), scale8(green, masterScale),
                 scale8(blue, masterScale));
 }
@@ -278,7 +300,10 @@ uint8_t RgbService::trianglePulse(uint16_t position, uint16_t start,
     }
     const uint16_t phase = static_cast<uint16_t>(
         (position - start) * 510U / width);
-    return static_cast<uint8_t>(phase <= 255U ? phase : 510U - phase);
+    const uint16_t triangle = phase <= 255U ? phase : 510U - phase;
+    const uint32_t numerator = static_cast<uint32_t>(triangle) * triangle *
+                               (765U - 2U * triangle);
+    return static_cast<uint8_t>(numerator / (255U * 255U));
 }
 
 void RgbService::hsvToRgb(uint16_t hue, uint8_t& red, uint8_t& green,

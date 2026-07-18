@@ -16,7 +16,8 @@ public:
 
 private:
     static constexpr uint8_t SETTING_COUNT = 5;
-    static constexpr uint8_t BRIGHTNESS_VALUES[] = {10, 25, 40, 60, 80, 100};
+    static constexpr uint8_t BRIGHTNESS_VALUES[] = {
+        5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100};
 
     lv_obj_t* root_ = nullptr;
     UiCard rows_[SETTING_COUNT];

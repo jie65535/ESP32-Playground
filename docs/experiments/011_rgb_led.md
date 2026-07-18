@@ -27,11 +27,13 @@ GRB 数据，不增加第三方库。一次发送约 30µs；颜色没有变化�
 1. Power：灯光开关。
 2. Effect：Solid、Breathe、Rainbow、Heartbeat、Sparkle。
 3. Palette：Cyan、Violet、Rose、Amber、Green、Blue、White。
-4. Brightness：10%、25%、40%、60%、80%、100%。
+4. Brightness：5%～100%，以常用的 5%～10% 步进调整。
 5. Speed：Slow、Normal、Fast。
 
 上下移动焦点，左右调整，回车执行当前设置；Backspace/Back 返回桌面。呼吸、彩虹
 和心跳使用 `millis()` 相位推进，Sparkle 使用有界伪随机亮度，不调用长时间 `delay()`。
+亮度修改采用目标值/实际值分离，LED 在约 300ms 内渐变到新目标，避免按键调整时突然跳变；
+呼吸和心跳使用 smoothstep 曲线，并以 10ms 节拍刷新，避免在线性三角波的峰值出现速度突变。
 
 ## 构建与测试
 
