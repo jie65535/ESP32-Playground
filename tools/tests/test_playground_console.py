@@ -16,7 +16,12 @@ class ConsoleMappingTests(unittest.TestCase):
     def test_arrow_and_enter_map_to_firmware_commands(self) -> None:
         self.assertEqual(CONSOLE.command_for_key(CONSOLE.KeyEvent("up")), "up")
         self.assertEqual(CONSOLE.command_for_key(CONSOLE.KeyEvent("down")), "down")
+        self.assertEqual(CONSOLE.command_for_key(CONSOLE.KeyEvent("left")), "left")
+        self.assertEqual(CONSOLE.command_for_key(CONSOLE.KeyEvent("right")), "right")
         self.assertEqual(CONSOLE.command_for_key(CONSOLE.KeyEvent("enter")), "ok")
+        self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("backspace")), "back"
+        )
 
     def test_shortcuts_cover_pages_color_and_capture(self) -> None:
         self.assertEqual(

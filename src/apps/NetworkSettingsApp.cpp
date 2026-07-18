@@ -44,11 +44,13 @@ void NetworkSettingsApp::onCommand(const AppCommand& command,
     WifiService& wifi = context.wifi;
     switch (command.type) {
         case AppCommandType::Previous:
+        case AppCommandType::Left:
             if (setupStage_ == SetupStage::Selecting) {
                 moveCursor(-1, context);
             }
             break;
         case AppCommandType::Next:
+        case AppCommandType::Right:
             if (setupStage_ == SetupStage::Selecting) {
                 moveCursor(1, context);
             }
@@ -168,7 +170,7 @@ void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
         windowStart_ = 0;
         context.console.print(F("[wifi-ui] networks ready: "));
         context.console.print(snapshot.scanCount);
-        context.console.println(F("; use up/down/ok"));
+        context.console.println(F("; use arrows/ok"));
     } else {
         setupStage_ = SetupStage::Inactive;
         context.console.println(F("[wifi-ui] scan produced no usable networks"));
@@ -193,10 +195,6 @@ void NetworkSettingsApp::onUpdateView(AppContext& context) {
     }
     lastViewSignature_ = signature;
     rebuildView(context);
-}
-
-bool NetworkSettingsApp::handlesNavigation() const {
-    return setupStage_ == SetupStage::Selecting;
 }
 
 void NetworkSettingsApp::startWizard(AppContext& context) {
@@ -270,7 +268,7 @@ void NetworkSettingsApp::buildHeader(AppContext& context,
 void NetworkSettingsApp::buildInactive(AppContext& context,
                                        const WifiSnapshot& snapshot) {
     buildHeader(context, "NETWORK / RADIO", "Connectivity",
-                "Enter toggles Wi-Fi  /  W opens setup");
+                "Enter toggles Wi-Fi  /  W opens setup  /  B returns");
 
     const String title = snapshot.ssid.isEmpty()
                              ? String("Wi-Fi Station")
@@ -314,7 +312,7 @@ void NetworkSettingsApp::buildScanning(AppContext& context) {
 
 void NetworkSettingsApp::buildSelection(AppContext& context) {
     buildHeader(context, "NETWORK / SETUP", "Choose a network",
-                "Up / Down moves  /  Enter selects");
+                "Arrow keys move  /  Enter selects  /  B returns");
     const int16_t count = context.wifi.scanCount();
     for (uint8_t row = 0; row < VISIBLE_ROWS; ++row) {
         const int16_t index = windowStart_ + row;
@@ -351,7 +349,7 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
 
 void NetworkSettingsApp::buildPassword(AppContext& context) {
     buildHeader(context, "NETWORK / SETUP", "Network selected",
-                "Password entry stays on the trusted USB console");
+                "Password entry stays on USB  /  B returns");
     const String ssid = shorten(context.wifi.selectedSsid(), 28);
     UiCard selected = context.ui.createCard(root_, 84, LV_SYMBOL_WIFI,
                                             ssid.c_str(), "credential required");

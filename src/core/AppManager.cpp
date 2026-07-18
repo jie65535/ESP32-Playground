@@ -19,18 +19,13 @@ void AppManager::handleCommand(const AppCommand& command) {
         return;
     }
     IApp& current = *apps_[currentIndex_];
-    if (command.type == AppCommandType::Previous &&
-        !current.handlesNavigation()) {
-        previousApp();
-    } else if (command.type == AppCommandType::Next &&
-               !current.handlesNavigation()) {
-        nextApp();
-    } else {
-        current.onCommand(command, context_);
-        const AppId requested = current.requestedApp();
-        if (requested != AppId::Count) {
-            activate(requested);
-        }
+    // Directional input belongs to the foreground app.  The launcher uses it
+    // to move its selection; an app may use it for its own lists or ignore it.
+    // Never interpret a direction as an application switch while an app is open.
+    current.onCommand(command, context_);
+    const AppId requested = current.requestedApp();
+    if (requested != AppId::Count) {
+        activate(requested);
     }
 }
 
@@ -44,23 +39,6 @@ void AppManager::render() {
     if (appCount_ > 0 && active_) {
         apps_[currentIndex_]->onUpdateView(context_);
     }
-}
-
-void AppManager::nextApp() {
-    if (appCount_ == 0) {
-        return;
-    }
-    const uint8_t next = static_cast<uint8_t>((currentIndex_ + 1U) % appCount_);
-    activate(apps_[next]->id());
-}
-
-void AppManager::previousApp() {
-    if (appCount_ == 0) {
-        return;
-    }
-    const uint8_t previous = currentIndex_ == 0 ? appCount_ - 1U
-                                                : currentIndex_ - 1U;
-    activate(apps_[previous]->id());
 }
 
 bool AppManager::activate(AppId id) {

@@ -12,7 +12,6 @@ public:
     void onTick(uint32_t nowMs, AppContext& context) override;
     lv_obj_t* onCreateView(AppContext& context) override;
     void onUpdateView(AppContext& context) override;
-    bool handlesNavigation() const override;
 
 private:
     static constexpr uint8_t VISIBLE_ROWS = 6;

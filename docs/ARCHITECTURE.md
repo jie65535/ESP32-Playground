@@ -80,6 +80,8 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持�
 
 ```text
 采集输入/服务事件 → AppManager 路由 → 当前 App 更新视图 → lv_timer_handler → 局部 flush
+
+导航语义遵循手机式分层：Launcher 接收四方向键移动应用选择，`Confirm` 进入应用；进入前台应用后，四方向键只交给当前应用处理，不再跨应用切换；`Backspace/Back` 返回 Launcher，`Home` 仍表示直接回到桌面。调试控制台仍可使用 `page system` 等显式命令直达页面。
 ```
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
@@ -122,7 +124,7 @@ TransportAdapter → SessionManager → ControlProtocol → InputRouter → AppM
 - `StateUpdate`：当前应用、菜单、网络状态、通知和遥测。
 - `BulkData`：截图、日志和性能测试数据，使用独立通道或明确流控。
 
-不把 PC/手机的原始键码直接传给应用。普通界面使用 `Up/Down/Confirm/Back` 等语义事件；需要同时检测多个按键的游戏可以订阅规范化的 `KeyDown/KeyUp`。
+不把 PC/手机的原始键码直接传给应用。普通界面使用 `Up/Down/Left/Right/Confirm/Back` 等语义事件；需要同时检测多个按键的游戏可以订阅规范化的 `KeyDown/KeyUp`。
 
 ### InputRouter 与 StatePublisher
 

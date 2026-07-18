@@ -42,7 +42,7 @@ void DisplayTestApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
     root_ = context.ui.createPageRoot("DISPLAY / ILI9341", "Color Lab",
-                                      "Enter toggles the calibration emphasis");
+                                      "Enter toggles calibration  /  B returns");
     modeLabel_ = context.ui.createLabel(root_, "BALANCED RGB565", 206, 14, 11,
                                         context.ui.muted());
 

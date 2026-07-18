@@ -30,7 +30,10 @@ import capture_screen
 VALID_COMMANDS = (
     "up",
     "down",
+    "left",
+    "right",
     "ok",
+    "back",
     "home",
     "status",
     "screenshot",
@@ -75,7 +78,7 @@ SHORTCUTS = {
     "?": "help",
     "s": CAPTURE_ACTION,
     "w": WIFI_SETUP_ACTION,
-    "b": "home",
+    "b": "back",
 }
 
 
@@ -224,8 +227,14 @@ def command_for_key(event: KeyEvent) -> str | None:
         return "up"
     if event.name == "down":
         return "down"
+    if event.name == "left":
+        return "left"
+    if event.name == "right":
+        return "right"
     if event.name == "enter":
         return "ok"
+    if event.name == "backspace":
+        return "back"
     if event.name == "character":
         return SHORTCUTS.get(event.character.lower())
     return None
@@ -268,9 +277,9 @@ def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
     print("  1/0 system   2 display   3 network")
-    print("  B home   C color test   R status   S screenshot + clipboard")
+    print("  B/backspace back   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")
-    print("  Arrow Up/Down and Enter are optional convenience keys")
+    print("  Desktop: arrows move, Enter opens; apps keep their own controls")
     print("  Full commands are accepted with --command; H help, Q quit")
     print()
 
@@ -294,13 +303,13 @@ def run_wifi_setup(transport: Transport) -> bool:
         print("[HOST] Wi-Fi scan did not complete successfully")
         return False
 
-    print("[HOST] Use Up/Down to move on the device screen, Enter to select, Q to cancel")
+    print("[HOST] Use arrow keys to move, Enter to select, Backspace/Q to cancel")
     while True:
         event = read_key()
-        if event.name == "quit":
+        if event.name in ("quit", "backspace"):
             transport.send("wifi wizard cancel")
             return False
-        if event.name in ("up", "down"):
+        if event.name in ("up", "down", "left", "right"):
             transport.send(event.name)
             continue
         if event.name != "enter":
@@ -344,7 +353,13 @@ def read_key() -> KeyEvent:
                 return KeyEvent("up")
             if extended == "P":
                 return KeyEvent("down")
+            if extended == "K":
+                return KeyEvent("left")
+            if extended == "M":
+                return KeyEvent("right")
             return KeyEvent("ignored")
+        if char == "\x08":
+            return KeyEvent("backspace")
         if char in ("\r", "\n"):
             return KeyEvent("enter")
         if char.lower() == "q":
@@ -365,7 +380,13 @@ def read_key() -> KeyEvent:
                 return KeyEvent("up")
             if suffix == "[B":
                 return KeyEvent("down")
+            if suffix == "[D":
+                return KeyEvent("left")
+            if suffix == "[C":
+                return KeyEvent("right")
             return KeyEvent("ignored")
+        if char == "\x7f":
+            return KeyEvent("backspace")
         if char in ("\r", "\n"):
             return KeyEvent("enter")
         if char.lower() == "q":

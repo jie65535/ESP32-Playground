@@ -48,7 +48,10 @@ bool isRemoteAllowed(AppCommandType type) {
     switch (type) {
         case AppCommandType::Previous:
         case AppCommandType::Next:
+        case AppCommandType::Left:
+        case AppCommandType::Right:
         case AppCommandType::Activate:
+        case AppCommandType::Back:
         case AppCommandType::Home:
         case AppCommandType::PageSystem:
         case AppCommandType::PageDisplay:
@@ -170,6 +173,7 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
 
     bool handled = true;
     switch (command.type) {
+        case AppCommandType::Back:
         case AppCommandType::Home:
             appManager_.activate(AppId::Launcher);
             break;

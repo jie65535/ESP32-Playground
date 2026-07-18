@@ -11,8 +11,6 @@ public:
     void handleCommand(const AppCommand& command);
     void tick(uint32_t nowMs);
     void render();
-    void nextApp();
-    void previousApp();
     bool activate(AppId id);
     AppId currentId() const;
     const char* currentName() const;

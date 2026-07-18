@@ -59,9 +59,15 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::Previous;
     } else if (lower == "down") {
         command.type = AppCommandType::Next;
+    } else if (lower == "left") {
+        command.type = AppCommandType::Left;
+    } else if (lower == "right") {
+        command.type = AppCommandType::Right;
     } else if (lower == "ok") {
         command.type = AppCommandType::Activate;
-    } else if (lower == "home" || lower == "back") {
+    } else if (lower == "back") {
+        command.type = AppCommandType::Back;
+    } else if (lower == "home") {
         command.type = AppCommandType::Home;
     } else if (lower == "page system") {
         command.type = AppCommandType::PageSystem;
@@ -179,7 +185,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
 }
 
 void ConsoleService::printHelp(Print& output) {
-    output.println(F("Commands: up | down | ok | home | page system | page display | page network"));
+    output.println(F("Commands: up | down | left | right | ok | back | home"));
+    output.println(F("         page system | page display | page network"));
     output.println(F("          color_test | screenshot | status | help"));
     output.println(F("Wi-Fi:    wifi scan | wifi select <index> | wifi ssid <name>"));
     output.println(F("          wifi password <password> | wifi open"));

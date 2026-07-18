@@ -175,7 +175,7 @@ def main() -> int:
 
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
-        print("Commands: up, down, ok, status, page system/display/network")
+        print("Commands: up, down, left, right, ok, back, home, status, page system/display/network")
         print("Meta: /clients, /quit")
         request_id = 1
         try:
