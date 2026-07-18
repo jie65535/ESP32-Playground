@@ -158,13 +158,18 @@ void DisplayService::waitForDma() {
 }
 
 void DisplayService::completeDmaTransfer() {
+    const bool completedLastArea = dmaPendingLast_;
     dmaPending_ = false;
     activeFlushMetrics_.transferUs += static_cast<uint32_t>(min<uint64_t>(
         esp_timer_get_time() - dmaStartedUs_, UINT32_MAX));
-    if (dmaPendingLast_) {
+    dmaPendingLast_ = false;
+    if (completedLastArea) {
+        if (dmaTransactionOpen_) {
+            display_.endWrite();
+            dmaTransactionOpen_ = false;
+        }
         finishFlushFrame();
     }
-    dmaPendingLast_ = false;
 }
 
 void DisplayService::finishFlushFrame() {
@@ -275,21 +280,19 @@ bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
         }
 
         dmaStartedUs_ = esp_timer_get_time();
-        display_.startWrite();
+        if (!dmaTransactionOpen_) {
+            display_.startWrite();
+            dmaTransactionOpen_ = true;
+        }
         display_.pushImageDMA(
             x1, y1, width, height,
             const_cast<uint16_t*>(reinterpret_cast<const uint16_t*>(pixels)),
             dmaBuffer_);
-        display_.dmaWait();
-        display_.endWrite();
-        activeFlushMetrics_.transferUs += static_cast<uint32_t>(min<uint64_t>(
-            esp_timer_get_time() - dmaStartedUs_, UINT32_MAX));
+        dmaPending_ = true;
+        dmaPendingLast_ = lastArea;
         activeFlushMetrics_.pixels += static_cast<uint32_t>(width * height);
         activeFlushMetrics_.areas++;
-        if (lastArea) {
-            finishFlushFrame();
-        }
-        return false;
+        return true;
     }
 
     const uint64_t transferStartedUs = esp_timer_get_time();

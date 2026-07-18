@@ -1,7 +1,7 @@
 # 实验 010：LCD 异步 DMA flush
 
-> 日期：2026-07-18  
-> 状态：代码与构建通过，等待真机验证
+> 日期：2026-07-19
+> 状态：真机验证通过
 
 ## 基线
 
@@ -28,8 +28,8 @@ LVGL 绘制、网络和其它主循环工作重叠。
 - flush callback 启动 DMA 后立即返回；LVGL 需要复用缓冲时才等待上一次传输。
 - 最后一块区域的 DMA 在后续主循环中轮询完成，再通知 LVGL flush ready。
 - shadow framebuffer 暂时保留，维持现有完整帧镜像和 USB 截图协议。
-- 当前真机验证阶段暂时对每个区域等待 DMA 完成；确认新库版本稳定后，再恢复
-  非阻塞 flush，避免把库修复和异步生命周期问题同时混在一起。
+- 官方库修复已真机确认，现已恢复非阻塞 flush：一个 draw buffer 由 DMA 发送时，
+  LVGL 使用另一个 buffer 渲染下一块区域；一帧最后一次 DMA 完成后再释放 SPI 事务。
 
 ## shadow framebuffer 的后续边界
 
@@ -46,11 +46,10 @@ LVGL 和 ILI9341 GRAM 已经负责正常显示的保留式刷新，shadow 不再
 ## 验证
 
 - `pio run -e playground`：通过。
-- 构建资源：RAM 52292 / 327680 bytes（16.0%）；Flash 1153229 / 6553600 bytes（17.6%）。
-
-## 真机待测
-
-- 启动日志应出现 `[display] SPI DMA enabled` 和 `[display] async flush enabled`。
-- 验证颜色、区域刷新、页面进出动画和状态栏均无错色、撕裂或冻结。
-- 比较 DMA 前后的 `ui`、SPI、copy、main-loop duty 和镜像 FPS。
-- 若 DMA 初始化或内部缓冲失败，应自动显示同步回退日志并保持界面可用。
+- `python -m unittest discover tools\\tests`：13 项通过。
+- 构建资源：RAM 52300 / 327680 bytes（16.0%）；Flash 1153753 / 6553600 bytes（17.6%）。
+- 启动日志出现 `[display] SPI DMA enabled` 和 `[display] async flush enabled`。
+- 官方库修复前，shadow/网络镜像持续更新但实体 LCD 只保留旧 GRAM 画面；升级后恢复。
+- 非阻塞双缓冲下页面动画 `ui` 从约 65 ms 降至约 39 ms，下降约 40%，实体屏幕
+  肉眼可见更流畅；SPI 仍约 31 ms，符合 40 MHz 物理线速边界。
+- 页面颜色、区域刷新、进入/返回动画与状态栏均正常。
