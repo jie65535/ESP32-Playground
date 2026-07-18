@@ -35,8 +35,8 @@ struct VolumeCurvePoint {
 // uses 0.5 dB steps, with 0xBF representing 0 dB. The top stays at 0 dB to
 // avoid the codec's optional +32 dB digital boost.
 constexpr VolumeCurvePoint SMALL_SPEAKER_VOLUME_CURVE[] = {
-    {1, -90},    // -45.0 dB
-    {10, -80},   // -40.0 dB
+    {1, -82},    // -41.0 dB
+    {10, -70},   // -35.0 dB
     {20, -64},   // -32.0 dB
     {30, -50},   // -25.0 dB
     {40, -44},   // -22.0 dB
