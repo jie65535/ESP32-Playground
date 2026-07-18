@@ -69,6 +69,7 @@ server status
 - [实验记录：屏幕和板卡信息](docs/experiments/001_display_info.md)
 - [实验记录：Wi-Fi Station](docs/experiments/002_wifi_station.md)
 - [实验记录：TCP 诊断服务器](docs/experiments/003_tcp_server.md)
+- [实验记录：TCP 应用层吞吐](docs/experiments/004_tcp_throughput.md)
 - [可复用经验知识库](docs/knowledge/README.md)
 - [厂商原始资料说明](docs/vendor/README.md)
 

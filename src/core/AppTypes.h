@@ -45,6 +45,29 @@ enum class AppCommandType : uint8_t {
     ServerConnect,
     ServerClear,
     ServerHelp,
+    BenchUpload,
+    BenchDownload,
+    BenchStatus,
+    BenchCancel,
+};
+
+enum class BenchmarkState : uint8_t {
+    Idle,
+    Connecting,
+    Uploading,
+    Downloading,
+    WaitingResult,
+    Complete,
+    Error,
+};
+
+struct BenchmarkSnapshot {
+    BenchmarkState state = BenchmarkState::Idle;
+    uint32_t totalBytes = 0;
+    uint32_t transferredBytes = 0;
+    uint64_t elapsedUs = 0;
+    float mbps = 0.0F;
+    String lastError;
 };
 
 struct AppCommand {

@@ -56,6 +56,8 @@ VALID_COMMANDS = (
     "server connect",
     "server clear",
     "server help",
+    "bench status",
+    "bench cancel",
 )
 
 CAPTURE_ACTION = "__capture_screenshot__"
@@ -240,6 +242,8 @@ def normalize_commands(commands: Iterable[str]) -> list[str]:
             "wifi ssid ",
             "wifi password ",
             "server set ",
+            "bench upload ",
+            "bench download ",
         )
         prefix = next((item for item in prefixes if lower_value.startswith(item)), None)
         if prefix is None or not value[len(prefix):]:

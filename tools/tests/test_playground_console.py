@@ -62,6 +62,7 @@ class ConsoleMappingTests(unittest.TestCase):
                     "wifi ssid HomeNet",
                     "wifi password AbCd1234",
                     "server set 192.168.1.4 19000",
+                    "bench upload 4194304",
                 ]
             ),
             [
@@ -71,6 +72,7 @@ class ConsoleMappingTests(unittest.TestCase):
                 "wifi ssid HomeNet",
                 "wifi password AbCd1234",
                 "server set 192.168.1.4 19000",
+                "bench upload 4194304",
             ],
         )
         self.assertEqual(

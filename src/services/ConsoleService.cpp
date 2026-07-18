@@ -109,6 +109,10 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::ServerClear;
     } else if (lower == "server help") {
         command.type = AppCommandType::ServerHelp;
+    } else if (lower == "bench status") {
+        command.type = AppCommandType::BenchStatus;
+    } else if (lower == "bench cancel") {
+        command.type = AppCommandType::BenchCancel;
     } else if (lower.startsWith("wifi select ")) {
         String argument = line.substring(12);
         argument.trim();
@@ -145,6 +149,26 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
                 command.number = port.toInt();
             }
         }
+    } else if (lower.startsWith("bench upload ")) {
+        String argument = line.substring(13);
+        argument.trim();
+        if (!isUnsignedInteger(argument)) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            command.type = AppCommandType::BenchUpload;
+            command.number = argument.toInt();
+        }
+    } else if (lower.startsWith("bench download ")) {
+        String argument = line.substring(15);
+        argument.trim();
+        if (!isUnsignedInteger(argument)) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            command.type = AppCommandType::BenchDownload;
+            command.number = argument.toInt();
+        }
     } else if (!line.isEmpty()) {
         command.type = AppCommandType::Unknown;
         command.value = line;
@@ -161,4 +185,6 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("          wifi on | wifi off | wifi toggle | wifi wizard"));
     output.println(F("Server:   server set <host> <port> | server status"));
     output.println(F("          server on | server off | server connect | server clear"));
+    output.println(F("Bench:    bench upload <bytes> | bench download <bytes>"));
+    output.println(F("          bench status | bench cancel"));
 }

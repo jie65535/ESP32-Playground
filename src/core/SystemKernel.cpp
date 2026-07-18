@@ -56,6 +56,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::Status:
         case AppCommandType::WifiStatus:
         case AppCommandType::ServerStatus:
+        case AppCommandType::BenchStatus:
             return true;
         default:
             return false;
@@ -73,6 +74,7 @@ void SystemKernel::setup() {
     display_.begin();
     wifi_.begin(Serial);
     server_.begin(Serial);
+    benchmark_.begin(Serial);
     console_.begin(Serial);
 
     appManager_.registerApp(systemInfoApp_);
@@ -109,6 +111,7 @@ void SystemKernel::loop() {
 
     wifi_.tick(nowMs);
     server_.tick(nowMs, wifi_.snapshot());
+    benchmark_.tick(nowMs);
 
     uint32_t requestId = 0;
     String remoteLine;
@@ -144,6 +147,7 @@ void SystemKernel::loop() {
             Serial.println(ESP.getFreePsram());
             wifi_.printStatus(Serial);
             server_.printStatus(Serial);
+            benchmark_.printStatus(Serial);
         }
     }
 }
@@ -175,6 +179,36 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::Status:
             printStatus();
+            break;
+        case AppCommandType::BenchUpload: {
+            const ServerSnapshot server = server_.snapshot();
+            if (server.host.isEmpty() || command.number <= 0) {
+                Serial.println(F("[bench] configure server target and byte count"));
+                handled = false;
+            } else {
+                handled = benchmark_.startUpload(
+                    server.host, BenchmarkService::DEFAULT_PORT,
+                    static_cast<uint32_t>(command.number));
+            }
+            break;
+        }
+        case AppCommandType::BenchDownload: {
+            const ServerSnapshot server = server_.snapshot();
+            if (server.host.isEmpty() || command.number <= 0) {
+                Serial.println(F("[bench] configure server target and byte count"));
+                handled = false;
+            } else {
+                handled = benchmark_.startDownload(
+                    server.host, BenchmarkService::DEFAULT_PORT,
+                    static_cast<uint32_t>(command.number));
+            }
+            break;
+        }
+        case AppCommandType::BenchStatus:
+            benchmark_.printStatus(Serial);
+            break;
+        case AppCommandType::BenchCancel:
+            benchmark_.cancel();
             break;
         case AppCommandType::Help:
             ConsoleService::printHelp(Serial);
@@ -213,6 +247,8 @@ void SystemKernel::printStatus() {
     Serial.print(F(" psram="));
     Serial.println(ESP.getFreePsram());
     wifi_.printStatus(Serial);
+    server_.printStatus(Serial);
+    benchmark_.printStatus(Serial);
 }
 
 void SystemKernel::requestRedraw() {

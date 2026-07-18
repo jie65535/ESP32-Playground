@@ -7,6 +7,7 @@
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
+#include "services/BenchmarkService.h"
 #include "services/DisplayService.h"
 #include "services/ServerService.h"
 #include "services/WifiService.h"
@@ -21,6 +22,7 @@ private:
     DisplayService display_;
     WifiService wifi_;
     ServerService server_;
+    BenchmarkService benchmark_;
     ConsoleService console_;
     AppContext context_;
     AppManager appManager_;

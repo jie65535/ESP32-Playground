@@ -33,6 +33,8 @@ Wi-Fi 入网稳定后，USB 控制台的命令层可以复用为无线控制台�
 
 当前已加入第一版 `ServerService`：服务器地址、端口和启用状态保存在 `server` NVS namespace；设备主动 TCP 连接服务器，发送 `PGOS/1 HELLO` 和周期 heartbeat，接收 `PING` 并回复 `PONG`。USB 与 TCP 命令共同进入有界 `InputRouter`；TCP 只允许导航、页面和状态白名单，返回 ACK/STATE，敏感 Wi-Fi/服务器配置命令被拒绝。电脑端使用无依赖的 `tools/pgos_server.py`，默认监听 TCP 19000。当前尚未加入认证和 TLS，不作为通用远程 shell。
 
+独立的 `BenchmarkService` 使用 TCP 19001 测量固定字节流，不与控制通道混用。电脑端使用 `tools/pgos_benchmark.py`；设备命令为 `bench upload <bytes>`、`bench download <bytes>`、`bench status` 和 `bench cancel`。
+
 第二步使用 HTTP + JSON 完成双向联调：
 
 ```text
