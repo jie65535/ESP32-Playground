@@ -78,7 +78,6 @@ SHORTCUTS = {
     "?": "help",
     "s": CAPTURE_ACTION,
     "w": WIFI_SETUP_ACTION,
-    "b": "back",
 }
 
 
@@ -277,7 +276,7 @@ def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
     print("  1/0 system   2 display   3 network")
-    print("  B/backspace back   C color test   R status   S screenshot + clipboard")
+    print("  Backspace back   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")
     print("  Desktop: arrows move, Enter opens; apps keep their own controls")
     print("  Full commands are accepted with --command; H help, Q quit")

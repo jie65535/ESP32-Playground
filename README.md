@@ -42,7 +42,7 @@ python tools/playground_console.py --port COM3 --wifi-setup
 python tools/capture_screen.py --port COM3 --output captures/home.png
 ```
 
-控制台的 `1/2/3` 可直接跳页，`B` 或 Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `back`、`home`、`wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
+控制台的 `1/2/3` 可直接跳页，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `back`、`home`、`wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
 
 局域网 TCP 控制台服务器：接收 HELLO/heartbeat，发送 PING，并可在交互提示符中发送白名单命令：
 
@@ -58,7 +58,7 @@ server on
 server status
 ```
 
-服务器连接后可直接输入 `up`、`down`、`left`、`right`、`ok`、`back`、`home`、`status`、`page system`、`page display` 或 `page network`。桌面上的四方向键只移动应用选择，进入应用后由当前应用自行处理；`back`/Backspace/`B` 返回桌面，`home` 直接回到桌面。设备返回 ACK；`status` 还会返回结构化 STATE。Wi-Fi 密码、清除凭据等敏感命令不会通过 TCP 执行。
+服务器连接后可直接输入 `up`、`down`、`left`、`right`、`ok`、`back`、`home`、`status`、`page system`、`page display` 或 `page network`。桌面上的四方向键只移动应用选择，进入应用后由当前应用自行处理；`back` 返回桌面，`home` 直接回到桌面。设备返回 ACK；`status` 还会返回结构化 STATE。Wi-Fi 密码、清除凭据等敏感命令不会通过 TCP 执行。
 
 ## 文档入口
 

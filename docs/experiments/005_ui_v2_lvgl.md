@@ -12,7 +12,7 @@
 - 内存：显示服务在 PSRAM 中维护 320×240 RGB565 shadow framebuffer（153600 bytes），用于截图和调试
 - UI 运行时：`src/ui/UiRuntime.*`
 - 当前页面：Launcher、System、Display、Network
-- 新增导航命令：`back` / `home`，主机控制台快捷键为 `B`，Backspace 映射为 `back`
+- 新增导航命令：`back` / `home`，Backspace 映射为 `back`
 
 ## 视觉和交互
 
