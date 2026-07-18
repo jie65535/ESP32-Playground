@@ -10,7 +10,8 @@ const char* itemName(uint8_t index) {
         case 1: return "Color Lab";
         case 2: return "Display";
         case 3: return "Sound";
-        case 4: return "Connectivity";
+        case 4: return "Console";
+        case 5: return "Connectivity";
         default: return "Unknown";
     }
 }
@@ -21,7 +22,8 @@ const char* itemDescription(uint8_t index) {
         case 1: return "display and visual experiments";
         case 2: return "brightness and screen timeout";
         case 3: return "volume and interaction feedback";
-        case 4: return "Wi-Fi, IP and TCP console";
+        case 4: return "server address and wireless control";
+        case 5: return "Wi-Fi, IP and network services";
         default: return "";
     }
 }
@@ -32,7 +34,8 @@ const char* itemSymbol(uint8_t index) {
         case 1: return LV_SYMBOL_IMAGE;
         case 2: return LV_SYMBOL_EYE_OPEN;
         case 3: return LV_SYMBOL_VOLUME_MAX;
-        case 4: return LV_SYMBOL_WIFI;
+        case 4: return LV_SYMBOL_UPLOAD;
+        case 5: return LV_SYMBOL_WIFI;
         default: return LV_SYMBOL_LIST;
     }
 }
@@ -43,7 +46,8 @@ AppId itemApp(uint8_t index) {
         case 1: return AppId::DisplayTest;
         case 2: return AppId::DisplaySettings;
         case 3: return AppId::SoundSettings;
-        case 4: return AppId::NetworkSettings;
+        case 4: return AppId::ConsoleSettings;
+        case 5: return AppId::NetworkSettings;
         default: return AppId::Count;
     }
 }

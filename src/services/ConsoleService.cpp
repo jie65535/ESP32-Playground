@@ -77,6 +77,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageDisplaySettings;
     } else if (lower == "page sound") {
         command.type = AppCommandType::PageSound;
+    } else if (lower == "page console") {
+        command.type = AppCommandType::PageConsole;
     } else if (lower == "page network") {
         command.type = AppCommandType::PageNetwork;
     } else if (lower == "color_test") {
@@ -121,6 +123,14 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::ServerClear;
     } else if (lower == "server help") {
         command.type = AppCommandType::ServerHelp;
+    } else if (lower == "mirror on") {
+        command.type = AppCommandType::MirrorOn;
+    } else if (lower == "mirror off") {
+        command.type = AppCommandType::MirrorOff;
+    } else if (lower == "mirror toggle") {
+        command.type = AppCommandType::MirrorToggle;
+    } else if (lower == "mirror status") {
+        command.type = AppCommandType::MirrorStatus;
     } else if (lower == "bench status") {
         command.type = AppCommandType::BenchStatus;
     } else if (lower == "bench cancel") {
@@ -190,7 +200,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
 
 void ConsoleService::printHelp(Print& output) {
     output.println(F("Commands: up | down | left | right | ok | back | home"));
-    output.println(F("         page system | page display | page settings | page sound | page network"));
+    output.println(F("         page system | page display | page settings | page sound"));
+    output.println(F("         page console | page network"));
     output.println(F("          color_test | screenshot | status | help"));
     output.println(F("Wi-Fi:    wifi scan | wifi select <index> | wifi ssid <name>"));
     output.println(F("          wifi password <password> | wifi open"));
@@ -198,6 +209,7 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("          wifi on | wifi off | wifi toggle | wifi wizard"));
     output.println(F("Server:   server set <host> <port> | server status"));
     output.println(F("          server on | server off | server connect | server clear"));
+    output.println(F("Mirror:   mirror on | mirror off | mirror toggle | mirror status"));
     output.println(F("Bench:    bench upload <bytes> | bench download <bytes>"));
     output.println(F("          bench status | bench cancel"));
 }

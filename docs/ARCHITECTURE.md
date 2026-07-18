@@ -21,7 +21,7 @@ SystemKernel / AppManager
        ├── Display / Input
        ├── Storage / SettingsStore
        ├── WiFi / BLE
-       ├── Console / NetworkTransport
+       ├── Console / Server / MirrorTransport
        └── Audio / Time
 ```
 
@@ -69,10 +69,11 @@ public:
 - `BleService`：开关、扫描、配对和连接；未启用时不占用应用逻辑。
 - `ConsoleService`：命令注册、帮助和 USB/无线传输适配。
 - `ServerService`：UDP/mDNS 发现、手工地址、TCP 会话和心跳。
+- `MirrorService`：由上位机控制的临时 framebuffer 上行通道，不持久化功能开关。
 - `TimeService`：单调时钟、NTP 和时区。
 - `AudioService`：ES8311 与 I²S、音量、反馈音和试听；需要实时性时可拥有独立任务。
 
-Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持“自动发现列表”和“手动输入主机/IP + 端口”，与手机网络设置的交互一致。
+Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备只需要保存目标服务器主机/IP + 控制端口，并在网络恢复后自动重连；镜像、画面推送、音频流和录制属于上位机能力，不在设备设置中复制一套开关。
 
 ## 事件与渲染
 
@@ -86,7 +87,7 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持�
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
 
-页面转场区分进入和返回：进入前台应用使用 `Forward`（新页面从右侧进入），返回 Launcher 使用 `Backward`（桌面从左侧进入、当前应用向右退出）。所有页面根节点都是纵向滚动视口，焦点切换时由 `UiRuntime::centerFocused` 计算夹紧后的目标位置，用 ease-out 动画把项目拉向视口中心；顶部/底部不足半屏时保持边界，不制造空白。遥测刷新不能调用页面转场，也不能重播焦点动画。
+页面转场区分进入和返回：进入前台应用使用 `Forward`（新页面从右侧进入），返回 Launcher 使用 `Backward`（重建的父页面先放在下层，当前应用向右退出并露出父页面）。所有页面根节点都是纵向滚动视口，焦点切换时由 `UiRuntime::centerFocused` 计算夹紧后的目标位置，用 ease-out 动画把项目拉向视口中心；顶部/底部不足半屏时保持边界，不制造空白。遥测刷新不能调用页面转场，也不能重播焦点动画。
 
 ### Peak 项目的可迁移经验
 
@@ -147,7 +148,13 @@ TransportAdapter → SessionManager → ControlProtocol → InputRouter → AppM
 
 `StatePublisher` 反向发布结构化状态。手机 App 通常渲染自己的原生界面，而不是持续接收 320×240 framebuffer；截图/画面流只作为调试、镜像或特定游戏模式。这样 BLE 低带宽链路也能高效操作。
 
-TCP 高带宽链路可以在未来增加独立 `BulkData` 通道：设备向电脑发送 RGB565 关键帧/脏矩形实现无线镜像，或由电脑把受限尺寸的 RGB565 帧发送到设备专用 `RenderSurface` 实现投屏。控制命令、状态、日志和画面数据必须分帧并分别流控，不能让大帧阻塞输入队列、LVGL tick 或 OTA/调试连接；USB CDC 继续只承担烧录和备用维护，不作为唯一控制链路。
+当前已经建立第一个独立 `BulkData` 通道：控制使用 TCP 19000，吞吐实验使用 19001，`MirrorService` 使用 19002 向 PGOS Studio 发送带 `PGMF` 帧头的 320×240 RGB565BE 完整帧。第一版约 5 FPS，用每轮固定发送预算避免独占主循环；后续再演进为脏矩形、关键帧、压缩与录制。电脑向设备专用 `RenderSurface` 反向推送画面仍是后续能力。控制命令、状态、日志和画面数据必须分别流控，不能让大帧阻塞输入队列、LVGL tick 或 OTA/调试连接；USB CDC 继续只承担烧录和备用维护，不作为唯一控制链路。
+
+19000/19001/19002 是实验阶段便于独立抓包和排障的端口分工，不是长期协议约束。TCP 单个监听端口可以接受多条连接；协议稳定后可让控制、镜像、音频和文件连接共享 19000，并由连接首帧的 channel handshake 分类。共享监听端口不等于把所有数据塞进同一 TCP 字节流：各通道仍应保留独立 socket 和独立流控，避免媒体背压影响输入延迟。
+
+### PGOS Studio
+
+PGOS Studio 是“薄设备、富上位机”边界的第一份实现，可理解为面向 PGOS 的精简 scrcpy：它负责无线键盘导航、状态面板、屏幕镜像和未来录制/推流工具。Studio 不复制 Launcher 的应用注册表，也不为每个页面增加深链接按钮；新增设备 App 后，方向、确认、返回语义天然继续有效。页面直达和原始命令入口只保留给 USB/协议测试工具。
 
 ## FreeRTOS 使用策略
 

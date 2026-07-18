@@ -8,7 +8,7 @@
 
 当前固件点亮 ILI9341 屏幕，显示芯片、内存、运行时间和板卡信息，并开始 Wi-Fi Station 实验：通过 USB 控制台扫描/选择网络、输入密码并保存到设备 NVS，连接状态、IP 和 RSSI 同时显示在屏幕与控制台。
 
-当前固件使用 LVGL 9.5 retained-mode UI：系统桌面、系统信息、显示实验、显示设置、声音和网络设置由统一主题、可滚动页面、状态栏、页面转场和焦点卡片组成。显示设置支持 GPIO45 PWM 亮度、空闲息屏、活动唤醒和 NVS 持久化；声音页支持 ES8311 音量、反馈音和试听。LVGL 使用 40 行 RGB565 局部缓冲，显示服务在 PSRAM 中维护完整 shadow framebuffer，因此仍保留无损截图协议；USB 状态日志只低频输出。
+当前固件使用 LVGL 9.5 retained-mode UI：系统桌面、系统信息、显示实验、显示设置、声音、控制台和网络设置由统一主题、可滚动页面、状态栏、页面转场和焦点卡片组成。显示设置支持 GPIO45 PWM 亮度、空闲息屏、活动唤醒和 NVS 持久化；声音页支持 ES8311 音量、反馈音和试听。控制台页只显示 Wi-Fi 模式下的目标服务器和连接状态；镜像、画面推送、音频流等上位机功能不作为设备设置。LVGL 使用 40 行 RGB565 局部缓冲，显示服务在 PSRAM 中维护完整 shadow framebuffer，因此仍保留无损截图与无线镜像能力；USB 状态日志只低频输出。
 
 ## 当前环境
 
@@ -42,23 +42,35 @@ python tools/playground_console.py --port COM3 --wifi-setup
 python tools/capture_screen.py --port COM3 --output captures/home.png
 ```
 
-控制台的显式 `page system`、`page display`、`page settings`、`page sound` 和 `page network` 可直达页面，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `back`、`home`、`wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
+USB 调试控制台的显式 `page system`、`page display`、`page settings`、`page sound`、`page console` 和 `page network` 可直达页面，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `back`、`home`、`wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
 
-局域网 TCP 控制台服务器：接收 HELLO/heartbeat，发送 PING，并可在交互提示符中发送白名单命令：
+## PGOS Studio 无线上位机
+
+PGOS Studio 是面向 PlaygroundOS 的轻量设备镜像与遥控器，定位类似开发板专用的精简 scrcpy：上位机监听控制连接，设备经 Wi-Fi 主动连接；GUI 只提供四方向、确认、返回和 Home，不维护设备页面深链接。页面直达命令仍保留在 USB/协议调试层，方便自动测试。
+
+安装并启动：
+
+```powershell
+python -m pip install -r tools/requirements-studio.txt
+python tools/pgos_studio.py --listen 0.0.0.0 --port 19000
+```
+
+首次通过 USB 给设备保存电脑地址；`server set` 会同时启用自动连接，之后 Wi-Fi 恢复或上位机重启时设备会非阻塞重连：
+
+```text
+server set 192.168.1.4 19000
+server status
+```
+
+默认端口分工为：19000 控制与状态、19001 吞吐实验、19002 屏幕镜像。Studio 的“开始镜像”会通过控制协议临时启用设备 `MirrorService`，设备把 320×240 RGB565 shadow framebuffer 发送到独立镜像通道；该开关不写入 NVS，也不出现在设备设置菜单。当前是约 5 FPS 的完整原始帧 MVP，后续再增加脏矩形、帧率统计、录制、反向画面推送和音频。
+
+无依赖的命令行诊断服务器仍保留，用于协议和自动化测试：
 
 ```powershell
 python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 ```
 
-设备端配置服务器地址并启用主动连接：
-
-```text
-server set 192.168.1.4 19000
-server on
-server status
-```
-
-服务器连接后可直接输入 `up`、`down`、`left`、`right`、`ok`、`back`、`home`、`status`、`page system`、`page display` 或 `page network`。桌面上的四方向键只移动应用选择，进入应用后由当前应用自行处理；`back` 返回桌面，`home` 直接回到桌面。设备返回 ACK；`status` 还会返回结构化 STATE。Wi-Fi 密码、清除凭据等敏感命令不会通过 TCP 执行。
+诊断服务器连接后可直接输入 `up`、`down`、`left`、`right`、`ok`、`back`、`home`、`status` 或调试用 `page ...` 命令。桌面上的四方向键只移动应用选择，进入应用后由当前应用自行处理；`back` 返回桌面，`home` 直接回到桌面。设备返回 ACK；`status` 还会返回结构化 STATE。Wi-Fi 密码、清除凭据和服务器配置等敏感命令不会通过 TCP 执行。
 
 ## 文档入口
 
@@ -74,6 +86,7 @@ server status
 - [实验记录：PGOS UI v2 / LVGL 9.5](docs/experiments/005_ui_v2_lvgl.md)
 - [实验记录：显示亮度与自动息屏](docs/experiments/006_display_settings.md)
 - [实验记录：声音设置与 ES8311 最小播放](docs/experiments/007_sound_settings.md)
+- [实验记录：PGOS Studio 与无线屏幕镜像](docs/experiments/008_pgos_studio_mirror.md)
 - [可复用经验知识库](docs/knowledge/README.md)
 - [厂商原始资料说明](docs/vendor/README.md)
 

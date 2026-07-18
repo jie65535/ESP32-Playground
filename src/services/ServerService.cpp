@@ -69,12 +69,15 @@ bool ServerService::setTarget(const String& host, uint32_t port) {
     }
     host_ = host;
     port_ = static_cast<uint16_t>(port);
+    enabled_ = true;
     if (preferencesReady_) {
         preferences_.putString("host", host_);
         preferences_.putUShort("port", port_);
+        preferences_.putBool("enabled", true);
     }
     lastError_ = "";
-    state_ = enabled_ ? ServerState::WaitingWifi : ServerState::Disabled;
+    state_ = ServerState::WaitingWifi;
+    backoffStep_ = 0;
     nextAttemptMs_ = millis();
     log_->print(F("[server] target saved: "));
     log_->print(host_);

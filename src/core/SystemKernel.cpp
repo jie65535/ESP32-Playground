@@ -57,11 +57,16 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageDisplay:
         case AppCommandType::PageDisplaySettings:
         case AppCommandType::PageSound:
+        case AppCommandType::PageConsole:
         case AppCommandType::PageNetwork:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
         case AppCommandType::WifiStatus:
         case AppCommandType::ServerStatus:
+        case AppCommandType::MirrorOn:
+        case AppCommandType::MirrorOff:
+        case AppCommandType::MirrorToggle:
+        case AppCommandType::MirrorStatus:
         case AppCommandType::BenchStatus:
             return true;
         default:
@@ -91,6 +96,10 @@ bool countsAsDisplayActivity(AppCommandType type) {
         case AppCommandType::Screenshot:
         case AppCommandType::WifiStatus:
         case AppCommandType::ServerStatus:
+        case AppCommandType::MirrorOn:
+        case AppCommandType::MirrorOff:
+        case AppCommandType::MirrorToggle:
+        case AppCommandType::MirrorStatus:
         case AppCommandType::BenchStatus:
             return false;
         default:
@@ -113,6 +122,7 @@ void SystemKernel::setup() {
     audio_.begin(Serial);
     wifi_.begin(Serial);
     server_.begin(Serial);
+    mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
 
@@ -121,6 +131,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(displayTestApp_);
         appManager_.registerApp(displaySettingsApp_);
         appManager_.registerApp(soundSettingsApp_);
+        appManager_.registerApp(consoleSettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
@@ -155,6 +166,7 @@ void SystemKernel::loop() {
 
     wifi_.tick(nowMs);
     server_.tick(nowMs, wifi_.snapshot());
+    mirror_.tick(nowMs, wifi_.snapshot(), server_.snapshot(), display_);
     benchmark_.tick(nowMs);
     audio_.tick(nowMs);
     display_.tick(nowMs);
@@ -205,6 +217,7 @@ void SystemKernel::loop() {
             Serial.println(ESP.getFreePsram());
             wifi_.printStatus(Serial);
             server_.printStatus(Serial);
+            mirror_.printStatus(Serial);
             benchmark_.printStatus(Serial);
             display_.printStatus(Serial);
             audio_.printStatus(Serial);
@@ -238,6 +251,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
         case AppCommandType::PageSound:
             appManager_.activate(AppId::SoundSettings);
             break;
+        case AppCommandType::PageConsole:
+            appManager_.activate(AppId::ConsoleSettings);
+            break;
         case AppCommandType::PageNetwork:
             appManager_.activate(AppId::NetworkSettings);
             break;
@@ -250,6 +266,18 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::Status:
             printStatus();
+            break;
+        case AppCommandType::MirrorOn:
+            mirror_.setEnabled(true);
+            break;
+        case AppCommandType::MirrorOff:
+            mirror_.setEnabled(false);
+            break;
+        case AppCommandType::MirrorToggle:
+            mirror_.toggleEnabled();
+            break;
+        case AppCommandType::MirrorStatus:
+            mirror_.printStatus(Serial);
             break;
         case AppCommandType::BenchUpload: {
             const ServerSnapshot server = server_.snapshot();
@@ -292,7 +320,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         default:
             if (isWifiCommand(command.type) || isServerCommand(command.type)) {
-                appManager_.activate(AppId::NetworkSettings);
+                appManager_.activate(
+                    isWifiCommand(command.type) ? AppId::NetworkSettings
+                    : AppId::ConsoleSettings);
                 appManager_.handleCommand(command);
             } else {
                 appManager_.handleCommand(command);
@@ -319,6 +349,7 @@ void SystemKernel::printStatus() {
     Serial.println(ESP.getFreePsram());
     wifi_.printStatus(Serial);
     server_.printStatus(Serial);
+    mirror_.printStatus(Serial);
     benchmark_.printStatus(Serial);
     display_.printStatus(Serial);
     audio_.printStatus(Serial);

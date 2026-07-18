@@ -41,6 +41,10 @@ class ConsoleMappingTests(unittest.TestCase):
             "page sound",
         )
         self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "6")),
+            "page console",
+        )
+        self.assertEqual(
             CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "c")),
             "color_test",
         )
@@ -75,6 +79,7 @@ class ConsoleMappingTests(unittest.TestCase):
                     "wifi ssid HomeNet",
                     "wifi password AbCd1234",
                     "server set 192.168.1.4 19000",
+                    "mirror status",
                     "bench upload 4194304",
                 ]
             ),
@@ -85,6 +90,7 @@ class ConsoleMappingTests(unittest.TestCase):
                 "wifi ssid HomeNet",
                 "wifi password AbCd1234",
                 "server set 192.168.1.4 19000",
+                "mirror status",
                 "bench upload 4194304",
             ],
         )

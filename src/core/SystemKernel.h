@@ -3,6 +3,7 @@
 #include "apps/DisplayTestApp.h"
 #include "apps/DisplaySettingsApp.h"
 #include "apps/SoundSettingsApp.h"
+#include "apps/ConsoleSettingsApp.h"
 #include "apps/LauncherApp.h"
 #include "apps/NetworkSettingsApp.h"
 #include "apps/SystemInfoApp.h"
@@ -13,6 +14,7 @@
 #include "services/AudioService.h"
 #include "services/DisplayService.h"
 #include "services/ServerService.h"
+#include "services/MirrorService.h"
 #include "services/WifiService.h"
 #include "ui/UiRuntime.h"
 
@@ -28,6 +30,7 @@ private:
     AudioService audio_;
     WifiService wifi_;
     ServerService server_;
+    MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
     AppContext context_;
@@ -37,6 +40,7 @@ private:
     DisplayTestApp displayTestApp_;
     DisplaySettingsApp displaySettingsApp_;
     SoundSettingsApp soundSettingsApp_;
+    ConsoleSettingsApp consoleSettingsApp_;
     NetworkSettingsApp networkSettingsApp_;
     LauncherApp launcherApp_;
     uint32_t lastRenderMs_ = 0;

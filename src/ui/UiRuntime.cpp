@@ -231,15 +231,35 @@ void UiRuntime::replacePage(lv_obj_t* page, UiPageTransition transition) {
     }
 
     const bool backward = transition == UiPageTransition::Backward;
-    lv_obj_set_x(page, backward ? -DisplayService::SCREEN_WIDTH
-                                : DisplayService::SCREEN_WIDTH);
+    if (backward) {
+        // A hierarchical back action reveals the page underneath while the
+        // current page exits to the right.  Put the freshly rebuilt parent
+        // below the current page instead of sliding it in from the left.
+        const int32_t oldIndex = lv_obj_get_index(previousPage_);
+        lv_obj_set_x(page, 0);
+        lv_obj_move_to_index(page, oldIndex);
+
+        lv_anim_delete(previousPage_, setObjX);
+        lv_anim_t popAnimation;
+        lv_anim_init(&popAnimation);
+        lv_anim_set_var(&popAnimation, previousPage_);
+        lv_anim_set_values(&popAnimation, 0, DisplayService::SCREEN_WIDTH);
+        lv_anim_set_duration(&popAnimation, 220);
+        lv_anim_set_path_cb(&popAnimation, lv_anim_path_ease_in);
+        lv_anim_set_exec_cb(&popAnimation, setObjX);
+        lv_anim_set_completed_cb(&popAnimation, onPageTransitionFinished);
+        lv_anim_set_user_data(&popAnimation, this);
+        lv_anim_start(&popAnimation);
+        return;
+    }
+
+    lv_obj_set_x(page, DisplayService::SCREEN_WIDTH);
 
     lv_anim_t animation;
     lv_anim_init(&animation);
     lv_anim_set_var(&animation, page);
     lv_anim_set_values(&animation,
-                       backward ? -DisplayService::SCREEN_WIDTH
-                                 : DisplayService::SCREEN_WIDTH,
+                       DisplayService::SCREEN_WIDTH,
                        0);
     lv_anim_set_duration(&animation, 220);
     lv_anim_set_path_cb(&animation, lv_anim_path_ease_out);
@@ -251,7 +271,7 @@ void UiRuntime::replacePage(lv_obj_t* page, UiPageTransition transition) {
     lv_anim_t oldAnimation;
     lv_anim_init(&oldAnimation);
     lv_anim_set_var(&oldAnimation, previousPage_);
-    lv_anim_set_values(&oldAnimation, 0, backward ? 24 : -24);
+    lv_anim_set_values(&oldAnimation, 0, -24);
     lv_anim_set_duration(&oldAnimation, 220);
     lv_anim_set_path_cb(&oldAnimation, lv_anim_path_ease_in);
     lv_anim_set_exec_cb(&oldAnimation, setObjX);

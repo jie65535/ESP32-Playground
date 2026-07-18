@@ -1,6 +1,5 @@
 #include "apps/NetworkSettingsApp.h"
 
-#include "services/ServerService.h"
 #include "services/WifiService.h"
 #include "ui/UiRuntime.h"
 
@@ -124,32 +123,6 @@ void NetworkSettingsApp::onCommand(const AppCommand& command,
             context.console.println(F("       wifi password <value> | wifi open"));
             context.console.println(F("       wifi status | wifi reconnect | wifi clear"));
             break;
-        case AppCommandType::ServerSet:
-            context.server.setTarget(command.value, command.number);
-            break;
-        case AppCommandType::ServerStatus:
-            context.server.printStatus(context.console);
-            break;
-        case AppCommandType::ServerOn:
-            context.server.setEnabled(true);
-            break;
-        case AppCommandType::ServerOff:
-            context.server.setEnabled(false);
-            break;
-        case AppCommandType::ServerToggle:
-            context.server.toggleEnabled();
-            break;
-        case AppCommandType::ServerConnect:
-            context.server.connectNow();
-            break;
-        case AppCommandType::ServerClear:
-            context.server.clearTarget();
-            break;
-        case AppCommandType::ServerHelp:
-            context.console.println(F("Server: server set <host> <port>"));
-            context.console.println(F("        server status | server on | server off"));
-            context.console.println(F("        server connect | server clear"));
-            break;
         default:
             break;
     }
@@ -180,7 +153,7 @@ void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
 
 lv_obj_t* NetworkSettingsApp::onCreateView(AppContext& context) {
     root_ = context.ui.createPageRoot("NETWORK / RADIO", "Connectivity",
-                                      "Wi-Fi station and wireless console");
+                                      "Wi-Fi station and local radio");
     lastViewSignature_ = "";
     return root_;
 }
@@ -268,7 +241,7 @@ void NetworkSettingsApp::buildHeader(AppContext& context,
 void NetworkSettingsApp::buildInactive(AppContext& context,
                                        const WifiSnapshot& snapshot) {
     buildHeader(context, "NETWORK / RADIO", "Connectivity",
-                "Wi-Fi station and wireless console");
+                "Wi-Fi station and local radio");
 
     const String title = snapshot.ssid.isEmpty()
                              ? String("Wi-Fi Station")
@@ -292,11 +265,6 @@ void NetworkSettingsApp::buildInactive(AppContext& context,
     const String retry = String(snapshot.reconnectCount);
     context.ui.createValueRow(root_, "RETRIES", retry.c_str(), 170, &value);
 
-    const ServerSnapshot server = context.server.snapshot();
-    String serverValue = server.host.isEmpty() ? String("not configured")
-                                                : server.host + ":" + server.port;
-    context.ui.createValueRow(root_, "TCP TARGET", serverValue.c_str(), 192,
-                              &value);
 }
 
 void NetworkSettingsApp::buildScanning(AppContext& context) {
@@ -371,7 +339,6 @@ void NetworkSettingsApp::buildPassword(AppContext& context) {
 
 String NetworkSettingsApp::viewSignature(AppContext& context) const {
     const WifiSnapshot wifi = context.wifi.snapshot();
-    const ServerSnapshot server = context.server.snapshot();
     String signature = String(static_cast<uint8_t>(setupStage_));
     signature += '|';
     signature += static_cast<uint8_t>(wifi.state);
@@ -387,11 +354,5 @@ String NetworkSettingsApp::viewSignature(AppContext& context) const {
     signature += cursor_;
     signature += '|';
     signature += windowStart_;
-    signature += '|';
-    signature += server.host;
-    signature += '|';
-    signature += server.port;
-    signature += '|';
-    signature += static_cast<uint8_t>(server.state);
     return signature;
 }

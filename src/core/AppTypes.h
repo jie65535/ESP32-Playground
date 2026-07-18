@@ -7,6 +7,7 @@ enum class AppId : uint8_t {
     DisplayTest,
     DisplaySettings,
     SoundSettings,
+    ConsoleSettings,
     NetworkSettings,
     Launcher,
     Count,
@@ -26,6 +27,7 @@ enum class AppCommandType : uint8_t {
     PageDisplay,
     PageDisplaySettings,
     PageSound,
+    PageConsole,
     PageNetwork,
     ColorTest,
     Screenshot,
@@ -53,6 +55,10 @@ enum class AppCommandType : uint8_t {
     ServerConnect,
     ServerClear,
     ServerHelp,
+    MirrorOn,
+    MirrorOff,
+    MirrorToggle,
+    MirrorStatus,
     BenchUpload,
     BenchDownload,
     BenchStatus,
@@ -133,5 +139,14 @@ struct ServerSnapshot {
     uint16_t port = 19000;
     uint32_t reconnectCount = 0;
     uint32_t messageCount = 0;
+    String lastError;
+};
+
+struct MirrorSnapshot {
+    bool enabled = false;
+    bool connected = false;
+    uint16_t port = 19002;
+    uint32_t frameCount = 0;
+    String host;
     String lastError;
 };

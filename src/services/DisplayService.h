@@ -31,6 +31,8 @@ public:
 
     /* The framebuffer export format remains RGB565BE for the host tools. */
     void writeScreenshot(Stream& output);
+    bool copyShadowRgb565BE(size_t offset, uint8_t* destination,
+                            size_t length) const;
     static String formatBytes(size_t bytes);
 
 private:

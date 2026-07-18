@@ -3,7 +3,7 @@
 #include "core/App.h"
 #include "ui/UiRuntime.h"
 
-class LauncherApp final : public IApp {
+class ConsoleSettingsApp final : public IApp {
 public:
     AppId id() const override;
     const char* name() const override;
@@ -13,13 +13,16 @@ public:
     void onTick(uint32_t nowMs, AppContext& context) override;
     lv_obj_t* onCreateView(AppContext& context) override;
     void onUpdateView(AppContext& context) override;
-    AppId requestedApp() const override;
 
 private:
-    static constexpr uint8_t ITEM_COUNT = 6;
-    uint8_t selected_ = 0;
-    int8_t renderedSelection_ = -1;
-    AppId requested_ = AppId::Count;
+    static constexpr uint8_t ITEM_COUNT = 2;
+
     lv_obj_t* root_ = nullptr;
-    UiCard cards_[ITEM_COUNT];
+    UiCard rows_[ITEM_COUNT];
+    lv_obj_t* valueLabels_[ITEM_COUNT] = {};
+    uint8_t selected_ = 0;
+    int8_t renderedSelected_ = -1;
+    String lastStatusSignature_;
+
+    String statusSignature(AppContext& context) const;
 };

@@ -229,6 +229,25 @@ void DisplayService::writeScreenshot(Stream& output) {
     screenshotInProgress_ = false;
 }
 
+bool DisplayService::copyShadowRgb565BE(size_t offset, uint8_t* destination,
+                                        size_t length) const {
+    const size_t totalBytes =
+        static_cast<size_t>(SCREEN_WIDTH) * SCREEN_HEIGHT * 2U;
+    if (!ready_ || shadow_ == nullptr || destination == nullptr ||
+        offset > totalBytes || length > totalBytes - offset ||
+        (offset & 1U) != 0 || (length & 1U) != 0) {
+        return false;
+    }
+
+    const size_t firstPixel = offset / 2U;
+    for (size_t index = 0; index < length / 2U; ++index) {
+        const uint16_t value = shadow_[firstPixel + index];
+        destination[index * 2U] = static_cast<uint8_t>(value >> 8U);
+        destination[index * 2U + 1U] = static_cast<uint8_t>(value & 0xffU);
+    }
+    return true;
+}
+
 String DisplayService::formatBytes(size_t bytes) {
     if (bytes >= 1024U * 1024U) {
         return String(static_cast<float>(bytes) / (1024.0F * 1024.0F), 1) +
