@@ -51,7 +51,7 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 - `UiRuntime` 统一管理 LVGL 显示驱动、主题、22px 状态栏、页面转场和焦点卡片；Launcher、System、Color Lab、Display Settings、Sound、Network 已迁移到 retained-mode 页面。
 - DisplayService 使用 GPIO45 LEDC PWM 控制背光，提供亮度、空闲息屏、活动唤醒和 `pgos_display` NVS 持久化；默认 100% / Never，第一次导航输入只唤醒屏幕而不误操作页面。
 - 页面根节点是纵向滚动视口，焦点项使用非线性滚动自动靠近视口中心；状态栏使用波纹 Wi-Fi 图标和服务连接图标，不把诊断数值挤进顶栏。
-- AudioService 使用已验证的 ES8311/I²S 方向，提供音量、反馈音、试听和 `pgos_audio` NVS 持久化；Sound 页面在音频硬件不可用时降级显示。
+- AudioService 使用已验证的 ES8311/I²S 方向，提供音量、反馈音、试听和 `pgos_audio` NVS 持久化；音量采用 AOSP 风格分段 dB 曲线并在 0 dB 封顶，Sound 页面在音频硬件不可用时降级显示。
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
 - USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和 ACK/STATE，手机式服务器设置界面与认证控制协议仍待后续。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。

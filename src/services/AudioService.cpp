@@ -23,6 +23,70 @@ constexpr uint8_t SYSTEM_REG13 = 0x13;
 constexpr uint8_t DAC_MUTE_REG = 0x31;
 constexpr uint8_t DAC_VOLUME_REG = 0x32;
 constexpr uint8_t DAC_RAMP_REG = 0x37;
+constexpr int16_t ES8311_ZERO_DB_REGISTER = 0xBF;
+
+struct VolumeCurvePoint {
+    uint8_t percent;
+    int16_t gainHalfDb;
+};
+
+// AOSP-inspired speaker curve. ES8311 register 0x32 uses 0.5 dB steps,
+// with 0xBF representing 0 dB. Keeping the top at 0 dB avoids the codec's
+// optional +32 dB digital boost while preserving a phone-like progression.
+constexpr VolumeCurvePoint PHONE_VOLUME_CURVE[] = {
+    {1, -116},   // -58.0 dB
+    {20, -80},   // -40.0 dB
+    {60, -34},   // -17.0 dB
+    {100, 0},    //   0.0 dB
+};
+
+int16_t gainHalfDbForVolumePercent(uint8_t percent) {
+    if (percent == 0) {
+        return PHONE_VOLUME_CURVE[0].gainHalfDb;
+    }
+
+    for (size_t index = 1;
+         index < sizeof(PHONE_VOLUME_CURVE) / sizeof(PHONE_VOLUME_CURVE[0]);
+         ++index) {
+        const VolumeCurvePoint& upper = PHONE_VOLUME_CURVE[index];
+        if (percent > upper.percent) {
+            continue;
+        }
+
+        const VolumeCurvePoint& lower = PHONE_VOLUME_CURVE[index - 1];
+        const int32_t percentOffset = percent - lower.percent;
+        const int32_t percentSpan = upper.percent - lower.percent;
+        const int32_t gainSpan = upper.gainHalfDb - lower.gainHalfDb;
+        return static_cast<int16_t>(
+            lower.gainHalfDb +
+            (percentOffset * gainSpan + percentSpan / 2) / percentSpan);
+    }
+
+    return PHONE_VOLUME_CURVE[
+        sizeof(PHONE_VOLUME_CURVE) / sizeof(PHONE_VOLUME_CURVE[0]) - 1]
+        .gainHalfDb;
+}
+
+uint8_t codecRegisterForVolumePercent(uint8_t percent) {
+    if (percent == 0) {
+        return 0;
+    }
+    const int32_t value =
+        ES8311_ZERO_DB_REGISTER + gainHalfDbForVolumePercent(percent);
+    return static_cast<uint8_t>(constrain(value, 1, ES8311_ZERO_DB_REGISTER));
+}
+
+void printHalfDb(Print& output, int16_t halfDb) {
+    if (halfDb > 0) {
+        output.print('+');
+    } else if (halfDb < 0) {
+        output.print('-');
+        halfDb = -halfDb;
+    }
+    output.print(halfDb / 2);
+    output.print((halfDb & 1) != 0 ? F(".5") : F(".0"));
+    output.print(F("dB"));
+}
 
 }  // namespace
 
@@ -134,7 +198,14 @@ void AudioService::printStatus(Print& output) const {
     output.print(ready_ ? F("ready") : F("unavailable"));
     output.print(F(" volume="));
     output.print(volumePercent_);
-    output.print(F("% feedback="));
+    output.print(F("% curve=phone"));
+    if (volumePercent_ == 0) {
+        output.print(F(" gain=mute"));
+    } else {
+        output.print(F(" gain="));
+        printHalfDb(output, gainHalfDbForVolumePercent(volumePercent_));
+    }
+    output.print(F(" feedback="));
     output.print(feedbackEnabled_ ? F("on") : F("off"));
     if (!lastError_.isEmpty()) {
         output.print(F(" error="));
@@ -259,10 +330,7 @@ bool AudioService::setCodecMuted(bool muted) {
 }
 
 bool AudioService::applyCodecVolume() {
-    const uint8_t value = volumePercent_ == 0
-                              ? 0
-                              : static_cast<uint8_t>(
-                                    (volumePercent_ * 256U / 100U) - 1U);
+    const uint8_t value = codecRegisterForVolumePercent(volumePercent_);
     return writeRegister(DAC_VOLUME_REG, value) &&
            setCodecMuted(volumePercent_ == 0);
 }

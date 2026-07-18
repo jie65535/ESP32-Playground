@@ -33,16 +33,18 @@ python tools/playground_console.py --port COM3 --command "page sound"
 
 - COM3 启动状态为 `audio state=ready volume=60% feedback=off`，ES8311/I²S 初始化成功。
 - Test tone 能触发约 300 ms 播放，交互反馈音开关可以持久化。
-- 现场试听确认 40% 已很轻，60% 适合作为日常音量，100% 明显很响；硬件播放链路成立，但 UI 百分比到听感的曲线尚未冻结。
+- 现场试听确认旧曲线下 40% 已很轻，60% 适合作为日常音量，100% 明显很响；硬件播放链路成立，当前已部署临时手机式曲线，最终校准仍待继续试听。
 - RAM：51208 bytes / 327680 bytes（15.6%）。
-- Flash：1126521 bytes / 6553600 bytes（17.2%）。
+- Flash：1126865 bytes / 6553600 bytes（17.2%）。
 
 Android 的公开音频策略不是把 UI 百分比线性映射到振幅，而是把 UI index 通过分段曲线转换成 dB。AOSP 默认扬声器媒体曲线的参考点为 `1 → -58 dB`、`20 → -40 dB`、`60 → -17 dB`、`100 → 0 dB`，并允许不同音频用途和输出设备使用不同曲线：
 
 - <https://source.android.com/docs/core/audio/implement-policy>
 - <https://android.googlesource.com/platform/frameworks/av/+/refs/heads/main/services/audiopolicy/config/default_volume_tables.xml>
 
-因此 40% 听起来远小于“最大响度的一半”是正常现象。PGOS 当前仍把 UI 百分比线性写入 ES8311 音量寄存器；下一步应根据这块扬声器的实听结果建立分段 dB/寄存器表，而不是盲目把 40% 拉平到很响。
+ES8311 数据手册进一步确认，DAC 音量寄存器 `0x32` 以 `0.5 dB/step` 调节：`0x00 = -95.5 dB`、`0xBF = 0 dB`、`0xFF = +32 dB`。旧实现把 0%～100% 线性映射到 `0x00`～`0xFF`，等于让 100% 使用 `+32 dB` 数字增益；这解释了 40% 几乎听不清、60% 合适而 100% 突然非常响的现象。
+
+当前临时改用 AOSP 风格分段曲线：`1% = -58 dB`、`20% = -40 dB`、`60% = -17 dB`、`100% = 0 dB`，区间线性插值，0% 单独硬静音。这样保留手机常见的听感进度，并把最大值封顶在 0 dB，避免使用 ES8311 的正数字增益。该曲线是无扬声器料号情况下的通用起点，仍需根据当前样机试听微调。
 
 截图：
 
