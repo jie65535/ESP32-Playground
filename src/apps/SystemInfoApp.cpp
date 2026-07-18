@@ -53,11 +53,13 @@ lv_obj_t* SystemInfoApp::onCreateView(AppContext& context) {
                                       "ESP32-S3", "R8N16 / 240 MHz");
     cards_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_LOOP,
                                       "Main loop", "--");
-    cards_[2] = context.ui.createCard(root_, 158, LV_SYMBOL_LIST,
+    cards_[2] = context.ui.createCard(root_, 158, LV_SYMBOL_IMAGE,
+                                      "LCD flush", "--");
+    cards_[3] = context.ui.createCard(root_, 208, LV_SYMBOL_LIST,
                                       "Internal RAM", "--");
-    cards_[3] = context.ui.createCard(root_, 208, LV_SYMBOL_DRIVE,
+    cards_[4] = context.ui.createCard(root_, 258, LV_SYMBOL_DRIVE,
                                       "PSRAM", "--");
-    cards_[4] = context.ui.createCard(root_, 258, LV_SYMBOL_SAVE,
+    cards_[5] = context.ui.createCard(root_, 308, LV_SYMBOL_SAVE,
                                       "Flash and OTA", "--");
     return root_;
 }
@@ -78,10 +80,15 @@ void SystemInfoApp::onUpdateView(AppContext& context) {
     const RuntimeSnapshot runtime = context.runtime.snapshot();
     const String identity = String("uptime ") + nowMs_ / 1000U +
                             "s / tasks " + runtime.taskCount;
-    const String loop = String(runtime.mainLoopBusyPercent) +
-                        "% duty / ui " +
-                        String(runtime.lastUiUs / 1000U) + " ms / net " +
-                        String(runtime.lastMirrorUs / 1000U) + " ms";
+    const String loop = String("duty ") + runtime.mainLoopBusyPercent +
+                        "% / ui " + String(runtime.lastUiUs / 1000.0F, 1) +
+                        " ms / net " +
+                        String(runtime.lastMirrorUs / 1000.0F, 1) + " ms";
+    const String flush = String("SPI ") +
+                         String(runtime.lastFlushTransferUs / 1000.0F, 1) +
+                         " ms / copy " +
+                         String(runtime.lastFlushCopyUs / 1000.0F, 1) +
+                         " ms / " + runtime.lastFlushAreas + " areas";
     const String heap = String(percent(runtime.freeHeap, runtime.heapSize)) +
                         "% free / min " +
                         DisplayService::formatBytes(runtime.minimumFreeHeap);
@@ -94,7 +101,8 @@ void SystemInfoApp::onUpdateView(AppContext& context) {
                          DisplayService::formatBytes(runtime.freeSketchSpace);
     lv_label_set_text(cards_[0].subtitle, identity.c_str());
     lv_label_set_text(cards_[1].subtitle, loop.c_str());
-    lv_label_set_text(cards_[2].subtitle, heap.c_str());
-    lv_label_set_text(cards_[3].subtitle, psram.c_str());
-    lv_label_set_text(cards_[4].subtitle, flash.c_str());
+    lv_label_set_text(cards_[2].subtitle, flush.c_str());
+    lv_label_set_text(cards_[3].subtitle, heap.c_str());
+    lv_label_set_text(cards_[4].subtitle, psram.c_str());
+    lv_label_set_text(cards_[5].subtitle, flash.c_str());
 }

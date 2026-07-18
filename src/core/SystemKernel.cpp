@@ -255,8 +255,12 @@ void SystemKernel::loop() {
             runtime_.printStatus(Serial);
         }
     }
+    display_.beginFlushMetrics();
     stageStartedUs = esp_timer_get_time();
     ui_.tick();
+    const DisplayService::FlushMetrics flushMetrics = display_.flushMetrics();
+    runtime_.recordFlushMetrics(flushMetrics.copyUs, flushMetrics.transferUs,
+                                flushMetrics.pixels, flushMetrics.areas);
     runtime_.recordStage(
         RuntimeMonitorService::Stage::Ui,
         static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));

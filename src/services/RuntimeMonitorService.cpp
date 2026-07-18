@@ -55,6 +55,16 @@ void RuntimeMonitorService::recordStage(Stage stage, uint32_t elapsedUs) {
     }
 }
 
+void RuntimeMonitorService::recordFlushMetrics(uint32_t copyUs,
+                                                uint32_t transferUs,
+                                                uint32_t pixels,
+                                                uint16_t areas) {
+    snapshot_.lastFlushCopyUs = copyUs;
+    snapshot_.lastFlushTransferUs = transferUs;
+    snapshot_.lastFlushPixels = pixels;
+    snapshot_.lastFlushAreas = areas;
+}
+
 RuntimeSnapshot RuntimeMonitorService::snapshot() const {
     return snapshot_;
 }
@@ -83,7 +93,15 @@ void RuntimeMonitorService::printStatus(Print& output) const {
     output.print(F(" display="));
     output.print(snapshot_.lastDisplayUs);
     output.print(F(" ui="));
-    output.println(snapshot_.lastUiUs);
+    output.print(snapshot_.lastUiUs);
+    output.print(F(" flush_us spi="));
+    output.print(snapshot_.lastFlushTransferUs);
+    output.print(F(" copy="));
+    output.print(snapshot_.lastFlushCopyUs);
+    output.print(F(" areas="));
+    output.print(snapshot_.lastFlushAreas);
+    output.print(F(" pixels="));
+    output.println(snapshot_.lastFlushPixels);
 }
 
 void RuntimeMonitorService::sampleResources(uint32_t nowMs) {

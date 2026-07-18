@@ -33,6 +33,8 @@ ACK 0 ERROR busy
 - TCP FIFO 之后仍进入 16 项 `InputRouter`，两层都保持有界。
 - 主循环增加 Wi-Fi、Server、Mirror、Display、UI 等阶段的最近一次耗时，便于区分
   LCD 刷新、网络发送和 LVGL 本身的阻塞。
+- System Monitor 额外显示 LCD SPI 传输耗时、PSRAM 镜像拷贝耗时和本次 LVGL
+  刷新的区域数量；`ui` 仍表示 LVGL 渲染加同步 flush 的总耗时。
 
 ## CPU 指标边界
 
@@ -44,7 +46,7 @@ ACK 0 ERROR busy
 
 - `pio run -e playground`：通过。
 - `python -m unittest discover tools\tests`：13 项通过。
-- 最新构建资源：RAM 51928 / 327680 bytes（15.8%）；Flash 1136809 / 6553600 bytes（17.3%）。
+- 最新构建资源：RAM 52000 / 327680 bytes（15.9%）；Flash 1137621 / 6553600 bytes（17.4%）。
 
 ## 真机待测
 

@@ -170,4 +170,8 @@ struct RuntimeSnapshot {
     uint32_t lastAudioUs = 0;
     uint32_t lastDisplayUs = 0;
     uint32_t lastUiUs = 0;
+    uint32_t lastFlushCopyUs = 0;
+    uint32_t lastFlushTransferUs = 0;
+    uint32_t lastFlushPixels = 0;
+    uint16_t lastFlushAreas = 0;
 };

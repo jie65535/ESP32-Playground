@@ -15,7 +15,7 @@ public:
     void onUpdateView(AppContext& context) override;
 
 private:
-    static constexpr uint8_t ITEM_COUNT = 5;
+    static constexpr uint8_t ITEM_COUNT = 6;
 
     uint32_t nowMs_ = 0;
     lv_obj_t* root_ = nullptr;

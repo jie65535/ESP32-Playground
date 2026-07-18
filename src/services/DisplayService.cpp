@@ -1,5 +1,6 @@
 #include "services/DisplayService.h"
 
+#include <esp_timer.h>
 #include <esp_heap_caps.h>
 
 DisplayService::DisplayService() = default;
@@ -94,6 +95,14 @@ bool DisplayService::noteActivity(uint32_t nowMs) {
     return woke;
 }
 
+void DisplayService::beginFlushMetrics() {
+    flushMetrics_ = FlushMetrics{};
+}
+
+DisplayService::FlushMetrics DisplayService::flushMetrics() const {
+    return flushMetrics_;
+}
+
 uint8_t DisplayService::brightnessPercent() const {
     return brightnessPercent_;
 }
@@ -146,7 +155,15 @@ void DisplayService::printStatus(Print& output) const {
         output.print(F("s"));
     }
     output.print(F(" backlight="));
-    output.println(screenOff_ ? F("off") : F("on"));
+    output.print(screenOff_ ? F("off") : F("on"));
+    output.print(F(" flush_us spi="));
+    output.print(flushMetrics_.transferUs);
+    output.print(F(" copy="));
+    output.print(flushMetrics_.copyUs);
+    output.print(F(" areas="));
+    output.print(flushMetrics_.areas);
+    output.print(F(" pixels="));
+    output.println(flushMetrics_.pixels);
 }
 
 void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
@@ -172,18 +189,26 @@ void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
     const size_t screenWidth = SCREEN_WIDTH;
 
     const uint16_t* colors = reinterpret_cast<const uint16_t*>(pixels);
+    const uint64_t copyStartedUs = esp_timer_get_time();
     for (int32_t row = 0; row < height; ++row) {
         const uint16_t* source = colors + row * width;
         uint16_t* target = shadow_ +
                            static_cast<size_t>(y1 + row) * screenWidth + x1;
         memcpy(target, source, static_cast<size_t>(width) * sizeof(uint16_t));
     }
+    flushMetrics_.copyUs += static_cast<uint32_t>(
+        min<uint64_t>(esp_timer_get_time() - copyStartedUs, UINT32_MAX));
 
+    const uint64_t transferStartedUs = esp_timer_get_time();
     display_.startWrite();
     display_.setAddrWindow(x1, y1, width, height);
     display_.pushColors(const_cast<uint16_t*>(colors),
                          width * height, true);
     display_.endWrite();
+    flushMetrics_.transferUs += static_cast<uint32_t>(
+        min<uint64_t>(esp_timer_get_time() - transferStartedUs, UINT32_MAX));
+    flushMetrics_.pixels += static_cast<uint32_t>(width * height);
+    flushMetrics_.areas++;
 }
 
 void DisplayService::writeScreenshot(Stream& output) {

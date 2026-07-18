@@ -8,6 +8,13 @@
 
 class DisplayService {
 public:
+    struct FlushMetrics {
+        uint32_t copyUs = 0;
+        uint32_t transferUs = 0;
+        uint32_t pixels = 0;
+        uint16_t areas = 0;
+    };
+
     DisplayService();
 
     static constexpr uint16_t SCREEN_WIDTH = 320;
@@ -18,6 +25,8 @@ public:
     void pushBacklightOn();
     void tick(uint32_t nowMs);
     bool noteActivity(uint32_t nowMs);
+    void beginFlushMetrics();
+    FlushMetrics flushMetrics() const;
 
     uint8_t brightnessPercent() const;
     void setBrightnessPercent(uint8_t percent);
@@ -57,6 +66,7 @@ private:
     uint32_t screenTimeoutSeconds_ = DEFAULT_TIMEOUT_SECONDS;
     uint32_t lastActivityMs_ = 0;
     uint32_t settingsSaveDueMs_ = 0;
+    FlushMetrics flushMetrics_;
 
     void holdBacklightOff();
     void applyBacklight();
