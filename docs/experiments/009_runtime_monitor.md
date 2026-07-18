@@ -31,6 +31,8 @@ ACK 0 ERROR busy
 - Wi-Fi Station 禁用默认 modem sleep，优先降低交互 RTT。
 - TCP 接收层从单 pending 槽改为 8 项 FIFO；队列满时以原始 request ID 返回 `busy`。
 - TCP FIFO 之后仍进入 16 项 `InputRouter`，两层都保持有界。
+- 主循环增加 Wi-Fi、Server、Mirror、Display、UI 等阶段的最近一次耗时，便于区分
+  LCD 刷新、网络发送和 LVGL 本身的阻塞。
 
 ## CPU 指标边界
 
@@ -42,7 +44,7 @@ ACK 0 ERROR busy
 
 - `pio run -e playground`：通过。
 - `python -m unittest discover tools\tests`：13 项通过。
-- 构建资源：RAM 51896 / 327680 bytes（15.8%）；Flash 1136117 / 6553600 bytes（17.3%）。
+- 最新构建资源：RAM 51928 / 327680 bytes（15.8%）；Flash 1136809 / 6553600 bytes（17.3%）。
 
 ## 真机待测
 
@@ -50,3 +52,5 @@ ACK 0 ERROR busy
 - 连续快速发送 20 次方向键，确认 ACK 均带对应 request ID，或在真实队列满时按原 ID 返回 busy。
 - 观察最低 Heap 是否随镜像、测速和页面滚动持续下降。
 - 对比 modem sleep 关闭前后的 RTT、RSSI、吞吐和功耗。
+- 在 System Monitor 记录 `ui ms`、`net ms`，并在串口观察 `stages_us`，比较镜像关闭、静态
+  页面和动画三种状态。

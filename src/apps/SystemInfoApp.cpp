@@ -79,7 +79,9 @@ void SystemInfoApp::onUpdateView(AppContext& context) {
     const String identity = String("uptime ") + nowMs_ / 1000U +
                             "s / tasks " + runtime.taskCount;
     const String loop = String(runtime.mainLoopBusyPercent) +
-                        "% duty / " + runtime.mainLoopWorkUs + " us last";
+                        "% duty / ui " +
+                        String(runtime.lastUiUs / 1000U) + " ms / net " +
+                        String(runtime.lastMirrorUs / 1000U) + " ms";
     const String heap = String(percent(runtime.freeHeap, runtime.heapSize)) +
                         "% free / min " +
                         DisplayService::formatBytes(runtime.minimumFreeHeap);

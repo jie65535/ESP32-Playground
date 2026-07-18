@@ -6,9 +6,20 @@
 
 class RuntimeMonitorService {
 public:
+    enum class Stage : uint8_t {
+        Wifi,
+        Server,
+        Mirror,
+        Benchmark,
+        Audio,
+        Display,
+        Ui,
+    };
+
     void begin(Print& log);
     void beginLoop();
     void endLoop();
+    void recordStage(Stage stage, uint32_t elapsedUs);
 
     RuntimeSnapshot snapshot() const;
     void printStatus(Print& output) const;

@@ -43,6 +43,18 @@ void RuntimeMonitorService::endLoop() {
     }
 }
 
+void RuntimeMonitorService::recordStage(Stage stage, uint32_t elapsedUs) {
+    switch (stage) {
+        case Stage::Wifi: snapshot_.lastWifiUs = elapsedUs; break;
+        case Stage::Server: snapshot_.lastServerUs = elapsedUs; break;
+        case Stage::Mirror: snapshot_.lastMirrorUs = elapsedUs; break;
+        case Stage::Benchmark: snapshot_.lastBenchmarkUs = elapsedUs; break;
+        case Stage::Audio: snapshot_.lastAudioUs = elapsedUs; break;
+        case Stage::Display: snapshot_.lastDisplayUs = elapsedUs; break;
+        case Stage::Ui: snapshot_.lastUiUs = elapsedUs; break;
+    }
+}
+
 RuntimeSnapshot RuntimeMonitorService::snapshot() const {
     return snapshot_;
 }
@@ -61,7 +73,17 @@ void RuntimeMonitorService::printStatus(Print& output) const {
     output.print('/');
     output.print(snapshot_.psramSize);
     output.print(F(" tasks="));
-    output.println(snapshot_.taskCount);
+    output.print(snapshot_.taskCount);
+    output.print(F(" stages_us wifi="));
+    output.print(snapshot_.lastWifiUs);
+    output.print(F(" server="));
+    output.print(snapshot_.lastServerUs);
+    output.print(F(" mirror="));
+    output.print(snapshot_.lastMirrorUs);
+    output.print(F(" display="));
+    output.print(snapshot_.lastDisplayUs);
+    output.print(F(" ui="));
+    output.println(snapshot_.lastUiUs);
 }
 
 void RuntimeMonitorService::sampleResources(uint32_t nowMs) {

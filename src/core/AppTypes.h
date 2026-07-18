@@ -163,4 +163,11 @@ struct RuntimeSnapshot {
     uint32_t sketchSize = 0;
     uint32_t freeSketchSpace = 0;
     uint32_t taskCount = 0;
+    uint32_t lastWifiUs = 0;
+    uint32_t lastServerUs = 0;
+    uint32_t lastMirrorUs = 0;
+    uint32_t lastBenchmarkUs = 0;
+    uint32_t lastAudioUs = 0;
+    uint32_t lastDisplayUs = 0;
+    uint32_t lastUiUs = 0;
 };

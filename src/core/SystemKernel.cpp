@@ -1,5 +1,7 @@
 #include "core/SystemKernel.h"
 
+#include <esp_timer.h>
+
 namespace {
 
 constexpr uint32_t SERIAL_BAUD = 115200;
@@ -162,6 +164,7 @@ void SystemKernel::setup() {
 void SystemKernel::loop() {
     runtime_.beginLoop();
     const uint32_t nowMs = millis();
+    uint64_t stageStartedUs = esp_timer_get_time();
     AppCommand command;
     while (console_.poll(command)) {
         if (!inputRouter_.push(command, InputSource::Usb)) {
@@ -170,11 +173,34 @@ void SystemKernel::loop() {
     }
 
     wifi_.tick(nowMs);
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Wifi,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    stageStartedUs = esp_timer_get_time();
     server_.tick(nowMs, wifi_.snapshot(), runtime_.snapshot());
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Server,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    stageStartedUs = esp_timer_get_time();
     mirror_.tick(nowMs, wifi_.snapshot(), server_.snapshot(), display_);
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Mirror,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    stageStartedUs = esp_timer_get_time();
     benchmark_.tick(nowMs);
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Benchmark,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    stageStartedUs = esp_timer_get_time();
     audio_.tick(nowMs);
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Audio,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    stageStartedUs = esp_timer_get_time();
     display_.tick(nowMs);
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Display,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
     ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), nowMs);
 
     uint32_t requestId = 0;
@@ -229,7 +255,11 @@ void SystemKernel::loop() {
             runtime_.printStatus(Serial);
         }
     }
+    stageStartedUs = esp_timer_get_time();
     ui_.tick();
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Ui,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
     runtime_.endLoop();
     delay(1);
 }
