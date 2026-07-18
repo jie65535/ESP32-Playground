@@ -55,6 +55,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::Home:
         case AppCommandType::PageSystem:
         case AppCommandType::PageDisplay:
+        case AppCommandType::PageDisplaySettings:
         case AppCommandType::PageNetwork:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
@@ -64,6 +65,35 @@ bool isRemoteAllowed(AppCommandType type) {
             return true;
         default:
             return false;
+    }
+}
+
+bool isWakeOnlyCommand(AppCommandType type) {
+    switch (type) {
+        case AppCommandType::Previous:
+        case AppCommandType::Next:
+        case AppCommandType::Left:
+        case AppCommandType::Right:
+        case AppCommandType::Activate:
+        case AppCommandType::Back:
+        case AppCommandType::Home:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool countsAsDisplayActivity(AppCommandType type) {
+    switch (type) {
+        case AppCommandType::Status:
+        case AppCommandType::Help:
+        case AppCommandType::Screenshot:
+        case AppCommandType::WifiStatus:
+        case AppCommandType::ServerStatus:
+        case AppCommandType::BenchStatus:
+            return false;
+        default:
+            return true;
     }
 }
 
@@ -87,6 +117,7 @@ void SystemKernel::setup() {
     if (uiReady_) {
         appManager_.registerApp(systemInfoApp_);
         appManager_.registerApp(displayTestApp_);
+        appManager_.registerApp(displaySettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
@@ -122,6 +153,7 @@ void SystemKernel::loop() {
     wifi_.tick(nowMs);
     server_.tick(nowMs, wifi_.snapshot());
     benchmark_.tick(nowMs);
+    display_.tick(nowMs);
     ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), nowMs);
 
     uint32_t requestId = 0;
@@ -138,6 +170,14 @@ void SystemKernel::loop() {
 
     RoutedCommand routed;
     while (inputRouter_.poll(routed)) {
+        const bool wokeDisplay = countsAsDisplayActivity(routed.command.type)
+                                     ? display_.noteActivity(nowMs)
+                                     : false;
+        if (wokeDisplay && routed.source != InputSource::Tcp &&
+            isWakeOnlyCommand(routed.command.type)) {
+            requestRedraw();
+            continue;
+        }
         handleCommand(routed);
     }
 
@@ -159,6 +199,7 @@ void SystemKernel::loop() {
             wifi_.printStatus(Serial);
             server_.printStatus(Serial);
             benchmark_.printStatus(Serial);
+            display_.printStatus(Serial);
         }
     }
     ui_.tick();
@@ -182,6 +223,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageDisplay:
             appManager_.activate(AppId::DisplayTest);
+            break;
+        case AppCommandType::PageDisplaySettings:
+            appManager_.activate(AppId::DisplaySettings);
             break;
         case AppCommandType::PageNetwork:
             appManager_.activate(AppId::NetworkSettings);
@@ -265,6 +309,7 @@ void SystemKernel::printStatus() {
     wifi_.printStatus(Serial);
     server_.printStatus(Serial);
     benchmark_.printStatus(Serial);
+    display_.printStatus(Serial);
 }
 
 void SystemKernel::requestRedraw() {

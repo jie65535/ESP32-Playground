@@ -48,7 +48,8 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 - 已创建 PlatformIO `playground` 环境。
 - 当前固件由 PlaygroundOS `SystemKernel` 编排，显示、控制台、Wi-Fi 和现有页面已拆分为独立 Service/App 模块。
 - DisplayService 使用 LVGL 9.5 的 40 行 RGB565 局部缓冲，并在 PSRAM 中维护 320×240 RGB565 shadow framebuffer；背光首帧保护和 RGB565BE 截图协议继续保留，串口状态每 10 秒低频输出。
-- `UiRuntime` 统一管理 LVGL 显示驱动、主题、22px 状态栏、页面转场和焦点卡片；Launcher、System、Display、Network 已迁移到 retained-mode 页面。
+- `UiRuntime` 统一管理 LVGL 显示驱动、主题、22px 状态栏、页面转场和焦点卡片；Launcher、System、Color Lab、Display Settings、Network 已迁移到 retained-mode 页面。
+- DisplayService 使用 GPIO45 LEDC PWM 控制背光，提供亮度、空闲息屏、活动唤醒和 `pgos_display` NVS 持久化；默认 100% / Never，第一次导航输入只唤醒屏幕而不误操作页面。
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
 - USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和 ACK/STATE，手机式服务器设置界面与认证控制协议仍待后续。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。

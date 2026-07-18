@@ -5,6 +5,7 @@
 enum class AppId : uint8_t {
     SystemInfo,
     DisplayTest,
+    DisplaySettings,
     NetworkSettings,
     Launcher,
     Count,
@@ -22,6 +23,7 @@ enum class AppCommandType : uint8_t {
     Home,
     PageSystem,
     PageDisplay,
+    PageDisplaySettings,
     PageNetwork,
     ColorTest,
     Screenshot,

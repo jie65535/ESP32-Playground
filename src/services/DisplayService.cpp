@@ -12,9 +12,30 @@ void DisplayService::holdBacklightOff() {
 void DisplayService::begin() {
     holdBacklightOff();
 
+    preferencesReady_ = preferences_.begin("pgos_display", false);
+    if (preferencesReady_) {
+        brightnessPercent_ = preferences_.getUChar(
+            "brightness", DEFAULT_BRIGHTNESS_PERCENT);
+        if (brightnessPercent_ < 10 || brightnessPercent_ > 100) {
+            brightnessPercent_ = DEFAULT_BRIGHTNESS_PERCENT;
+        }
+        screenTimeoutSeconds_ = preferences_.getUInt(
+            "timeout_s", DEFAULT_TIMEOUT_SECONDS);
+        if (screenTimeoutSeconds_ > 24U * 60U * 60U) {
+            screenTimeoutSeconds_ = DEFAULT_TIMEOUT_SECONDS;
+        }
+    } else {
+        Serial.println(F("[display] NVS settings unavailable; using defaults"));
+    }
+
     display_.begin();
     display_.setRotation(1);
     display_.setTextWrap(false);
+
+    ledcSetup(BACKLIGHT_PWM_CHANNEL, BACKLIGHT_PWM_FREQUENCY,
+              BACKLIGHT_PWM_RESOLUTION);
+    ledcAttachPin(LCD_BACKLIGHT_PIN, BACKLIGHT_PWM_CHANNEL);
+    ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
 
     const size_t pixels = static_cast<size_t>(SCREEN_WIDTH) * SCREEN_HEIGHT;
     shadow_ = static_cast<uint16_t*>(heap_caps_malloc(
@@ -30,6 +51,7 @@ void DisplayService::begin() {
 
     memset(shadow_, 0, pixels * sizeof(uint16_t));
     ready_ = true;
+    lastActivityMs_ = millis();
 }
 
 bool DisplayService::ready() const {
@@ -37,7 +59,94 @@ bool DisplayService::ready() const {
 }
 
 void DisplayService::pushBacklightOn() {
-    digitalWrite(LCD_BACKLIGHT_PIN, HIGH);
+    backlightArmed_ = true;
+    screenOff_ = false;
+    lastActivityMs_ = millis();
+    applyBacklight();
+}
+
+void DisplayService::tick(uint32_t nowMs) {
+    if (!ready_) {
+        return;
+    }
+
+    if (settingsDirty_ &&
+        static_cast<int32_t>(nowMs - settingsSaveDueMs_) >= 0) {
+        saveSettings();
+    }
+
+    if (backlightArmed_ && !screenOff_ && screenTimeoutSeconds_ > 0 &&
+        nowMs - lastActivityMs_ >= screenTimeoutSeconds_ * 1000UL) {
+        screenOff_ = true;
+        applyBacklight();
+        Serial.println(F("[display] screen backlight off (idle timeout)"));
+    }
+}
+
+bool DisplayService::noteActivity(uint32_t nowMs) {
+    const bool woke = screenOff_;
+    lastActivityMs_ = nowMs;
+    if (woke) {
+        screenOff_ = false;
+        applyBacklight();
+        Serial.println(F("[display] backlight on (activity)"));
+    }
+    return woke;
+}
+
+uint8_t DisplayService::brightnessPercent() const {
+    return brightnessPercent_;
+}
+
+void DisplayService::setBrightnessPercent(uint8_t percent) {
+    percent = constrain(percent, static_cast<uint8_t>(10),
+                         static_cast<uint8_t>(100));
+    if (percent == brightnessPercent_) {
+        return;
+    }
+    brightnessPercent_ = percent;
+    settingsDirty_ = true;
+    settingsSaveDueMs_ = millis() + 750U;
+    applyBacklight();
+}
+
+uint32_t DisplayService::screenTimeoutSeconds() const {
+    return screenTimeoutSeconds_;
+}
+
+void DisplayService::setScreenTimeoutSeconds(uint32_t seconds) {
+    if (seconds > 24U * 60U * 60U) {
+        seconds = DEFAULT_TIMEOUT_SECONDS;
+    }
+    if (seconds == screenTimeoutSeconds_) {
+        return;
+    }
+    screenTimeoutSeconds_ = seconds;
+    settingsDirty_ = true;
+    settingsSaveDueMs_ = millis() + 750U;
+    lastActivityMs_ = millis();
+    if (screenOff_) {
+        screenOff_ = false;
+        applyBacklight();
+    }
+}
+
+bool DisplayService::screenIsOff() const {
+    return screenOff_;
+}
+
+void DisplayService::printStatus(Print& output) const {
+    output.print(F("[display] brightness="));
+    output.print(brightnessPercent_);
+    output.print(F("% timeout="));
+    if (screenTimeoutSeconds_ == 0) {
+        output.print(F("never"));
+    } else {
+        output.print(screenTimeoutSeconds_);
+        output.print(F("s"));
+    }
+    output.print(F(" backlight="));
+    output.println(screenOff_ ? F("off") : F("on"));
 }
 
 void DisplayService::flush(const lv_area_t& area, const uint8_t* pixels) {
@@ -126,4 +235,23 @@ String DisplayService::formatBytes(size_t bytes) {
                " MB";
     }
     return String(static_cast<float>(bytes) / 1024.0F, 1) + " KB";
+}
+
+void DisplayService::applyBacklight() {
+    if (!backlightArmed_ || screenOff_) {
+        ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
+        return;
+    }
+    const uint32_t duty = static_cast<uint32_t>(brightnessPercent_) * 255U / 100U;
+    ledcWrite(BACKLIGHT_PWM_CHANNEL, duty);
+}
+
+void DisplayService::saveSettings() {
+    settingsDirty_ = false;
+    if (!preferencesReady_) {
+        return;
+    }
+    preferences_.putUChar("brightness", brightnessPercent_);
+    preferences_.putUInt("timeout_s", screenTimeoutSeconds_);
+    Serial.println(F("[display] settings saved"));
 }

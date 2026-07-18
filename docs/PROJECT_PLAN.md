@@ -14,7 +14,7 @@
 
 ## 当前：Wi-Fi Station
 
-PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`DisplayService`、`ConsoleService` 和 `WifiService` 已在 `src/` 下分层，现有三个页面作为前台 App 运行。
+PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`DisplayService`、`ConsoleService` 和 `WifiService` 已在 `src/` 下分层，System、Color Lab、Display Settings 和 Network 作为前台 App 运行。
 
 - 连接家庭 2.4 GHz 路由器。
 - 显示 SSID、IP、RSSI 和重连次数。
@@ -23,6 +23,8 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 - 通过 USB 控制台扫描、选择 SSID 和输入密码；密码只写入设备 NVS，不进入 Git。
 - 支持隐藏 SSID 的手工输入和开放网络。
 - NTP 状态显示留待入网稳定后单独增加。
+
+显示设置基座已加入：GPIO45 使用 PWM 控制背光亮度，空闲计时只关闭背光而不停止系统服务；亮度和息屏时间保存到独立 NVS namespace，并由 Display App 修改。
 
 ## 随后：局域网 HTTP/JSON
 

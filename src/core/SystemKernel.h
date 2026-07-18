@@ -1,6 +1,7 @@
 #pragma once
 
 #include "apps/DisplayTestApp.h"
+#include "apps/DisplaySettingsApp.h"
 #include "apps/LauncherApp.h"
 #include "apps/NetworkSettingsApp.h"
 #include "apps/SystemInfoApp.h"
@@ -31,6 +32,7 @@ private:
     InputRouter inputRouter_;
     SystemInfoApp systemInfoApp_;
     DisplayTestApp displayTestApp_;
+    DisplaySettingsApp displaySettingsApp_;
     NetworkSettingsApp networkSettingsApp_;
     LauncherApp launcherApp_;
     uint32_t lastRenderMs_ = 0;
