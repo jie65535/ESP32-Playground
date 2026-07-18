@@ -22,9 +22,14 @@ LVGL 绘制、网络和其它主循环工作重叠。
 - LVGL 优先申请两块 320×40 RGB565 内部 DMA-capable draw buffer，每块 25.6 KB。
 - 两块内部缓冲或 DMA 初始化失败时，自动回退到原有 PSRAM 单缓冲同步 flush。
 - TFT_eSPI DMA 成功时启用 LVGL 双缓冲和 `flush_wait_cb`。
+- TFT_eSPI 固定到官方最新代码提交 `83d4d16`。它包含 `20e81da` 的 ESP32-S3 DMA
+  完成寄存器修复、`c00d8f4` 的 Arduino-ESP32 3.x DMA 兼容修复，以及后续 S3
+  SPI port 编号修复；不跟随浮动 `master`。
 - flush callback 启动 DMA 后立即返回；LVGL 需要复用缓冲时才等待上一次传输。
 - 最后一块区域的 DMA 在后续主循环中轮询完成，再通知 LVGL flush ready。
 - shadow framebuffer 暂时保留，维持现有完整帧镜像和 USB 截图协议。
+- 当前真机验证阶段暂时对每个区域等待 DMA 完成；确认新库版本稳定后，再恢复
+  非阻塞 flush，避免把库修复和异步生命周期问题同时混在一起。
 
 ## shadow framebuffer 的后续边界
 

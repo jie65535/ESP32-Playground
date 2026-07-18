@@ -103,7 +103,23 @@ bool DisplayService::initDma() {
     if (dmaEnabled_) {
         return true;
     }
+
+    dmaBuffer_ = static_cast<uint16_t*>(heap_caps_malloc(
+        DMA_BUFFER_PIXELS * sizeof(uint16_t),
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
+    if (dmaBuffer_ == nullptr) {
+        Serial.println(F("[display] DMA staging buffer unavailable"));
+        return false;
+    }
+
     dmaEnabled_ = display_.initDMA();
+    if (!dmaEnabled_) {
+        heap_caps_free(dmaBuffer_);
+        dmaBuffer_ = nullptr;
+        Serial.println(F("[display] SPI DMA unavailable"));
+        return false;
+    }
+    display_.setSwapBytes(true);
     Serial.println(dmaEnabled_ ? F("[display] SPI DMA enabled")
                                : F("[display] SPI DMA unavailable"));
     return dmaEnabled_;
@@ -128,7 +144,6 @@ bool DisplayService::finishDmaIfReady() {
         return false;
     }
 
-    display_.endWrite();
     completeDmaTransfer();
     return true;
 }
@@ -139,7 +154,6 @@ void DisplayService::waitForDma() {
     }
 
     display_.dmaWait();
-    display_.endWrite();
     completeDmaTransfer();
 }
 
@@ -260,19 +274,22 @@ bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
             waitForDma();
         }
 
-        lv_draw_sw_rgb565_swap(const_cast<uint8_t*>(pixels),
-                               static_cast<uint32_t>(width * height));
         dmaStartedUs_ = esp_timer_get_time();
         display_.startWrite();
-        display_.setAddrWindow(x1, y1, width, height);
-        display_.pushPixelsDMA(
+        display_.pushImageDMA(
+            x1, y1, width, height,
             const_cast<uint16_t*>(reinterpret_cast<const uint16_t*>(pixels)),
-            static_cast<uint32_t>(width * height));
-        dmaPending_ = true;
-        dmaPendingLast_ = lastArea;
+            dmaBuffer_);
+        display_.dmaWait();
+        display_.endWrite();
+        activeFlushMetrics_.transferUs += static_cast<uint32_t>(min<uint64_t>(
+            esp_timer_get_time() - dmaStartedUs_, UINT32_MAX));
         activeFlushMetrics_.pixels += static_cast<uint32_t>(width * height);
         activeFlushMetrics_.areas++;
-        return true;
+        if (lastArea) {
+            finishFlushFrame();
+        }
+        return false;
     }
 
     const uint64_t transferStartedUs = esp_timer_get_time();

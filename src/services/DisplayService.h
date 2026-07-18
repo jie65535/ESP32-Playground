@@ -57,10 +57,13 @@ private:
     static constexpr size_t SCREENSHOT_CHUNK = 1024;
     static constexpr uint8_t DEFAULT_BRIGHTNESS_PERCENT = 100;
     static constexpr uint32_t DEFAULT_TIMEOUT_SECONDS = 0;
+    static constexpr size_t DMA_BUFFER_PIXELS =
+        static_cast<size_t>(SCREEN_WIDTH) * 40U;
 
     TFT_eSPI display_;
     Preferences preferences_;
     uint16_t* shadow_ = nullptr;
+    uint16_t* dmaBuffer_ = nullptr;
     bool ready_ = false;
     bool screenshotInProgress_ = false;
     bool backlightArmed_ = false;
@@ -77,6 +80,7 @@ private:
     bool asyncFlushEnabled_ = false;
     bool dmaPending_ = false;
     bool dmaPendingLast_ = false;
+    bool dmaTransactionOpen_ = false;
     uint64_t dmaStartedUs_ = 0;
 
     void holdBacklightOff();
