@@ -9,6 +9,8 @@ RGB565 frame cannot be mixed with human-readable serial output.
 from __future__ import annotations
 
 import argparse
+import collections
+import getpass
 import os
 import pathlib
 import sys
@@ -36,9 +38,21 @@ VALID_COMMANDS = (
     "page system",
     "page display",
     "page network",
+    "wifi scan",
+    "wifi status",
+    "wifi reconnect",
+    "wifi clear",
+    "wifi open",
+    "wifi help",
+    "wifi on",
+    "wifi off",
+    "wifi toggle",
+    "wifi wizard",
+    "wifi wizard cancel",
 )
 
 CAPTURE_ACTION = "__capture_screenshot__"
+WIFI_SETUP_ACTION = "__wifi_setup__"
 
 SHORTCUTS = {
     "0": "page system",
@@ -50,7 +64,14 @@ SHORTCUTS = {
     "h": "help",
     "?": "help",
     "s": CAPTURE_ACTION,
+    "w": WIFI_SETUP_ACTION,
 }
+
+
+def command_for_log(command: str) -> str:
+    if command.lower().startswith("wifi password "):
+        return "wifi password <hidden>"
+    return command
 
 
 class Transport(Protocol):
@@ -58,16 +79,27 @@ class Transport(Protocol):
 
     def capture(self) -> pathlib.Path | None: ...
 
+    def clear_received_lines(self) -> None: ...
+
+    def wait_for(self, markers: tuple[str, ...], timeout: float) -> str | None: ...
+
     def close(self) -> None: ...
 
 
 class DryRunTransport:
     def send(self, command: str) -> None:
-        print(f"[DRY-RUN] send: {command}")
+        print(f"[DRY-RUN] send: {command_for_log(command)}")
 
     def capture(self) -> pathlib.Path | None:
         print("[DRY-RUN] capture screenshot and copy image to clipboard")
         return None
+
+    def clear_received_lines(self) -> None:
+        return
+
+    def wait_for(self, markers: tuple[str, ...], timeout: float) -> str | None:
+        del timeout
+        return markers[0] if markers else None
 
     def close(self) -> None:
         return
@@ -93,13 +125,32 @@ class SerialTransport:
         self._stop = threading.Event()
         self._capture_requested = threading.Event()
         self._reader_paused = threading.Event()
+        self._received_lines: collections.deque[str] = collections.deque(maxlen=256)
+        self._received_condition = threading.Condition()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
 
     def send(self, command: str) -> None:
-        self._serial.write((command + "\n").encode("ascii"))
+        self._serial.write((command + "\n").encode("utf-8"))
         self._serial.flush()
-        print(f"[HOST] {command}")
+        print(f"[HOST] {command_for_log(command)}")
+
+    def clear_received_lines(self) -> None:
+        with self._received_condition:
+            self._received_lines.clear()
+
+    def wait_for(self, markers: tuple[str, ...], timeout: float) -> str | None:
+        deadline = time.monotonic() + timeout
+        with self._received_condition:
+            while True:
+                while self._received_lines:
+                    line = self._received_lines.popleft()
+                    if any(marker in line for marker in markers):
+                        return line
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+                self._received_condition.wait(remaining)
 
     def capture(self) -> pathlib.Path | None:
         output = capture_screen.default_output_path()
@@ -144,7 +195,11 @@ class SerialTransport:
                 self._stop.set()
                 return
             if line:
-                print(f"\n[DEVICE] {line.decode('utf-8', errors='replace').rstrip()}")
+                decoded = line.decode("utf-8", errors="replace").rstrip()
+                with self._received_condition:
+                    self._received_lines.append(decoded)
+                    self._received_condition.notify_all()
+                print(f"\n[DEVICE] {decoded}")
 
 
 @dataclass(frozen=True)
@@ -168,10 +223,16 @@ def command_for_key(event: KeyEvent) -> str | None:
 def normalize_commands(commands: Iterable[str]) -> list[str]:
     normalized = []
     for command in commands:
-        value = command.strip().lower()
-        if value not in VALID_COMMANDS:
+        value = command.strip()
+        lower_value = value.lower()
+        if lower_value in VALID_COMMANDS:
+            normalized.append(lower_value)
+            continue
+        prefixes = ("wifi select ", "wifi ssid ", "wifi password ")
+        prefix = next((item for item in prefixes if lower_value.startswith(item)), None)
+        if prefix is None or not value[len(prefix):]:
             raise ValueError(f"unsupported command: {command}")
-        normalized.append(value)
+        normalized.append(prefix + value[len(prefix):])
     return normalized
 
 
@@ -188,11 +249,70 @@ def list_ports() -> list[str]:
 def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
-    print("  1/0 system   2 display   3 network placeholder")
+    print("  1/0 system   2 display   3 network")
     print("  C color test   R status   S screenshot + clipboard")
+    print("  W Wi-Fi scan/select/password setup (password input is hidden)")
     print("  Arrow Up/Down and Enter are optional convenience keys")
     print("  Full commands are accepted with --command; H help, Q quit")
     print()
+
+
+def run_wifi_setup(transport: Transport) -> bool:
+    print("\nStarting Wi-Fi setup wizard...")
+    transport.clear_received_lines()
+    transport.send("wifi wizard")
+    result = transport.wait_for(
+        (
+            "[wifi-ui] networks ready:",
+            "[wifi-ui] scan produced no usable networks",
+            "[wifi] scan failed after retries",
+        ),
+        timeout=40.0,
+    )
+    if result is None:
+        print("[HOST] Wi-Fi scan timed out; use W to try again")
+        return False
+    if "networks ready:" not in result:
+        print("[HOST] Wi-Fi scan did not complete successfully")
+        return False
+
+    print("[HOST] Use Up/Down to move on the device screen, Enter to select, Q to cancel")
+    while True:
+        event = read_key()
+        if event.name == "quit":
+            transport.send("wifi wizard cancel")
+            return False
+        if event.name in ("up", "down"):
+            transport.send(event.name)
+            continue
+        if event.name != "enter":
+            continue
+
+        transport.clear_received_lines()
+        transport.send("ok")
+        selected = transport.wait_for(
+            ("[wifi-ui] password required", "[wifi] invalid index"),
+            timeout=3.0,
+        )
+        if selected is None or "password required" not in selected:
+            print("[HOST] network selection failed; try again")
+            continue
+        break
+
+    while True:
+        password = getpass.getpass(
+            "Wi-Fi password (blank only for an open network): "
+        )
+        password_bytes = password.encode("utf-8")
+        if not password or 8 <= len(password_bytes) <= 63:
+            break
+        print("[HOST] WPA/WPA2 password must contain 8 to 63 bytes")
+    if password:
+        transport.send(f"wifi password {password}")
+    else:
+        transport.send("wifi open")
+    print("[HOST] credentials sent to device NVS; use wifi status to inspect progress")
+    return True
 
 
 def read_key() -> KeyEvent:
@@ -251,6 +371,8 @@ def run_interactive(transport: Transport) -> None:
             print_controls()
         elif command == CAPTURE_ACTION:
             transport.capture()
+        elif command == WIFI_SETUP_ACTION:
+            run_wifi_setup(transport)
         else:
             transport.send(command)
 
@@ -261,6 +383,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--list", action="store_true", help="list available ports")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--wifi-setup",
+        action="store_true",
+        help="scan, select and securely enter a Wi-Fi password",
+    )
     parser.add_argument("--command", action="append", default=[])
     return parser
 
@@ -295,7 +422,9 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     try:
-        if commands:
+        if args.wifi_setup:
+            run_wifi_setup(transport)
+        elif commands:
             for command in commands:
                 if command == "screenshot":
                     transport.capture()

@@ -1,0 +1,28 @@
+#pragma once
+
+#include "core/AppTypes.h"
+
+#include <Arduino.h>
+
+class DisplayService;
+class WifiService;
+
+struct AppContext {
+    DisplayService& display;
+    WifiService& wifi;
+    Stream& console;
+};
+
+class IApp {
+public:
+    virtual ~IApp() = default;
+    virtual AppId id() const = 0;
+    virtual const char* name() const = 0;
+    virtual void onEnter(AppContext& context) = 0;
+    virtual void onExit(AppContext& context) = 0;
+    virtual void onCommand(const AppCommand& command, AppContext& context) = 0;
+    virtual void onTick(uint32_t nowMs, AppContext& context) = 0;
+    virtual void onRender(AppContext& context) = 0;
+    virtual bool handlesNavigation() const { return false; }
+    virtual AppId requestedApp() const { return AppId::Count; }
+};

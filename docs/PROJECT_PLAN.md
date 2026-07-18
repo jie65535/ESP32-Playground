@@ -1,6 +1,8 @@
 # Playground 项目路线
 
-## 当前：屏幕与板卡信息
+长期平台方向：PlaygroundOS（PGOS）。先建立稳定的服务、应用和连接边界，再逐项加入板载外设与实验应用。
+
+## 已完成：屏幕与板卡信息
 
 目标是建立可重复的最小固件：
 
@@ -10,13 +12,17 @@
 - 不连接外部模块，不依赖外部按键，不启用 Wi-Fi。
 - 使用 PSRAM 离屏 Sprite，支持 USB 键盘控制和 RGB565 无损截图。
 
-## 下一步：Wi-Fi Station
+## 当前：Wi-Fi Station
+
+PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`DisplayService`、`ConsoleService` 和 `WifiService` 已在 `src/` 下分层，现有三个页面作为前台 App 运行。
 
 - 连接家庭 2.4 GHz 路由器。
-- 显示 SSID、IP、RSSI、重连次数和 NTP 状态。
+- 显示 SSID、IP、RSSI 和重连次数。
 - USB 命令支持 `wifi status`、`wifi scan`、`wifi reconnect`。
 - 使用非阻塞连接状态机和退避重连。
-- SSID/密码先放在未跟踪本地配置，后续再做 NVS 配网。
+- 通过 USB 控制台扫描、选择 SSID 和输入密码；密码只写入设备 NVS，不进入 Git。
+- 支持隐藏 SSID 的手工输入和开放网络。
+- NTP 状态显示留待入网稳定后单独增加。
 
 ## 随后：局域网 HTTP/JSON
 

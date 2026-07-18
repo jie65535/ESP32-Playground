@@ -39,6 +39,10 @@ class ConsoleMappingTests(unittest.TestCase):
             CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "r")),
             "status",
         )
+        self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "w")),
+            CONSOLE.WIFI_SETUP_ACTION,
+        )
 
     def test_command_validation(self) -> None:
         self.assertEqual(
@@ -47,6 +51,30 @@ class ConsoleMappingTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             CONSOLE.normalize_commands(["alarm"])
+
+    def test_wifi_commands_preserve_case_sensitive_values(self) -> None:
+        self.assertEqual(
+            CONSOLE.normalize_commands(
+                [
+                    "WIFI SCAN",
+                    "wifi on",
+                    "wifi select 2",
+                    "wifi ssid HomeNet",
+                    "wifi password AbCd1234",
+                ]
+            ),
+            [
+                "wifi scan",
+                "wifi on",
+                "wifi select 2",
+                "wifi ssid HomeNet",
+                "wifi password AbCd1234",
+            ],
+        )
+        self.assertEqual(
+            CONSOLE.command_for_log("wifi password AbCd1234"),
+            "wifi password <hidden>",
+        )
 
 
 if __name__ == "__main__":

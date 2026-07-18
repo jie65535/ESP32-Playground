@@ -17,10 +17,11 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 1. `README.md`
 2. `docs/HARDWARE.md`
 3. `docs/PROJECT_PLAN.md`
-4. `docs/WIFI_PLAN.md`（涉及网络时）
-5. `docs/knowledge/README.md`（需要复用已有经验时）
-6. 对应的 `docs/experiments/*.md`
-7. 需要查厂商原文时，进入 `docs/vendor/2.8inch_IPS_ESP32-S3_ILI9341V_ES3C28P_ES3N28P_V1.0`
+4. `docs/ARCHITECTURE.md`（涉及平台、应用或模块边界时）
+5. `docs/WIFI_PLAN.md`（涉及网络时）
+6. `docs/knowledge/README.md`（需要复用已有经验时）
+7. 对应的 `docs/experiments/*.md`
+8. 需要查厂商原文时，进入 `docs/vendor/2.8inch_IPS_ESP32-S3_ILI9341V_ES3C28P_ES3N28P_V1.0`
 
 发生冲突时：
 
@@ -45,9 +46,10 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 ## 4. 当前实现状态
 
 - 已创建 PlatformIO `playground` 环境。
-- 当前固件负责初始化屏幕、背光和 USB CDC，并显示板卡/内存/运行时间信息。
-- 当前固件使用 320×240 RGB565 TFT_eSprite 离屏画布，优先分配到 PSRAM，完整绘制后一次推送；串口状态每 10 秒低频输出。
-- 当前固件不连接外部模块，不保存 Wi-Fi 密码，不启动 Wi-Fi；交互以 USB 键盘控制台为主，不要求外接业务按键。
+- 当前固件由 PlaygroundOS `SystemKernel` 编排，显示、控制台、Wi-Fi 和现有页面已拆分为独立 Service/App 模块。
+- DisplayService 使用 320×240 RGB565 TFT_eSprite 离屏画布，优先分配到 PSRAM，完整绘制后一次推送；串口状态每 10 秒低频输出。
+- WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
+- 当前交互仍以 USB 键盘控制台为主，不要求外接业务按键；暂不启动局域网服务和手机式设置向导。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。
 
 ## 5. 开发纪律
@@ -61,11 +63,12 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 
 ## 6. 下一步
 
-1. 用 `playground` 固件确认屏幕、背光、USB CDC 和内存显示。
-2. 新增 Wi-Fi Station 状态机，连接家庭 2.4 GHz 路由器。
-3. 增加 IP、RSSI、NTP 和重连信息显示。
-4. 增加局域网 HTTP/JSON 接口和 Python 上位机服务器。
-5. 再逐项探索 RGB、音频、麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
+1. 在当前样机上继续确认 PlaygroundOS 模块拆分后的显示、USB CDC 和 Wi-Fi Station 行为。
+2. 增加 Launcher、Settings 和统一输入事件，再实现手机式 Wi-Fi 开关/扫描列表/文本输入。
+3. 增加 NTP 状态显示，并保持网络任务非阻塞。
+4. 设计局域网无线控制台：优先设备主动 TCP 长连接，另提供 HTTP/JSON 状态与命令接口。
+5. 增加独立的吞吐/延迟测试，不把测试流量混入控制命令通道。
+6. 再逐项探索 RGB、音频、麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
 
 ## 7. 已迁移的通用资产
 
