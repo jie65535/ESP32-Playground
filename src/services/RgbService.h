@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Preferences.h>
 
 enum class RgbEffect : uint8_t {
     Solid,
@@ -56,24 +57,35 @@ private:
     static constexpr uint8_t RGB_PIN = 42;
     static constexpr uint32_t FRAME_INTERVAL_MS = 10;
     static constexpr uint8_t BRIGHTNESS_RAMP_STEP_PERCENT = 3;
+    static constexpr uint32_t SETTINGS_SAVE_DELAY_MS = 750;
+    static constexpr RgbEffect DEFAULT_EFFECT = RgbEffect::Rainbow;
+    static constexpr uint8_t DEFAULT_COLOR_INDEX = 0;
+    static constexpr uint8_t DEFAULT_BRIGHTNESS_PERCENT = 40;
+    static constexpr uint8_t DEFAULT_SPEED_INDEX = 1;
 
     Print* log_ = nullptr;
+    Preferences preferences_;
     bool ready_ = false;
+    bool preferencesReady_ = false;
+    bool settingsDirty_ = false;
     bool enabled_ = false;
     bool dirty_ = true;
-    RgbEffect effect_ = RgbEffect::Rainbow;
-    uint8_t colorIndex_ = 0;
-    uint8_t brightnessPercent_ = 40;
-    uint8_t appliedBrightnessPercent_ = 40;
-    uint8_t speedIndex_ = 1;
+    RgbEffect effect_ = DEFAULT_EFFECT;
+    uint8_t colorIndex_ = DEFAULT_COLOR_INDEX;
+    uint8_t brightnessPercent_ = DEFAULT_BRIGHTNESS_PERCENT;
+    uint8_t appliedBrightnessPercent_ = DEFAULT_BRIGHTNESS_PERCENT;
+    uint8_t speedIndex_ = DEFAULT_SPEED_INDEX;
     uint8_t outputRed_ = 0;
     uint8_t outputGreen_ = 0;
     uint8_t outputBlue_ = 0;
     uint32_t effectStartedMs_ = 0;
     uint32_t lastFrameMs_ = 0;
+    uint32_t settingsSaveDueMs_ = 0;
     uint32_t randomState_ = 0x42A5C39DU;
 
     void restartEffect();
+    void markSettingsDirty();
+    void saveSettings();
     void render(uint32_t nowMs);
     void writeOutput(uint8_t red, uint8_t green, uint8_t blue);
     static uint8_t scale8(uint8_t value, uint16_t scale);

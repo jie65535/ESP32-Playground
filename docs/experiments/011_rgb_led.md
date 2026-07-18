@@ -19,7 +19,8 @@ GRB 数据，不增加第三方库。一次发送约 30µs；颜色没有变化�
 
 - 上电关闭，避免启动时产生强光。
 - 默认效果为 Rainbow、亮度 40%、速度 Normal。
-- 设置只在当前运行会话中保存，第一版不写 NVS。
+- Power 只在当前运行会话中保存，重启后始终关闭。
+- Effect、Palette、Brightness 和 Speed 保存到 `pgos_rgb` NVS namespace，连续操作停止 750ms 后合并写入。
 - 离开 RGB Light 页面后灯效继续运行；服务生命周期不依赖页面生命周期。
 
 页面提供五个设置：
@@ -64,4 +65,4 @@ python tools/playground_console.py --port COM3 --command "page rgb"
 - 五种灯效在 Slow/Normal/Fast 下是否连续、无明显卡顿。
 - 灯效运行时页面动画、无线控制、镜像和音频是否仍正常。
 
-真机确认后再决定是否增加 NVS 持久化、通知灯语义、音乐律动或从上位机推送灯光场景。
+真机确认后再决定是否增加通知灯语义、音乐律动或从上位机推送灯光场景。

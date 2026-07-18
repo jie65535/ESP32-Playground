@@ -28,13 +28,53 @@ constexpr uint32_t SPARKLE_INTERVALS_MS[] = {120, 65, 35};
 
 void RgbService::begin(Print& log) {
     log_ = &log;
+    preferencesReady_ = preferences_.begin("pgos_rgb", false);
+    if (preferencesReady_) {
+        const uint8_t storedEffect = preferences_.getUChar(
+            "effect", static_cast<uint8_t>(DEFAULT_EFFECT));
+        effect_ = storedEffect < EFFECT_COUNT
+                      ? static_cast<RgbEffect>(storedEffect)
+                      : DEFAULT_EFFECT;
+
+        const uint8_t storedColor = preferences_.getUChar(
+            "color", DEFAULT_COLOR_INDEX);
+        colorIndex_ = storedColor < PALETTE_COUNT ? storedColor
+                                                  : DEFAULT_COLOR_INDEX;
+
+        const uint8_t storedBrightness = preferences_.getUChar(
+            "brightness", DEFAULT_BRIGHTNESS_PERCENT);
+        brightnessPercent_ =
+            storedBrightness >= 1 && storedBrightness <= 100
+                ? storedBrightness
+                : DEFAULT_BRIGHTNESS_PERCENT;
+        appliedBrightnessPercent_ = brightnessPercent_;
+
+        const uint8_t storedSpeed = preferences_.getUChar(
+            "speed", DEFAULT_SPEED_INDEX);
+        speedIndex_ = storedSpeed < SPEED_COUNT ? storedSpeed
+                                                 : DEFAULT_SPEED_INDEX;
+    } else {
+        log_->println(F("[rgb] NVS settings unavailable; using defaults"));
+    }
+
     effectStartedMs_ = millis();
     writeOutput(0, 0, 0);
     ready_ = true;
-    log_->println(F("[rgb] GPIO42 WS2812 ready; power=off"));
+    log_->print(F("[rgb] GPIO42 WS2812 ready; power=off effect="));
+    log_->print(effectName(effect_));
+    log_->print(F(" color="));
+    log_->print(paletteName(colorIndex_));
+    log_->print(F(" brightness="));
+    log_->print(brightnessPercent_);
+    log_->print(F("% speed="));
+    log_->println(speedName(speedIndex_));
 }
 
 void RgbService::tick(uint32_t nowMs) {
+    if (settingsDirty_ &&
+        static_cast<int32_t>(nowMs - settingsSaveDueMs_) >= 0) {
+        saveSettings();
+    }
     if (!ready_) {
         return;
     }
@@ -101,6 +141,7 @@ void RgbService::setEffect(RgbEffect effect) {
     }
     effect_ = effect;
     restartEffect();
+    markSettingsDirty();
 }
 
 uint8_t RgbService::colorIndex() const {
@@ -114,6 +155,7 @@ void RgbService::setColorIndex(uint8_t index) {
     }
     colorIndex_ = index;
     dirty_ = true;
+    markSettingsDirty();
 }
 
 uint8_t RgbService::brightnessPercent() const {
@@ -128,6 +170,7 @@ void RgbService::setBrightnessPercent(uint8_t percent) {
     }
     brightnessPercent_ = percent;
     dirty_ = true;
+    markSettingsDirty();
 }
 
 uint8_t RgbService::speedIndex() const {
@@ -141,6 +184,7 @@ void RgbService::setSpeedIndex(uint8_t index) {
     }
     speedIndex_ = index;
     restartEffect();
+    markSettingsDirty();
 }
 
 RgbSnapshot RgbService::snapshot() const {
@@ -212,6 +256,25 @@ void RgbService::restartEffect() {
     effectStartedMs_ = millis();
     lastFrameMs_ = 0;
     dirty_ = true;
+}
+
+void RgbService::markSettingsDirty() {
+    settingsDirty_ = true;
+    settingsSaveDueMs_ = millis() + SETTINGS_SAVE_DELAY_MS;
+}
+
+void RgbService::saveSettings() {
+    settingsDirty_ = false;
+    if (!preferencesReady_) {
+        return;
+    }
+    preferences_.putUChar("effect", static_cast<uint8_t>(effect_));
+    preferences_.putUChar("color", colorIndex_);
+    preferences_.putUChar("brightness", brightnessPercent_);
+    preferences_.putUChar("speed", speedIndex_);
+    if (log_ != nullptr) {
+        log_->println(F("[rgb] settings saved"));
+    }
 }
 
 void RgbService::render(uint32_t nowMs) {
