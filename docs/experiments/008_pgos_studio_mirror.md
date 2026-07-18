@@ -8,6 +8,7 @@
 - 让设备在 Wi-Fi Station 模式下只保存并主动连接目标上位机。
 - 上位机不占用 USB CDC，即可用方向、确认、返回和 Home 控制当前设备 UI。
 - 上位机显示设备 ID、IP、RSSI、heap 和有界事件日志。
+- 上位机测量控制 RTT、镜像实时 FPS/应用层 Mbps，并提供上下行吞吐测试。
 - 用独立 TCP 通道实时显示设备的 320×240 shadow framebuffer。
 - 不在设备菜单中暴露镜像、画面推送或音频流开关。
 
@@ -15,7 +16,7 @@
 
 ```text
 ESP32 ServerService  ── TCP 19000 ──> PGOS Studio 控制/状态
-ESP32 BenchmarkService ─ TCP 19001 ─> 吞吐实验工具
+ESP32 BenchmarkService ─ TCP 19001 ─> PGOS Studio 吞吐接收端
 ESP32 MirrorService  ── TCP 19002 ──> PGOS Studio RGB565 镜像
 ```
 
@@ -59,7 +60,7 @@ server status
 - `python -m py_compile tools/pgos_studio.py tools/playground_console.py tools/pgos_server.py`
 - `python -m unittest discover tools\tests`：13 项通过。
 - `pio run -e playground`：通过。
-- 构建资源：RAM 51488 / 327680 bytes（15.7%）；Flash 1131861 / 6553600 bytes（17.3%）。镜像另在 PSRAM 动态分配 153600 字节一致性快照缓冲。
+- 构建资源：RAM 51488 / 327680 bytes（15.7%）；Flash 1131889 / 6553600 bytes（17.3%）。镜像另在 PSRAM 动态分配 153600 字节一致性快照缓冲。
 
 ## 真机待测
 
@@ -68,4 +69,4 @@ server status
 - 实际帧率、控制延迟、RSSI 变化和长期运行稳定性。
 - 镜像开启时是否影响 LVGL 动画、音频反馈或 Wi-Fi 控制响应。
 
-真机结论应补充测试距离、RSSI、固件提交和主机命令；当前记录不能视为硬件实测完成。
+真机结论应补充测试距离、RSSI、固件提交和主机命令；当前记录不能视为硬件实测完成。测速时要分别记录“镜像同时开启”和“镜像关闭”的结果，否则镜像流量会成为带宽测试的一部分。

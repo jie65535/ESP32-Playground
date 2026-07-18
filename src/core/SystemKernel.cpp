@@ -67,7 +67,10 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::MirrorOff:
         case AppCommandType::MirrorToggle:
         case AppCommandType::MirrorStatus:
+        case AppCommandType::BenchUpload:
+        case AppCommandType::BenchDownload:
         case AppCommandType::BenchStatus:
+        case AppCommandType::BenchCancel:
             return true;
         default:
             return false;
@@ -285,8 +288,12 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
                 Serial.println(F("[bench] configure server target and byte count"));
                 handled = false;
             } else {
+                const uint16_t benchPort =
+                    server.port >= 65535U
+                        ? BenchmarkService::DEFAULT_PORT
+                        : static_cast<uint16_t>(server.port + 1U);
                 handled = benchmark_.startUpload(
-                    server.host, BenchmarkService::DEFAULT_PORT,
+                    server.host, benchPort,
                     static_cast<uint32_t>(command.number));
             }
             break;
@@ -297,8 +304,12 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
                 Serial.println(F("[bench] configure server target and byte count"));
                 handled = false;
             } else {
+                const uint16_t benchPort =
+                    server.port >= 65535U
+                        ? BenchmarkService::DEFAULT_PORT
+                        : static_cast<uint16_t>(server.port + 1U);
                 handled = benchmark_.startDownload(
-                    server.host, BenchmarkService::DEFAULT_PORT,
+                    server.host, benchPort,
                     static_cast<uint32_t>(command.number));
             }
             break;

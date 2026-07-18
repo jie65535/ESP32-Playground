@@ -31,9 +31,9 @@ Wi-Fi 入网稳定后，USB 控制台的命令层可以复用为无线控制台�
 
 控制通道和性能测试通道分离。控制通道使用带长度或换行边界的命令帧，保留白名单、设备 ID 和 token；吞吐测试另开 TCP 流，使用固定大小缓冲区与伪随机数据，分别测上行、下行、往返延迟、持续时间和断线恢复。报告应用层有效吞吐（Mbps），同时记录 RSSI、路由器距离和测试时是否有其它流量，避免把链路层标称速率当成实测结果。
 
-当前已加入第一版 `ServerService`：服务器地址、端口和启用状态保存在 `server` NVS namespace；`server set <host> <port>` 保存目标并自动启用连接，设备主动 TCP 连接服务器，发送 `PGOS/1 HELLO` 和周期 heartbeat，接收 `PING` 并回复 `PONG`。USB 与 TCP 命令共同进入有界 `InputRouter`；TCP 只允许导航、页面和状态白名单，返回 ACK/STATE，敏感 Wi-Fi/服务器配置命令被拒绝。电脑端日常使用 `tools/pgos_studio.py`，协议诊断继续使用无依赖的 `tools/pgos_server.py`，默认监听 TCP 19000。当前尚未加入认证和 TLS，不作为通用远程 shell。
+当前已加入第一版 `ServerService`：服务器地址、端口和启用状态保存在 `server` NVS namespace；`server set <host> <port>` 保存目标并自动启用连接，设备主动 TCP 连接服务器，发送 `PGOS/1 HELLO` 和周期 heartbeat，接收 `PING` 并回复 `PONG`。USB 与 TCP 命令共同进入有界 `InputRouter`；TCP 允许导航、页面、状态和受控吞吐测试白名单，返回 ACK/STATE，敏感 Wi-Fi/服务器配置命令被拒绝。电脑端日常使用 `tools/pgos_studio.py`，协议诊断继续使用无依赖的 `tools/pgos_server.py`，默认监听 TCP 19000。Studio 内置 19001 吞吐接收端，显示控制 RTT 与上下行 Mbps；当前尚未加入认证和 TLS，不作为通用远程 shell。
 
-独立的 `BenchmarkService` 使用 TCP 19001 测量固定字节流，不与控制通道混用。电脑端使用 `tools/pgos_benchmark.py`；设备命令为 `bench upload <bytes>`、`bench download <bytes>`、`bench status` 和 `bench cancel`。
+独立的 `BenchmarkService` 使用 TCP 19001 测量固定字节流，不与控制通道混用。PGOS Studio 已内置非阻塞测速接收端，命令行仍可使用 `tools/pgos_benchmark.py`；设备命令为 `bench upload <bytes>`、`bench download <bytes>`、`bench status` 和 `bench cancel`。
 
 `MirrorService` 使用 TCP 19002（控制端口 + 2）发送 `PGMF` 二进制帧，帧负载为 320×240 RGB565BE shadow framebuffer。镜像默认关闭，由已连接的 PGOS Studio 通过白名单命令临时打开，不写入 NVS；控制会话不可用时镜像 socket 关闭。第一版发送完整帧并限制单轮发送预算，优先验证链路、颜色和交互延迟，再优化脏矩形与压缩。
 

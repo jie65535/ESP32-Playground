@@ -9,9 +9,11 @@ for normal wireless control.
 from __future__ import annotations
 
 import argparse
+from array import array
 import datetime as dt
 import json
 import sys
+import time
 from typing import Any
 
 try:
@@ -21,6 +23,7 @@ try:
     from PySide6.QtWidgets import (
         QApplication,
         QCheckBox,
+        QComboBox,
         QGridLayout,
         QGroupBox,
         QHBoxLayout,
@@ -109,16 +112,36 @@ class PgosStudio(QMainWindow):
         self.listen_port = port
         self.server = QTcpServer(self)
         self.server.newConnection.connect(self._accept_connections)
+        self.bench_server = QTcpServer(self)
+        self.bench_server.newConnection.connect(self._accept_bench_connections)
         self.mirror_server = QTcpServer(self)
         self.mirror_server.newConnection.connect(self._accept_mirror_connections)
         self.socket: QTcpSocket | None = None
+        self.bench_socket: QTcpSocket | None = None
         self.mirror_socket: QTcpSocket | None = None
         self.receive_buffer = bytearray()
+        self.bench_buffer = bytearray()
         self.mirror_buffer = bytearray()
         self.last_mirror_image: QImage | None = None
         self.mirror_frame_count = 0
         self.mirror_requested = False
         self.command_buttons: list[QPushButton] = []
+        self.latency_button: QPushButton | None = None
+        self.benchmark_buttons: list[QPushButton] = []
+        self.bench_mode = ""
+        self.bench_total = 0
+        self.bench_transferred = 0
+        self.bench_started_ns = 0
+        self.bench_send_offset = 0
+        self.bench_result_buffer = bytearray()
+        self.benchmark_running = False
+        self.bench_pattern = bytes(
+            (index * 31 + 17) & 0xFF for index in range(64 * 1024)
+        )
+        self.ping_started_ns: int | None = None
+        self.mirror_window_started = time.perf_counter()
+        self.mirror_window_bytes = 0
+        self.mirror_window_frames = 0
         self.request_id = 1
         self.device_payload: dict[str, Any] = {}
 
@@ -195,6 +218,37 @@ class PgosStudio(QMainWindow):
             device_layout.addWidget(label, row, 0)
             device_layout.addWidget(value, row, 1)
         layout.addWidget(device_group)
+
+        quality_group = QGroupBox("网络质量")
+        quality_layout = QGridLayout(quality_group)
+        self.latency_value = QLabel("--")
+        self.mirror_rate_value = QLabel("--")
+        self.benchmark_value = QLabel("--")
+        quality_layout.addWidget(QLabel("控制 RTT"), 0, 0)
+        quality_layout.addWidget(self.latency_value, 0, 1)
+        quality_layout.addWidget(QLabel("镜像速率"), 1, 0)
+        quality_layout.addWidget(self.mirror_rate_value, 1, 1)
+        quality_layout.addWidget(QLabel("吞吐结果"), 2, 0)
+        quality_layout.addWidget(self.benchmark_value, 2, 1, 1, 2)
+        self.latency_button = QPushButton("测延迟")
+        self.latency_button.clicked.connect(self.measure_latency)
+        self.latency_button.setEnabled(False)
+        quality_layout.addWidget(self.latency_button, 0, 2)
+        self.benchmark_size = QComboBox()
+        self.benchmark_size.addItem("1 MiB", 1 * 1024 * 1024)
+        self.benchmark_size.addItem("4 MiB", 4 * 1024 * 1024)
+        self.benchmark_size.addItem("16 MiB", 16 * 1024 * 1024)
+        quality_layout.addWidget(self.benchmark_size, 1, 2)
+        upload_button = QPushButton("设备上行")
+        upload_button.clicked.connect(self.start_benchmark_upload)
+        download_button = QPushButton("设备下行")
+        download_button.clicked.connect(self.start_benchmark_download)
+        for button in (upload_button, download_button):
+            button.setEnabled(False)
+            self.benchmark_buttons.append(button)
+        quality_layout.addWidget(upload_button, 3, 1)
+        quality_layout.addWidget(download_button, 3, 2)
+        layout.addWidget(quality_group)
 
         nav_group = QGroupBox("方向控制")
         nav = QGridLayout(nav_group)
@@ -274,6 +328,10 @@ class PgosStudio(QMainWindow):
         for button in self.command_buttons:
             button.setEnabled(enabled)
         self.mirror_button.setEnabled(enabled and self.mirror_server.isListening())
+        if self.latency_button is not None:
+            self.latency_button.setEnabled(enabled)
+        for button in self.benchmark_buttons:
+            button.setEnabled(enabled and self.bench_server.isListening())
 
     def toggle_mirror(self) -> None:
         """Ask the device to start/stop its host-owned mirror stream."""
@@ -281,6 +339,27 @@ class PgosStudio(QMainWindow):
         if self.send_command("mirror on" if requested else "mirror off"):
             self.mirror_requested = requested
             self.mirror_button.setText("停止镜像" if requested else "开始镜像")
+
+    def measure_latency(self) -> None:
+        self._send_ping(force=True)
+
+    def _selected_benchmark_bytes(self) -> int:
+        value = self.benchmark_size.currentData()
+        return int(value) if value is not None else 4 * 1024 * 1024
+
+    def start_benchmark_upload(self) -> None:
+        if self.benchmark_running:
+            return
+        total = self._selected_benchmark_bytes()
+        if self.send_command(f"bench upload {total}"):
+            self.benchmark_value.setText("等待设备建立上行测速连接…")
+
+    def start_benchmark_download(self) -> None:
+        if self.benchmark_running:
+            return
+        total = self._selected_benchmark_bytes()
+        if self.send_command(f"bench download {total}"):
+            self.benchmark_value.setText("等待设备建立下行测速连接…")
 
     def toggle_listening(self) -> None:
         if self.server.isListening():
@@ -307,6 +386,11 @@ class PgosStudio(QMainWindow):
             self.append_log(f"监听失败：{message}", force=True)
             QMessageBox.warning(self, "PGOS Studio", message)
             return
+        if not self.bench_server.listen(address, port + 1):
+            self.append_log(
+                f"测速端口 {port + 1} 监听失败：{self.bench_server.errorString()}",
+                force=True,
+            )
         mirror_port = port + 2
         mirror_address = QHostAddress(self.listen_edit.text().strip())
         if mirror_port <= 65535 and not self.mirror_server.listen(
@@ -329,8 +413,10 @@ class PgosStudio(QMainWindow):
 
     def stop_listening(self) -> None:
         self._close_socket()
+        self._close_bench_socket()
         self._close_mirror_socket()
         self.server.close()
+        self.bench_server.close()
         self.mirror_server.close()
         self.listen_button.setText("启动")
         self.listen_edit.setEnabled(True)
@@ -362,6 +448,165 @@ class PgosStudio(QMainWindow):
             self.append_log(f"设备连接 {peer}", force=True)
             QTimer.singleShot(150, lambda: self.send_command("status"))
 
+    def _accept_bench_connections(self) -> None:
+        while self.bench_server.hasPendingConnections():
+            incoming = self.bench_server.nextPendingConnection()
+            if incoming is None:
+                continue
+            self._close_bench_socket()
+            self.benchmark_running = False
+            self.bench_socket = incoming
+            self.bench_buffer.clear()
+            self.bench_result_buffer.clear()
+            self.bench_mode = ""
+            self.bench_total = 0
+            self.bench_transferred = 0
+            self.bench_send_offset = 0
+            incoming.readyRead.connect(self._read_bench_socket)
+            incoming.bytesWritten.connect(self._pump_benchmark_download)
+            incoming.disconnected.connect(self._bench_disconnected)
+            self.append_log(
+                f"测速连接 {incoming.peerAddress().toString()}:{incoming.peerPort()}",
+                force=True,
+            )
+
+    def _read_bench_socket(self) -> None:
+        if self.bench_socket is None:
+            return
+        self.bench_buffer.extend(bytes(self.bench_socket.readAll()))
+        while True:
+            if not self.bench_mode:
+                marker = self.bench_buffer.find(b"\n")
+                if marker < 0:
+                    if len(self.bench_buffer) > 128:
+                        self._fail_benchmark("header too long")
+                    return
+                header = bytes(self.bench_buffer[:marker]).decode(
+                    "ascii", errors="replace"
+                ).strip()
+                del self.bench_buffer[: marker + 1]
+                parts = header.split()
+                if (
+                    len(parts) != 3
+                    or parts[0] != "PGOS_BENCH/1"
+                    or parts[1] not in {"UPLOAD", "DOWNLOAD"}
+                ):
+                    self._fail_benchmark(f"invalid benchmark header: {header}")
+                    return
+                try:
+                    total = int(parts[2])
+                except ValueError:
+                    self._fail_benchmark("invalid benchmark size")
+                    return
+                if total <= 0 or total > 64 * 1024 * 1024:
+                    self._fail_benchmark("benchmark size out of range")
+                    return
+                self.bench_mode = parts[1]
+                self.bench_total = total
+                self.bench_transferred = 0
+                self.bench_send_offset = 0
+                self.bench_started_ns = time.perf_counter_ns()
+                self.benchmark_running = True
+                self.append_log(
+                    f"测速开始 {self.bench_mode.lower()} {total / 1024 / 1024:.1f} MiB",
+                    force=True,
+                )
+                if self.bench_mode == "DOWNLOAD":
+                    self._pump_benchmark_download()
+
+            if self.bench_mode == "UPLOAD":
+                remaining = self.bench_total - self.bench_transferred
+                if remaining > 0 and self.bench_buffer:
+                    count = min(remaining, len(self.bench_buffer))
+                    del self.bench_buffer[:count]
+                    self.bench_transferred += count
+                if self.bench_transferred < self.bench_total:
+                    return
+                elapsed_us = max(
+                    1, (time.perf_counter_ns() - self.bench_started_ns) // 1000
+                )
+                if self.bench_socket is not None:
+                    self.bench_socket.write(
+                        f"RESULT {self.bench_total} {elapsed_us}\n".encode("ascii")
+                    )
+                self._finish_benchmark("上行", elapsed_us, elapsed_us)
+                return
+
+            if self.bench_mode == "DOWNLOAD":
+                if self.bench_send_offset < self.bench_total:
+                    self._pump_benchmark_download()
+                    return
+                marker = self.bench_buffer.find(b"\n")
+                if marker < 0:
+                    return
+                result = bytes(self.bench_buffer[:marker]).decode(
+                    "ascii", errors="replace"
+                ).strip()
+                del self.bench_buffer[: marker + 1]
+                parts = result.split()
+                if len(parts) != 3 or parts[0] != "RESULT":
+                    self._fail_benchmark("invalid download result")
+                    return
+                try:
+                    received = int(parts[1])
+                    device_elapsed_us = int(parts[2])
+                except ValueError:
+                    self._fail_benchmark("invalid download metrics")
+                    return
+                if received != self.bench_total or device_elapsed_us <= 0:
+                    self._fail_benchmark("download result mismatch")
+                    return
+                host_elapsed_us = max(
+                    1, (time.perf_counter_ns() - self.bench_started_ns) // 1000
+                )
+                self._finish_benchmark(
+                    "下行", device_elapsed_us, host_elapsed_us
+                )
+                return
+
+            return
+
+    def _pump_benchmark_download(self, _written: int = 0) -> None:
+        if self.bench_socket is None or self.bench_mode != "DOWNLOAD":
+            return
+        max_queued = 256 * 1024
+        while (
+            self.bench_send_offset < self.bench_total
+            and self.bench_socket.bytesToWrite() < max_queued
+        ):
+            remaining = self.bench_total - self.bench_send_offset
+            count = min(len(self.bench_pattern), remaining)
+            written = self.bench_socket.write(self.bench_pattern[:count])
+            if written <= 0:
+                self._fail_benchmark("download socket write failed")
+                return
+            self.bench_send_offset += written
+
+    def _finish_benchmark(
+        self, direction: str, device_elapsed_us: int, host_elapsed_us: int
+    ) -> None:
+        device_mbps = self.bench_total * 8.0 / device_elapsed_us
+        host_mbps = self.bench_total * 8.0 / max(1, host_elapsed_us)
+        self.benchmark_value.setText(
+            f"{direction} {device_mbps:.2f} Mbps · host {host_mbps:.2f}"
+        )
+        self.append_log(
+            f"测速完成 {direction} device={device_mbps:.2f} Mbps "
+            f"host={host_mbps:.2f} Mbps",
+            force=True,
+        )
+        self.benchmark_running = False
+        if self.bench_socket is not None:
+            self.bench_socket.disconnectFromHost()
+        self.bench_mode = ""
+
+    def _fail_benchmark(self, message: str) -> None:
+        self.append_log(f"测速失败：{message}", force=True)
+        self.benchmark_value.setText("失败")
+        self.benchmark_running = False
+        self.bench_mode = ""
+        self._close_bench_socket()
+
     def _accept_mirror_connections(self) -> None:
         while self.mirror_server.hasPendingConnections():
             incoming = self.mirror_server.nextPendingConnection()
@@ -370,6 +615,9 @@ class PgosStudio(QMainWindow):
             self._close_mirror_socket()
             self.mirror_socket = incoming
             self.mirror_buffer.clear()
+            self.mirror_window_started = time.perf_counter()
+            self.mirror_window_bytes = 0
+            self.mirror_window_frames = 0
             self.mirror_requested = True
             self.mirror_button.setText("停止镜像")
             incoming.readyRead.connect(self._read_mirror_socket)
@@ -391,7 +639,9 @@ class PgosStudio(QMainWindow):
     def _read_mirror_socket(self) -> None:
         if self.mirror_socket is None:
             return
-        self.mirror_buffer.extend(bytes(self.mirror_socket.readAll()))
+        data = bytes(self.mirror_socket.readAll())
+        self.mirror_window_bytes += len(data)
+        self.mirror_buffer.extend(data)
         while True:
             if len(self.mirror_buffer) < 22:
                 return
@@ -430,23 +680,25 @@ class PgosStudio(QMainWindow):
     def _display_rgb565_frame(
         self, payload: bytes, width: int, height: int, frame_id: int
     ) -> None:
-        rgb = bytearray(width * height * 3)
-        destination = 0
-        for source in range(0, len(payload), 2):
-            value = (payload[source] << 8) | payload[source + 1]
-            red = (value >> 11) & 0x1F
-            green = (value >> 5) & 0x3F
-            blue = value & 0x1F
-            rgb[destination] = (red << 3) | (red >> 2)
-            rgb[destination + 1] = (green << 2) | (green >> 4)
-            rgb[destination + 2] = (blue << 3) | (blue >> 2)
-            destination += 3
+        pixels = array("H")
+        pixels.frombytes(payload)
+        if sys.byteorder == "little":
+            pixels.byteswap()
         image = QImage(
-            bytes(rgb), width, height, width * 3, QImage.Format.Format_RGB888
+            pixels.tobytes(), width, height, width * 2, QImage.Format.Format_RGB16
         ).copy()
         self.last_mirror_image = image
         self.mirror_frame_count += 1
+        self.mirror_window_frames += 1
         self._refresh_mirror_pixmap()
+        elapsed = time.perf_counter() - self.mirror_window_started
+        if elapsed >= 0.5:
+            mbps = self.mirror_window_bytes * 8.0 / elapsed / 1_000_000.0
+            fps = self.mirror_window_frames / elapsed
+            self.mirror_rate_value.setText(f"{fps:.1f} FPS · {mbps:.2f} Mbps")
+            self.mirror_window_started = time.perf_counter()
+            self.mirror_window_bytes = 0
+            self.mirror_window_frames = 0
         self.mirror_info.setText(
             f"实时镜像 · {width}×{height} · frame {frame_id} · "
             f"received {self.mirror_frame_count}"
@@ -488,6 +740,12 @@ class PgosStudio(QMainWindow):
             self.append_log(line)
             return
         if line == "PONG":
+            if self.ping_started_ns is not None:
+                elapsed_ms = (
+                    time.perf_counter_ns() - self.ping_started_ns
+                ) / 1_000_000.0
+                self.latency_value.setText(f"{elapsed_ms:.1f} ms")
+                self.ping_started_ns = None
             return
         payload = self._json_payload(line)
         if isinstance(payload, dict) and payload.get("type") == "heartbeat":
@@ -530,8 +788,14 @@ class PgosStudio(QMainWindow):
         self.append_log(f"TX #{request_id} {command}")
         return True
 
-    def _send_ping(self) -> None:
-        if self.socket is not None and self.socket.state() == QAbstractSocket.SocketState.ConnectedState:
+    def _send_ping(self, force: bool = False) -> None:
+        if (
+            self.socket is not None
+            and self.socket.state()
+            == QAbstractSocket.SocketState.ConnectedState
+            and (force or self.ping_started_ns is None)
+        ):
+            self.ping_started_ns = time.perf_counter_ns()
             self.socket.write(b"PING\n")
 
     def _device_disconnected(self) -> None:
@@ -556,6 +820,37 @@ class PgosStudio(QMainWindow):
         self.receive_buffer.clear()
         try:
             socket.disconnected.disconnect(self._device_disconnected)
+        except RuntimeError:
+            pass
+        socket.disconnectFromHost()
+        socket.close()
+        socket.deleteLater()
+
+    def _bench_disconnected(self) -> None:
+        sender = self.sender()
+        if self.bench_socket is not None and sender is not self.bench_socket:
+            return
+        if self.benchmark_running:
+            self._fail_benchmark("测速连接断开")
+        self.bench_socket = None
+        self.bench_buffer.clear()
+
+    def _close_bench_socket(self) -> None:
+        if self.bench_socket is None:
+            return
+        socket = self.bench_socket
+        self.bench_socket = None
+        self.bench_buffer.clear()
+        try:
+            socket.disconnected.disconnect(self._bench_disconnected)
+        except RuntimeError:
+            pass
+        try:
+            socket.readyRead.disconnect(self._read_bench_socket)
+        except RuntimeError:
+            pass
+        try:
+            socket.bytesWritten.disconnect(self._pump_benchmark_download)
         except RuntimeError:
             pass
         socket.disconnectFromHost()

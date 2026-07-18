@@ -154,7 +154,7 @@ TransportAdapter → SessionManager → ControlProtocol → InputRouter → AppM
 
 ### PGOS Studio
 
-PGOS Studio 是“薄设备、富上位机”边界的第一份实现，可理解为面向 PGOS 的精简 scrcpy：它负责无线键盘导航、状态面板、屏幕镜像和未来录制/推流工具。Studio 不复制 Launcher 的应用注册表，也不为每个页面增加深链接按钮；新增设备 App 后，方向、确认、返回语义天然继续有效。页面直达和原始命令入口只保留给 USB/协议测试工具。
+PGOS Studio 是“薄设备、富上位机”边界的第一份实现，可理解为面向 PGOS 的精简 scrcpy：它负责无线键盘导航、状态面板、控制 RTT、镜像 FPS/吞吐和独立上下行测速。Studio 不复制 Launcher 的应用注册表，也不为每个页面增加深链接按钮；新增设备 App 后，方向、确认、返回语义天然继续有效。页面直达和原始命令入口只保留给 USB/协议测试工具。
 
 ## FreeRTOS 使用策略
 

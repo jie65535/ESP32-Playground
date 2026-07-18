@@ -40,6 +40,12 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 - 音频上/下行实验与设备专属调试面板。
 - 保持 GUI 只依赖通用输入与能力协商，不为每个设备页面增加快捷入口。
 
+## 随后：系统监视器
+
+- 设备端新增可滚动 System Monitor 页面，显示 Heap/PSRAM/Flash/文件系统占用、温度（若硬件支持）和 Wi-Fi/控制通道指标。
+- CPU 利用率采用 FreeRTOS idle/runtime 采样，不用 loop 次数伪造；先验证双核统计口径，再对外显示百分比。
+- Studio 复用同一份结构化快照，提供历史曲线；监视器本身不能阻塞镜像、音频和控制输入。
+
 ## 后续：局域网 HTTP/JSON
 
 - ESP32 提供 `/api/v1/status` 和 `/api/v1/telemetry`。
