@@ -2,7 +2,7 @@
 
 > 最后更新：2026-07-18
 > 工作目录：`G:\MCU\ESP32Playground`
-> 当前阶段：屏幕与板卡信息展示
+> 当前阶段：PGOS UI v2 / LVGL 9.5 与网络应用基座
 
 ## 1. 项目定位
 
@@ -47,7 +47,8 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 
 - 已创建 PlatformIO `playground` 环境。
 - 当前固件由 PlaygroundOS `SystemKernel` 编排，显示、控制台、Wi-Fi 和现有页面已拆分为独立 Service/App 模块。
-- DisplayService 使用 320×240 RGB565 TFT_eSprite 离屏画布，优先分配到 PSRAM，完整绘制后一次推送；串口状态每 10 秒低频输出。
+- DisplayService 使用 LVGL 9.5 的 40 行 RGB565 局部缓冲，并在 PSRAM 中维护 320×240 RGB565 shadow framebuffer；背光首帧保护和 RGB565BE 截图协议继续保留，串口状态每 10 秒低频输出。
+- `UiRuntime` 统一管理 LVGL 显示驱动、主题、22px 状态栏、页面转场和焦点卡片；Launcher、System、Display、Network 已迁移到 retained-mode 页面。
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
 - USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和 ACK/STATE，手机式服务器设置界面与认证控制协议仍待后续。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。
@@ -63,12 +64,12 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 
 ## 6. 下一步
 
-1. 在当前样机上继续确认 PlaygroundOS 模块拆分后的显示、USB CDC 和 Wi-Fi Station 行为。
-2. 增加 Launcher、Settings 和统一输入事件，再实现手机式 Wi-Fi 开关/扫描列表/文本输入。
+1. 在当前样机上继续确认 LVGL UI v2 的页面转场、焦点动画、截图和长时间稳定性。
+2. 把统一输入语义扩展到实体按键/编码器，并增加受控的文本输入页面。
 3. 增加 NTP 状态显示，并保持网络任务非阻塞。
-4. 验证 ServerService 到电脑的 TCP HELLO/heartbeat/PING 链路。
-5. 设计局域网无线控制台：优先设备主动 TCP 长连接，另提供 HTTP/JSON 状态与命令接口。
-6. 增加独立的吞吐/延迟测试，不把测试流量混入控制命令通道。
+4. 验证 ServerService 到电脑的 TCP HELLO/heartbeat/PING 链路和 UI 状态同步。
+5. 设计 HTTP/JSON 状态接口、控制权和局域网认证，不把 TCP 控制台升级成任意远程 shell。
+6. 为游戏和高频实验建立独立 RenderSurface，避免破坏系统 Shell 的 LVGL 所有权。
 7. 再逐项探索 RGB、音频、麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
 
 ## 7. 已迁移的通用资产

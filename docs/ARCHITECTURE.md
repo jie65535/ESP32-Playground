@@ -40,7 +40,8 @@ public:
     virtual void onExit(AppContext& context) = 0;
     virtual void onEvent(const AppEvent& event, AppContext& context) = 0;
     virtual void onTick(uint32_t nowMs, AppContext& context) = 0;
-    virtual void onRender(UiCanvas& canvas) = 0;
+    virtual lv_obj_t* onCreateView(AppContext& context) = 0;
+    virtual void onUpdateView(AppContext& context) = 0;
 };
 ```
 
@@ -75,11 +76,13 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。服务器设置支持�
 
 ## 事件与渲染
 
-输入、Wi-Fi、BLE、计时器和服务器变化统一转换为 `AppEvent`。系统每轮执行：
+输入、Wi-Fi、BLE、计时器和服务器变化统一转换为命令、快照或 `AppEvent`。当前 PGOS UI v2 使用 LVGL 9.5，系统每轮执行：
 
 ```text
-采集输入/服务事件 → AppManager 路由 → 当前 App 更新 → 完整离屏渲染 → 一次推屏
+采集输入/服务事件 → AppManager 路由 → 当前 App 更新视图 → lv_timer_handler → 局部 flush
 ```
+
+`UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
 
 事件使用小型枚举/结构体和有界队列，避免跨模块共享可变全局状态。服务回调只入队，不直接调用应用和 UI。
 

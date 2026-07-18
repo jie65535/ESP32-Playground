@@ -49,6 +49,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::Previous:
         case AppCommandType::Next:
         case AppCommandType::Activate:
+        case AppCommandType::Home:
         case AppCommandType::PageSystem:
         case AppCommandType::PageDisplay:
         case AppCommandType::PageNetwork:
@@ -66,26 +67,32 @@ bool isRemoteAllowed(AppCommandType type) {
 }  // namespace
 
 SystemKernel::SystemKernel()
-    : context_{display_, wifi_, server_, Serial}, appManager_(context_) {}
+    : ui_(display_),
+      context_{display_, wifi_, server_, Serial, ui_},
+      appManager_(context_) {}
 
 void SystemKernel::setup() {
     Serial.begin(SERIAL_BAUD);
     delay(50);
     display_.begin();
+    uiReady_ = ui_.begin();
     wifi_.begin(Serial);
     server_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
 
-    appManager_.registerApp(systemInfoApp_);
-    appManager_.registerApp(displayTestApp_);
-    appManager_.registerApp(networkSettingsApp_);
-    appManager_.registerApp(launcherApp_);
-    appManager_.begin(AppId::SystemInfo);
-
-    display_.startFrame();
-    appManager_.render();
-    display_.pushBacklightOn();
+    if (uiReady_) {
+        appManager_.registerApp(systemInfoApp_);
+        appManager_.registerApp(displayTestApp_);
+        appManager_.registerApp(networkSettingsApp_);
+        appManager_.registerApp(launcherApp_);
+        appManager_.begin(AppId::Launcher);
+        ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), millis());
+        ui_.tick();
+        display_.pushBacklightOn();
+    } else {
+        Serial.println(F("[ui] startup failed; display backlight remains off"));
+    }
 
     Serial.println();
     Serial.printf("PlaygroundOS started build=%s %s\n", __DATE__, __TIME__);
@@ -112,6 +119,7 @@ void SystemKernel::loop() {
     wifi_.tick(nowMs);
     server_.tick(nowMs, wifi_.snapshot());
     benchmark_.tick(nowMs);
+    ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), nowMs);
 
     uint32_t requestId = 0;
     String remoteLine;
@@ -150,6 +158,7 @@ void SystemKernel::loop() {
             benchmark_.printStatus(Serial);
         }
     }
+    ui_.tick();
 }
 
 bool SystemKernel::handleCommand(const RoutedCommand& routed) {
@@ -161,6 +170,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
 
     bool handled = true;
     switch (command.type) {
+        case AppCommandType::Home:
+            appManager_.activate(AppId::Launcher);
+            break;
         case AppCommandType::PageSystem:
             appManager_.activate(AppId::SystemInfo);
             break;

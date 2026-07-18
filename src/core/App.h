@@ -3,16 +3,19 @@
 #include "core/AppTypes.h"
 
 #include <Arduino.h>
+#include <lvgl.h>
 
 class DisplayService;
 class WifiService;
 class ServerService;
+class UiRuntime;
 
 struct AppContext {
     DisplayService& display;
     WifiService& wifi;
     ServerService& server;
     Stream& console;
+    UiRuntime& ui;
 };
 
 class IApp {
@@ -24,7 +27,8 @@ public:
     virtual void onExit(AppContext& context) = 0;
     virtual void onCommand(const AppCommand& command, AppContext& context) = 0;
     virtual void onTick(uint32_t nowMs, AppContext& context) = 0;
-    virtual void onRender(AppContext& context) = 0;
+    virtual lv_obj_t* onCreateView(AppContext& context) = 0;
+    virtual void onUpdateView(AppContext& context) = 0;
     virtual bool handlesNavigation() const { return false; }
     virtual AppId requestedApp() const { return AppId::Count; }
 };

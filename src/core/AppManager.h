@@ -23,4 +23,5 @@ private:
     IApp* apps_[MAX_APPS] = {};
     uint8_t appCount_ = 0;
     uint8_t currentIndex_ = 0;
+    bool active_ = false;
 };

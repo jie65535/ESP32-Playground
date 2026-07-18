@@ -8,13 +8,14 @@
 
 当前固件点亮 ILI9341 屏幕，显示芯片、内存、运行时间和板卡信息，并开始 Wi-Fi Station 实验：通过 USB 控制台扫描/选择网络、输入密码并保存到设备 NVS，连接状态、IP 和 RSSI 同时显示在屏幕与控制台。
 
-当前固件使用一个 320×240 RGB565 离屏 Sprite 在 PSRAM 中完成整帧绘制，再一次性推送到屏幕，避免清屏重绘闪烁；USB 状态日志只低频输出。
+当前固件使用 LVGL 9.5 retained-mode UI：系统桌面、系统信息、显示实验和网络设置由统一主题、状态栏、页面转场和焦点卡片组成。LVGL 使用 40 行 RGB565 局部缓冲，显示服务在 PSRAM 中维护完整 shadow framebuffer，因此仍保留无损截图协议；USB 状态日志只低频输出。
 
 ## 当前环境
 
 - PlatformIO + Arduino
 - `espressif32 @ 7.0.1`
 - `es3n28p_r8n16`
+- `lvgl @ 9.5.0`
 - ESP32-S3，16MB QIO Flash，8MB OPI PSRAM
 - ILI9341V，逻辑分辨率 320×240 横屏
 - 原生 USB CDC，`Serial` 波特率 115200
@@ -41,7 +42,7 @@ python tools/playground_console.py --port COM3 --wifi-setup
 python tools/capture_screen.py --port COM3 --output captures/home.png
 ```
 
-控制台的 `1/2/3` 可直接跳页，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 PSRAM 中的原始 RGB565 画布到 PNG/Windows 剪贴板。方向键和回车只是可选便利，`Q` 退出控制台。固件也接受 `wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
+控制台的 `1/2/3` 可直接跳页，`B` 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。方向键和回车只是可选便利，`Q` 退出控制台。固件也接受 `home`、`wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
 
 局域网 TCP 控制台服务器：接收 HELLO/heartbeat，发送 PING，并可在交互提示符中发送白名单命令：
 
@@ -70,6 +71,7 @@ server status
 - [实验记录：Wi-Fi Station](docs/experiments/002_wifi_station.md)
 - [实验记录：TCP 诊断服务器](docs/experiments/003_tcp_server.md)
 - [实验记录：TCP 应用层吞吐](docs/experiments/004_tcp_throughput.md)
+- [实验记录：PGOS UI v2 / LVGL 9.5](docs/experiments/005_ui_v2_lvgl.md)
 - [可复用经验知识库](docs/knowledge/README.md)
 - [厂商原始资料说明](docs/vendor/README.md)
 

@@ -1,6 +1,7 @@
 #include "apps/SystemInfoApp.h"
 
 #include "services/DisplayService.h"
+#include "ui/UiRuntime.h"
 
 AppId SystemInfoApp::id() const {
     return AppId::SystemInfo;
@@ -12,7 +13,13 @@ const char* SystemInfoApp::name() const {
 
 void SystemInfoApp::onEnter(AppContext&) {}
 
-void SystemInfoApp::onExit(AppContext&) {}
+void SystemInfoApp::onExit(AppContext&) {
+    root_ = nullptr;
+    uptimeValue_ = nullptr;
+    heapValue_ = nullptr;
+    psramValue_ = nullptr;
+    flashValue_ = nullptr;
+}
 
 void SystemInfoApp::onCommand(const AppCommand&, AppContext&) {}
 
@@ -20,23 +27,35 @@ void SystemInfoApp::onTick(uint32_t nowMs, AppContext&) {
     nowMs_ = nowMs;
 }
 
-void SystemInfoApp::onRender(AppContext& context) {
-    DisplayService& display = context.display;
-    display.startFrame();
-    display.drawHeader("SYSTEM");
-    display.drawText("ES3N28P / R8N16", 16, 40, TFT_WHITE,
-                     BitmapFontSize::Bold12);
-    display.drawText("ILI9341  320x240", 16, 62, TFT_WHITE,
-                     BitmapFontSize::Small12);
-    display.drawText("PlaygroundOS", 16, 80, TFT_CYAN,
-                     BitmapFontSize::Small12);
-    display.drawValue("Uptime", String(nowMs_ / 1000U) + " s", 108);
-    display.drawValue("Free heap", DisplayService::formatBytes(ESP.getFreeHeap()),
-                      132);
-    display.drawValue("Free PSRAM",
-                      DisplayService::formatBytes(ESP.getFreePsram()), 156);
-    display.drawValue("Flash",
-                      DisplayService::formatBytes(ESP.getFlashChipSize()), 180);
-    display.drawFooter("system telemetry");
-    display.pushFrame();
+lv_obj_t* SystemInfoApp::onCreateView(AppContext& context) {
+    root_ = context.ui.createPageRoot("DEVICE / SYSTEM", "System",
+                                      "The board behind PlaygroundOS");
+
+    UiCard identity = context.ui.createCard(
+        root_, 76, LV_SYMBOL_SETTINGS, "ESP32-S3",
+        "ES3N28P  /  R8N16  /  240 MHz");
+    identity.normalX = 12;
+    identity.normalWidth = 296;
+    context.ui.setCardFocused(identity, false, false);
+
+    context.ui.createValueRow(root_, "UPTIME", "--", 126, &uptimeValue_);
+    context.ui.createValueRow(root_, "FREE HEAP", "--", 148, &heapValue_);
+    context.ui.createValueRow(root_, "FREE PSRAM", "--", 170, &psramValue_);
+    context.ui.createValueRow(root_, "FLASH", "--", 192, &flashValue_);
+    return root_;
+}
+
+void SystemInfoApp::onUpdateView(AppContext&) {
+    if (uptimeValue_ == nullptr) {
+        return;
+    }
+
+    const String uptime = String(nowMs_ / 1000U) + " s";
+    const String heap = DisplayService::formatBytes(ESP.getFreeHeap());
+    const String psram = DisplayService::formatBytes(ESP.getFreePsram());
+    const String flash = DisplayService::formatBytes(ESP.getFlashChipSize());
+    lv_label_set_text(uptimeValue_, uptime.c_str());
+    lv_label_set_text(heapValue_, heap.c_str());
+    lv_label_set_text(psramValue_, psram.c_str());
+    lv_label_set_text(flashValue_, flash.c_str());
 }

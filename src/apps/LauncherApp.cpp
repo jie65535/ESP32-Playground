@@ -1,32 +1,42 @@
 #include "apps/LauncherApp.h"
 
-#include "services/DisplayService.h"
+#include "ui/UiRuntime.h"
 
 namespace {
 
 const char* itemName(uint8_t index) {
     switch (index) {
-        case 0:
-            return "System Info";
-        case 1:
-            return "Display Test";
-        case 2:
-            return "Wi-Fi Settings";
-        default:
-            return "Unknown";
+        case 0: return "System";
+        case 1: return "Color Lab";
+        case 2: return "Connectivity";
+        default: return "Unknown";
+    }
+}
+
+const char* itemDescription(uint8_t index) {
+    switch (index) {
+        case 0: return "memory, silicon and runtime";
+        case 1: return "display and visual experiments";
+        case 2: return "Wi-Fi, IP and TCP console";
+        default: return "";
+    }
+}
+
+const char* itemSymbol(uint8_t index) {
+    switch (index) {
+        case 0: return LV_SYMBOL_SETTINGS;
+        case 1: return LV_SYMBOL_IMAGE;
+        case 2: return LV_SYMBOL_WIFI;
+        default: return LV_SYMBOL_LIST;
     }
 }
 
 AppId itemApp(uint8_t index) {
     switch (index) {
-        case 0:
-            return AppId::SystemInfo;
-        case 1:
-            return AppId::DisplayTest;
-        case 2:
-            return AppId::NetworkSettings;
-        default:
-            return AppId::Count;
+        case 0: return AppId::SystemInfo;
+        case 1: return AppId::DisplayTest;
+        case 2: return AppId::NetworkSettings;
+        default: return AppId::Count;
     }
 }
 
@@ -42,9 +52,15 @@ const char* LauncherApp::name() const {
 
 void LauncherApp::onEnter(AppContext&) {
     requested_ = AppId::Count;
+    renderedSelection_ = -1;
 }
 
-void LauncherApp::onExit(AppContext&) {}
+void LauncherApp::onExit(AppContext&) {
+    root_ = nullptr;
+    for (UiCard& card : cards_) {
+        card = UiCard{};
+    }
+}
 
 void LauncherApp::onCommand(const AppCommand& command, AppContext&) {
     if (command.type == AppCommandType::Previous) {
@@ -58,24 +74,25 @@ void LauncherApp::onCommand(const AppCommand& command, AppContext&) {
 
 void LauncherApp::onTick(uint32_t, AppContext&) {}
 
-void LauncherApp::onRender(AppContext& context) {
-    DisplayService& display = context.display;
-    display.startFrame();
-    display.drawHeader("DESKTOP");
-    display.drawText("PlaygroundOS", 16, 42, TFT_WHITE, BitmapFontSize::Bold12);
-    display.drawText("Select an application", 16, 64, TFT_LIGHTGREY,
-                     BitmapFontSize::Small12);
+lv_obj_t* LauncherApp::onCreateView(AppContext& context) {
+    root_ = context.ui.createPageRoot("PLAYGROUND / HOME", "Applications",
+                                      "Explore the board, one experiment at a time");
     for (uint8_t index = 0; index < ITEM_COUNT; ++index) {
-        const int16_t y = 92 + static_cast<int16_t>(index) * 32;
-        if (index == selected_) {
-            display.fillRect(10, y - 4, 300, 26, TFT_DARKCYAN);
-            display.drawText(">", 18, y, TFT_YELLOW, BitmapFontSize::Bold12);
-        }
-        display.drawText(itemName(index), 38, y, TFT_WHITE,
-                         BitmapFontSize::Bold12);
+        cards_[index] = context.ui.createCard(
+            root_, 76 + static_cast<int16_t>(index) * 45,
+            itemSymbol(index), itemName(index), itemDescription(index));
     }
-    display.drawFooter("up/down select   enter open");
-    display.pushFrame();
+    return root_;
+}
+
+void LauncherApp::onUpdateView(AppContext& context) {
+    if (renderedSelection_ == static_cast<int8_t>(selected_)) {
+        return;
+    }
+    for (uint8_t index = 0; index < ITEM_COUNT; ++index) {
+        context.ui.setCardFocused(cards_[index], index == selected_);
+    }
+    renderedSelection_ = static_cast<int8_t>(selected_);
 }
 
 bool LauncherApp::handlesNavigation() const {

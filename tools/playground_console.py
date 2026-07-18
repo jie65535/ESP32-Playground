@@ -31,6 +31,7 @@ VALID_COMMANDS = (
     "up",
     "down",
     "ok",
+    "home",
     "status",
     "screenshot",
     "color_test",
@@ -74,6 +75,7 @@ SHORTCUTS = {
     "?": "help",
     "s": CAPTURE_ACTION,
     "w": WIFI_SETUP_ACTION,
+    "b": "home",
 }
 
 
@@ -266,7 +268,7 @@ def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
     print("  1/0 system   2 display   3 network")
-    print("  C color test   R status   S screenshot + clipboard")
+    print("  B home   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")
     print("  Arrow Up/Down and Enter are optional convenience keys")
     print("  Full commands are accepted with --command; H help, Q quit")

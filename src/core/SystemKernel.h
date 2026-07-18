@@ -11,6 +11,7 @@
 #include "services/DisplayService.h"
 #include "services/ServerService.h"
 #include "services/WifiService.h"
+#include "ui/UiRuntime.h"
 
 class SystemKernel {
 public:
@@ -20,6 +21,7 @@ public:
 
 private:
     DisplayService display_;
+    UiRuntime ui_;
     WifiService wifi_;
     ServerService server_;
     BenchmarkService benchmark_;
@@ -34,6 +36,7 @@ private:
     uint32_t lastRenderMs_ = 0;
     uint32_t lastStatusMs_ = 0;
     bool redrawRequested_ = true;
+    bool uiReady_ = false;
 
     bool handleCommand(const RoutedCommand& routed);
     void printStatus();

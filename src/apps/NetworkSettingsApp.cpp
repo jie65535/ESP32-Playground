@@ -1,8 +1,8 @@
 #include "apps/NetworkSettingsApp.h"
 
-#include "services/DisplayService.h"
 #include "services/ServerService.h"
 #include "services/WifiService.h"
+#include "ui/UiRuntime.h"
 
 namespace {
 
@@ -29,10 +29,14 @@ const char* NetworkSettingsApp::name() const {
     return "Network";
 }
 
-void NetworkSettingsApp::onEnter(AppContext&) {}
+void NetworkSettingsApp::onEnter(AppContext&) {
+    lastViewSignature_ = "";
+}
 
 void NetworkSettingsApp::onExit(AppContext&) {
     setupStage_ = SetupStage::Inactive;
+    root_ = nullptr;
+    lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::onCommand(const AppCommand& command,
@@ -147,6 +151,7 @@ void NetworkSettingsApp::onCommand(const AppCommand& command,
         default:
             break;
     }
+    lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
@@ -168,39 +173,26 @@ void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
         setupStage_ = SetupStage::Inactive;
         context.console.println(F("[wifi-ui] scan produced no usable networks"));
     }
+    lastViewSignature_ = "";
 }
 
-void NetworkSettingsApp::onRender(AppContext& context) {
-    if (setupStage_ != SetupStage::Inactive) {
-        drawWizard(context);
+lv_obj_t* NetworkSettingsApp::onCreateView(AppContext& context) {
+    root_ = context.ui.createPageRoot("NETWORK / RADIO", "Connectivity",
+                                      "Wi-Fi station and wireless console");
+    lastViewSignature_ = "";
+    return root_;
+}
+
+void NetworkSettingsApp::onUpdateView(AppContext& context) {
+    if (root_ == nullptr) {
         return;
     }
-
-    DisplayService& display = context.display;
-    const WifiSnapshot snapshot = context.wifi.snapshot();
-    display.startFrame();
-    display.drawHeader("NETWORK");
-    display.drawText("Wi-Fi Station", 16, 44, TFT_WHITE, BitmapFontSize::Bold12);
-    display.drawText("2.4 GHz Station", 16, 64, TFT_WHITE,
-                     BitmapFontSize::Small12);
-    display.drawValue("State", context.wifi.stateName(), 88);
-    display.drawValue("SSID", snapshot.ssid.isEmpty() ? String("--")
-                                                        : shorten(snapshot.ssid, 19),
-                      112);
-    display.drawValue("IP", snapshot.ip, 136);
-    display.drawValue("RSSI", rssiText(snapshot), 160);
-    display.drawValue("Retry", String(snapshot.reconnectCount), 184);
-    if (snapshot.state == WifiState::Scanning) {
-        display.drawFooter("scanning networks...");
-    } else if (snapshot.scanCount >= 0) {
-        display.drawFooter(String("scan ready: ") + snapshot.scanCount +
-                           " network(s)  W: setup");
-    } else if (!snapshot.lastError.isEmpty()) {
-        display.drawFooter(snapshot.lastError);
-    } else {
-        display.drawFooter("Enter: Wi-Fi on/off   W: setup");
+    const String signature = viewSignature(context);
+    if (signature == lastViewSignature_) {
+        return;
     }
-    display.pushFrame();
+    lastViewSignature_ = signature;
+    rebuildView(context);
 }
 
 bool NetworkSettingsApp::handlesNavigation() const {
@@ -212,6 +204,7 @@ void NetworkSettingsApp::startWizard(AppContext& context) {
     setupStage_ = SetupStage::Scanning;
     cursor_ = 0;
     windowStart_ = 0;
+    lastViewSignature_ = "";
     context.console.println(F("[wifi-ui] scanning; please wait"));
     context.wifi.startScan();
 }
@@ -231,6 +224,7 @@ void NetworkSettingsApp::moveCursor(int16_t delta, AppContext& context) {
     } else if (cursor_ >= windowStart_ + VISIBLE_ROWS) {
         windowStart_ = cursor_ - VISIBLE_ROWS + 1;
     }
+    lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::selectCurrent(AppContext& context) {
@@ -238,56 +232,163 @@ void NetworkSettingsApp::selectCurrent(AppContext& context) {
         return;
     }
     setupStage_ = SetupStage::AwaitingPassword;
+    lastViewSignature_ = "";
     context.console.print(F("[wifi-ui] password required for "));
     context.console.print(context.wifi.selectedSsid());
     context.console.println(F("; use hidden host input"));
 }
 
-void NetworkSettingsApp::drawWizard(AppContext& context) {
-    DisplayService& display = context.display;
-    display.startFrame();
-    display.drawHeader("WIFI SETUP");
-    if (setupStage_ == SetupStage::Scanning) {
-        display.drawText("Scanning 2.4 GHz networks...", 16, 78, TFT_WHITE,
-                         BitmapFontSize::Bold12);
-        display.drawFooter("please wait...");
-        display.pushFrame();
-        return;
+void NetworkSettingsApp::rebuildView(AppContext& context) {
+    lv_obj_clean(root_);
+    switch (setupStage_) {
+        case SetupStage::Scanning:
+            buildScanning(context);
+            break;
+        case SetupStage::Selecting:
+            buildSelection(context);
+            break;
+        case SetupStage::AwaitingPassword:
+            buildPassword(context);
+            break;
+        case SetupStage::Inactive:
+        default:
+            buildInactive(context, context.wifi.snapshot());
+            break;
     }
+}
 
-    if (setupStage_ == SetupStage::AwaitingPassword) {
-        display.drawText("Network selected", 16, 54, TFT_LIGHTGREY,
-                         BitmapFontSize::Small12);
-        display.drawText(shorten(context.wifi.selectedSsid(), 25), 16, 82,
-                         TFT_WHITE, BitmapFontSize::Bold12);
-        display.drawText("Enter password in host console", 16, 122, TFT_YELLOW,
-                         BitmapFontSize::Small12);
-        display.drawFooter("password is hidden   Q: cancel");
-        display.pushFrame();
-        return;
+void NetworkSettingsApp::buildHeader(AppContext& context,
+                                     const char* eyebrow, const char* title,
+                                     const char* subtitle) {
+    context.ui.createLabel(root_, eyebrow, 16, 10, 12, context.ui.accent());
+    context.ui.createLabel(root_, title, 16, 27, 24, context.ui.text());
+    if (subtitle != nullptr) {
+        context.ui.createLabel(root_, subtitle, 17, 57, 12, context.ui.muted());
     }
+}
 
-    display.drawText("Up/Down select, Enter connect", 12, 36, TFT_LIGHTGREY,
-                     BitmapFontSize::Small12);
+void NetworkSettingsApp::buildInactive(AppContext& context,
+                                       const WifiSnapshot& snapshot) {
+    buildHeader(context, "NETWORK / RADIO", "Connectivity",
+                "Enter toggles Wi-Fi  /  W opens setup");
+
+    const String title = snapshot.ssid.isEmpty()
+                             ? String("Wi-Fi Station")
+                             : shorten(snapshot.ssid, 24);
+    String subtitle = context.wifi.stateName();
+    if (snapshot.state == WifiState::Connected) {
+        subtitle += "  /  2.4 GHz";
+    }
+    UiCard connection = context.ui.createCard(
+        root_, 76, LV_SYMBOL_WIFI, title.c_str(), subtitle.c_str());
+    connection.normalX = 12;
+    connection.normalWidth = 296;
+    context.ui.setCardFocused(connection,
+                              snapshot.state == WifiState::Connected, false);
+
+    lv_obj_t* value = nullptr;
+    context.ui.createValueRow(root_, "IP ADDRESS", snapshot.ip.c_str(), 126,
+                              &value);
+    const String rssi = rssiText(snapshot);
+    context.ui.createValueRow(root_, "SIGNAL", rssi.c_str(), 148, &value);
+    const String retry = String(snapshot.reconnectCount);
+    context.ui.createValueRow(root_, "RETRIES", retry.c_str(), 170, &value);
+
+    const ServerSnapshot server = context.server.snapshot();
+    String serverValue = server.host.isEmpty() ? String("not configured")
+                                                : server.host + ":" + server.port;
+    context.ui.createValueRow(root_, "TCP TARGET", serverValue.c_str(), 192,
+                              &value);
+}
+
+void NetworkSettingsApp::buildScanning(AppContext& context) {
+    buildHeader(context, "NETWORK / SETUP", "Scanning",
+                "Looking for nearby 2.4 GHz networks");
+    context.ui.createLabel(root_, LV_SYMBOL_REFRESH, 145, 89, 28,
+                           context.ui.accent());
+    context.ui.createLabel(root_, "Non-blocking radio scan", 74, 130, 16,
+                           context.ui.text());
+    context.ui.createLabel(root_, "The console and services remain responsive",
+                           42, 157, 12, context.ui.muted());
+}
+
+void NetworkSettingsApp::buildSelection(AppContext& context) {
+    buildHeader(context, "NETWORK / SETUP", "Choose a network",
+                "Up / Down moves  /  Enter selects");
     const int16_t count = context.wifi.scanCount();
     for (uint8_t row = 0; row < VISIBLE_ROWS; ++row) {
         const int16_t index = windowStart_ + row;
         if (index >= count) {
             break;
         }
-        const int16_t y = 56 + static_cast<int16_t>(row) * 20;
-        if (index == cursor_) {
-            display.fillRect(8, y - 3, 304, 18, TFT_DARKCYAN);
-            display.drawText(">", 12, y, TFT_YELLOW, BitmapFontSize::Bold12);
-        }
-        display.drawText(String(index), 28, y, TFT_LIGHTGREY,
-                         BitmapFontSize::Small12);
-        display.drawText(shorten(context.wifi.scanSsid(index), 22), 52, y,
-                         TFT_WHITE, BitmapFontSize::Small12);
-        display.drawText(String(context.wifi.scanRssi(index)) + "dBm", 304, y,
-                         TFT_LIGHTGREY, BitmapFontSize::Small12,
-                         BitmapTextAlign::Right);
+        const bool selected = index == cursor_;
+        const int16_t y = 79 + static_cast<int16_t>(row) * 22;
+        lv_obj_t* item = lv_obj_create(root_);
+        lv_obj_remove_style_all(item);
+        lv_obj_set_size(item, selected ? 296 : 284, 20);
+        lv_obj_set_pos(item, selected ? 12 : 18, y);
+        lv_obj_set_style_radius(item, 6, 0);
+        lv_obj_set_style_bg_color(item,
+                                  selected ? context.ui.accentSoft()
+                                           : context.ui.panel(),
+                                  0);
+        lv_obj_set_style_bg_opa(item, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(item, selected ? 1 : 0, 0);
+        lv_obj_set_style_border_color(item, context.ui.accent(), 0);
+        lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE);
+
+        context.ui.createLabel(item, selected ? ">" : "", 7, 2, 12,
+                               context.ui.accent());
+        const String ssid = shorten(context.wifi.scanSsid(index), 25);
+        context.ui.createLabel(item, ssid.c_str(), 22, 2, 12,
+                               context.ui.text());
+        const String signal = String(context.wifi.scanRssi(index)) + " dBm";
+        lv_obj_t* signalLabel = context.ui.createLabel(
+            item, signal.c_str(), 274, 2, 12, context.ui.muted());
+        lv_obj_align(signalLabel, LV_ALIGN_RIGHT_MID, -7, 0);
     }
-    display.drawFooter("up/down move   enter select   Q cancel");
-    display.pushFrame();
+}
+
+void NetworkSettingsApp::buildPassword(AppContext& context) {
+    buildHeader(context, "NETWORK / SETUP", "Network selected",
+                "Password entry stays on the trusted USB console");
+    const String ssid = shorten(context.wifi.selectedSsid(), 28);
+    UiCard selected = context.ui.createCard(root_, 84, LV_SYMBOL_WIFI,
+                                            ssid.c_str(), "credential required");
+    selected.normalX = 12;
+    selected.normalWidth = 296;
+    context.ui.setCardFocused(selected, true);
+    context.ui.createLabel(root_, LV_SYMBOL_EYE_CLOSE, 24, 145, 20,
+                           context.ui.accent());
+    context.ui.createLabel(root_, "Type the password in playground_console",
+                           58, 145, 12, context.ui.text());
+    context.ui.createLabel(root_, "It will be stored in device NVS, never Git",
+                           58, 170, 12, context.ui.muted());
+}
+
+String NetworkSettingsApp::viewSignature(AppContext& context) const {
+    const WifiSnapshot wifi = context.wifi.snapshot();
+    const ServerSnapshot server = context.server.snapshot();
+    String signature = String(static_cast<uint8_t>(setupStage_));
+    signature += '|';
+    signature += static_cast<uint8_t>(wifi.state);
+    signature += '|';
+    signature += wifi.ssid;
+    signature += '|';
+    signature += wifi.ip;
+    signature += '|';
+    signature += wifi.rssi;
+    signature += '|';
+    signature += wifi.scanCount;
+    signature += '|';
+    signature += cursor_;
+    signature += '|';
+    signature += windowStart_;
+    signature += '|';
+    signature += server.host;
+    signature += '|';
+    signature += server.port;
+    signature += '|';
+    signature += static_cast<uint8_t>(server.state);
+    return signature;
 }

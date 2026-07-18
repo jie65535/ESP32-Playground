@@ -1,0 +1,57 @@
+#if 1
+#ifndef LV_CONF_H
+#define LV_CONF_H
+
+/* PGOS uses LVGL as the retained-mode shell renderer. */
+#define LV_COLOR_DEPTH 16
+#define LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB
+#define LV_USE_STDLIB_STRING LV_STDLIB_CLIB
+#define LV_USE_STDLIB_SPRINTF LV_STDLIB_CLIB
+
+#define LV_USE_OS LV_OS_NONE
+
+#define LV_USE_LOG 0
+#define LV_USE_ASSERT_NULL 0
+#define LV_USE_ASSERT_MALLOC 0
+#define LV_USE_ASSERT_STYLE 0
+#define LV_USE_ASSERT_MEM_INTEGRITY 0
+#define LV_USE_ASSERT_OBJ 0
+
+#define LV_USE_PERF_MONITOR 0
+#define LV_USE_MEM_MONITOR 0
+
+#define LV_DPI_DEF 96
+#define LV_DEF_REFR_PERIOD 20
+
+/* Keep the font set small and deliberate. */
+#define LV_FONT_MONTSERRAT_10 1
+#define LV_FONT_MONTSERRAT_12 1
+#define LV_FONT_MONTSERRAT_14 1
+#define LV_FONT_MONTSERRAT_16 1
+#define LV_FONT_MONTSERRAT_20 1
+#define LV_FONT_MONTSERRAT_24 1
+#define LV_FONT_MONTSERRAT_28 1
+#define LV_FONT_DEFAULT &lv_font_montserrat_14
+
+#define LV_USE_THEME_DEFAULT 0
+#define LV_USE_THEME_SIMPLE 0
+#define LV_USE_THEME_MONO 0
+#define LV_USE_FLEX 1
+#define LV_USE_GRID 0
+
+#define LV_USE_LABEL 1
+#define LV_USE_IMAGE 1
+#define LV_USE_BUTTON 1
+#define LV_USE_CANVAS 1
+#define LV_USE_BAR 1
+#define LV_USE_ARC 0
+#define LV_USE_KEYBOARD 0
+#define LV_USE_TEXTAREA 0
+#define LV_USE_SPINBOX 0
+#define LV_USE_SPINNER 0
+#define LV_USE_LIST 0
+#define LV_USE_MENU 0
+#define LV_USE_MSGBOX 0
+
+#endif /* LV_CONF_H */
+#endif

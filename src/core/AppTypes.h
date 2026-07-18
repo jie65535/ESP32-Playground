@@ -16,6 +16,7 @@ enum class AppCommandType : uint8_t {
     Previous,
     Next,
     Activate,
+    Home,
     PageSystem,
     PageDisplay,
     PageNetwork,
