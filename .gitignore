@@ -1,0 +1,16 @@
+.pio/
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+
+# The vendor board package is a large local reference archive.
+# Keep its README tracked, but do not commit PDFs, ZIPs, EXEs, images,
+# CAD files or other binary assets into the normal Git history.
+docs/vendor/*
+!docs/vendor/README.md
+
+# Local Wi-Fi credentials and captures.
+include/secrets.local.h
+captures/
+logs/
