@@ -55,4 +55,4 @@ POST PC_SERVER/api/v1/heartbeat
 }
 ```
 
-字段结构先稳定，再增加设备能力和实验数据；不要把产品 BMS 字段带入 Playground 协议。
+字段结构先稳定，再增加设备能力和实验数据；不要把未经验证的业务字段直接带入 Playground 协议。

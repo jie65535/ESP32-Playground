@@ -10,6 +10,9 @@ __pycache__/
 docs/vendor/*
 !docs/vendor/README.md
 
+# Original BDF files are kept locally for regeneration; generated subsets are tracked.
+tools/vendor-fonts/*
+
 # Local Wi-Fi credentials and captures.
 include/secrets.local.h
 captures/
