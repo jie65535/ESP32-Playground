@@ -69,6 +69,63 @@ class PixelConversionTests(unittest.TestCase):
                     0,
                 ]
             ),
+            )
+
+
+class _FakeSerial:
+    def __init__(self, payload: bytes, chunk_size: int = 17) -> None:
+        self._payload = bytearray(payload)
+        self._chunk_size = chunk_size
+
+    def read(self, size: int) -> bytes:
+        if not self._payload:
+            return b""
+        count = min(size, self._chunk_size, len(self._payload))
+        result = bytes(self._payload[:count])
+        del self._payload[:count]
+        return result
+
+
+def _frame_header(request_id: int, sequence: int) -> bytes:
+    return CAPTURE.FRAME_HEADER_STRUCT.pack(
+        CAPTURE.FRAME_MAGIC,
+        CAPTURE.FRAME_VERSION,
+        CAPTURE.PIXEL_FORMAT_RGB565BE,
+        CAPTURE.FRAME_HEADER_STRUCT.size,
+        320,
+        240,
+        153600,
+        request_id,
+        sequence,
+    )
+
+
+class ScreenshotProtocolTests(unittest.TestCase):
+    def test_header_resynchronizes_after_binary_stale_frame(self) -> None:
+        stale_frame = _frame_header(100, 1) + b"\x08\x83" * 23
+        current_frame = _frame_header(200, 2)
+        reader = CAPTURE._BufferedSerialReader(
+            _FakeSerial(stale_frame + current_frame)
+        )
+        self.assertEqual(
+            reader.read_header(200, timeout=0.1),
+            (153600, 200, 2),
+        )
+
+    def test_capture_default_timeout_covers_full_usb_frame(self) -> None:
+        self.assertGreaterEqual(
+            CAPTURE.capture_framebuffer.__defaults__[0], 30.0
+        )
+
+    def test_trailer_validates_request_sequence_and_crc(self) -> None:
+        trailer = CAPTURE.FRAME_TRAILER_STRUCT.pack(
+            CAPTURE.TRAILER_MAGIC, 200, 2, 0xCBF43926
+        )
+        self.assertEqual(
+            CAPTURE._BufferedSerialReader(_FakeSerial(trailer)).read_trailer(
+                200, 2, timeout=0.1
+            ),
+            0xCBF43926,
         )
 
 

@@ -67,6 +67,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageGamepad:
         case AppCommandType::PageConsole:
         case AppCommandType::PageNetwork:
+        case AppCommandType::PageSnake:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
@@ -125,8 +126,8 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
-      context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_, Serial,
-               ui_, runtime_},
+      context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
+               snakeScore_, Serial, ui_, runtime_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
@@ -151,6 +152,7 @@ void SystemKernel::setup() {
     wifi_.begin(Serial);
     server_.begin(Serial);
     gamepad_.begin(Serial);
+    snakeScore_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -166,6 +168,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(controllerSettingsApp_);
         appManager_.registerApp(consoleSettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
+        appManager_.registerApp(snakeApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
         ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
@@ -391,6 +394,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
         case AppCommandType::PageNetwork:
             appManager_.activate(AppId::NetworkSettings);
             break;
+        case AppCommandType::PageSnake:
+            appManager_.activate(AppId::Snake);
+            break;
         case AppCommandType::ColorTest:
             appManager_.activate(AppId::DisplayTest);
             appManager_.handleCommand(command);
@@ -398,7 +404,17 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
         case AppCommandType::Screenshot:
             display_.setCaptureEnabled(true);
             ui_.refreshNow();
-            display_.writeScreenshot(Serial);
+            // Normal console logging uses a zero-millisecond TX lock timeout
+            // so a disconnected host cannot stall the main loop.  A bounded
+            // wait is appropriate for this explicit bulk screenshot frame;
+            // it prevents transient TinyUSB lock contention from truncating
+            // the last bytes of the payload.
+            Serial.setTxTimeoutMs(100);
+            display_.writeScreenshot(
+                Serial, command.number > 0
+                           ? static_cast<uint32_t>(command.number)
+                           : 0U);
+            Serial.setTxTimeoutMs(0);
             display_.setCaptureEnabled(mirror_.snapshot().connected);
             break;
         case AppCommandType::Status:

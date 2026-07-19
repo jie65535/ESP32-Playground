@@ -51,7 +51,7 @@ public:
     bool flush(const lv_area_t& area, const uint8_t* pixels, bool lastArea);
 
     /* The framebuffer export format remains RGB565BE for the host tools. */
-    void writeScreenshot(Stream& output);
+    void writeScreenshot(Stream& output, uint32_t requestId);
     bool copyShadowRgb565BE(size_t offset, uint8_t* destination,
                             size_t length) const;
     static String formatBytes(size_t bytes);
@@ -91,6 +91,7 @@ private:
     bool asyncFlushEnabled_ = false;
     bool dmaPending_ = false;
     bool dmaPendingLast_ = false;
+    uint32_t screenshotSequence_ = 0;
     uint64_t dmaStartedUs_ = 0;
     uint64_t flushFrameStartedUs_ = 0;
 

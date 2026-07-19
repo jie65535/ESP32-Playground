@@ -2,6 +2,7 @@
 
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
+#include <esp_crc.h>
 
 #include <driver/spi_master.h>
 #include <esp_err.h>
@@ -18,6 +19,34 @@ constexpr int LCD_DC_PIN = 46;
 constexpr uint32_t LCD_PIXEL_CLOCK_HZ = 40U * 1000U * 1000U;
 constexpr size_t LCD_MAX_TRANSFER_BYTES =
     static_cast<size_t>(DisplayService::SCREEN_WIDTH) * 40U * sizeof(uint16_t);
+// A disconnected or stalled USB CDC host must not leave loopTask trapped in
+// the screenshot writer forever.  A normal 1 KiB chunk is much shorter than
+// this even at the nominal 115200 baud console setting.
+constexpr uint32_t SCREENSHOT_WRITE_STALL_TIMEOUT_MS = 3000UL;
+
+struct __attribute__((packed)) ScreenshotFrameHeader {
+    uint8_t magic[4];       // "PGS2"
+    uint8_t version;
+    uint8_t pixelFormat;    // RGB565BE
+    uint16_t headerBytes;
+    uint16_t width;
+    uint16_t height;
+    uint32_t payloadBytes;
+    uint32_t requestId;
+    uint32_t sequence;
+};
+
+struct __attribute__((packed)) ScreenshotFrameTrailer {
+    uint8_t magic[4];       // "PGE2"
+    uint32_t requestId;
+    uint32_t sequence;
+    uint32_t payloadCrc32;
+};
+
+static_assert(sizeof(ScreenshotFrameHeader) == 24,
+              "Screenshot header layout changed");
+static_assert(sizeof(ScreenshotFrameTrailer) == 16,
+              "Screenshot trailer layout changed");
 
 bool logEspError(const __FlashStringHelper* operation, esp_err_t error) {
     if (error == ESP_OK) {
@@ -517,7 +546,7 @@ void DisplayService::markCaptureRows(int32_t y1, int32_t y2) {
     }
 }
 
-void DisplayService::writeScreenshot(Stream& output) {
+void DisplayService::writeScreenshot(Stream& output, uint32_t requestId) {
     constexpr size_t screenshotBytes =
         static_cast<size_t>(SCREEN_WIDTH) * SCREEN_HEIGHT * 2U;
 
@@ -527,12 +556,50 @@ void DisplayService::writeScreenshot(Stream& output) {
     }
 
     screenshotInProgress_ = true;
-    output.print(F("PLAYGROUND_SCREENSHOT 1 320 240 RGB565BE "));
-    output.println(screenshotBytes);
+    const uint32_t sequence = ++screenshotSequence_;
+
+    auto writeBytes = [&](const uint8_t* data, size_t length) -> bool {
+        size_t written = 0;
+        uint32_t stalledSinceMs = 0;
+        while (written < length) {
+            const size_t step = output.write(data + written, length - written);
+            if (step == 0) {
+                if (stalledSinceMs == 0) {
+                    stalledSinceMs = millis();
+                } else if (millis() - stalledSinceMs >=
+                           SCREENSHOT_WRITE_STALL_TIMEOUT_MS) {
+                    return false;
+                }
+                delay(1);
+                continue;
+            }
+            stalledSinceMs = 0;
+            written += step;
+        }
+        return true;
+    };
+
+    ScreenshotFrameHeader header = {
+        {'P', 'G', 'S', '2'},
+        2,
+        1,
+        static_cast<uint16_t>(sizeof(ScreenshotFrameHeader)),
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
+        static_cast<uint32_t>(screenshotBytes),
+        requestId,
+        sequence,
+    };
+    if (!writeBytes(reinterpret_cast<const uint8_t*>(&header),
+                    sizeof(header))) {
+        screenshotInProgress_ = false;
+        return;
+    }
     output.flush();
 
     uint8_t chunk[SCREENSHOT_CHUNK];
     size_t offset = 0;
+    uint32_t payloadCrc = 0;
     while (offset < screenshotBytes) {
         const size_t count = min(sizeof(chunk), screenshotBytes - offset);
         const size_t firstPixel = offset / 2U;
@@ -541,21 +608,27 @@ void DisplayService::writeScreenshot(Stream& output) {
             chunk[index * 2U] = static_cast<uint8_t>(value >> 8U);
             chunk[index * 2U + 1U] = static_cast<uint8_t>(value & 0xffU);
         }
+        payloadCrc = esp_crc32_le(payloadCrc, chunk,
+                                  static_cast<uint32_t>(count));
 
-        size_t written = 0;
-        while (written < count) {
-            const size_t step = output.write(chunk + written, count - written);
-            if (step == 0) {
-                delay(1);
-                continue;
-            }
-            written += step;
+        if (!writeBytes(chunk, count)) {
+            // The host most likely timed out or closed the CDC handle.  Do
+            // not print here: the stream is still a binary frame and a text
+            // log would corrupt recovery.
+            screenshotInProgress_ = false;
+            return;
         }
         offset += count;
         yield();
     }
 
-    output.print(F("\nPLAYGROUND_SCREENSHOT_END\n"));
+    ScreenshotFrameTrailer trailer = {
+        {'P', 'G', 'E', '2'}, requestId, sequence, payloadCrc};
+    if (!writeBytes(reinterpret_cast<const uint8_t*>(&trailer),
+                    sizeof(trailer))) {
+        screenshotInProgress_ = false;
+        return;
+    }
     output.flush();
     screenshotInProgress_ = false;
 }

@@ -12,6 +12,7 @@ enum class AppId : uint8_t {
     ControllerSettings,
     ConsoleSettings,
     NetworkSettings,
+    Snake,
     Launcher,
     Count,
 };
@@ -35,6 +36,7 @@ enum class AppCommandType : uint8_t {
     PageGamepad,
     PageConsole,
     PageNetwork,
+    PageSnake,
     ColorTest,
     Screenshot,
     Status,

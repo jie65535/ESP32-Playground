@@ -14,9 +14,13 @@ import zlib
 from datetime import datetime
 
 
-SCREENSHOT_PREFIX = b"PLAYGROUND_SCREENSHOT "
-SCREENSHOT_END = b"PLAYGROUND_SCREENSHOT_END"
+FRAME_MAGIC = b"PGS2"
+TRAILER_MAGIC = b"PGE2"
+FRAME_VERSION = 2
+PIXEL_FORMAT_RGB565BE = 1
 SUPPORTED_FORMAT = "RGB565BE"
+FRAME_HEADER_STRUCT = struct.Struct("<4sBBHHHIII")
+FRAME_TRAILER_STRUCT = struct.Struct("<4sIII")
 
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -197,44 +201,120 @@ def read_exact(device, size: int, timeout: float) -> bytes:
     return bytes(data)
 
 
-def read_header(device, timeout: float) -> tuple[int, int, str, int]:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        line = device.readline()
-        if not line or not line.startswith(SCREENSHOT_PREFIX):
-            continue
-        fields = line.decode("ascii", errors="strict").strip().split()
-        if len(fields) != 6 or fields[0] != "PLAYGROUND_SCREENSHOT" or fields[1] != "1":
-            raise ValueError(f"unsupported screenshot header: {line!r}")
-        return int(fields[2]), int(fields[3]), fields[4], int(fields[5])
-    raise TimeoutError("screenshot header not received")
+class _BufferedSerialReader:
+    """Byte-stream reader that can resynchronize after an abandoned frame."""
 
+    def __init__(self, device) -> None:
+        self.device = device
+        self.buffer = bytearray()
 
-def read_footer(device, timeout: float) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        line = device.readline().strip()
-        if not line:
-            continue
-        if line == SCREENSHOT_END:
-            return
-        raise ValueError(f"unexpected screenshot footer: {line!r}")
-    raise TimeoutError("screenshot footer not received")
+    def _fill(self, timeout: float) -> None:
+        deadline = time.monotonic() + timeout
+        while True:
+            chunk = self.device.read(4096)
+            if chunk:
+                self.buffer.extend(chunk)
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError("screenshot frame data not received")
 
+    def read_exact(self, size: int, timeout: float) -> bytes:
+        deadline = time.monotonic() + timeout
+        while len(self.buffer) < size:
+            chunk = self.device.read(4096)
+            if chunk:
+                self.buffer.extend(chunk)
+                continue
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"received {len(self.buffer)} of {size} screenshot bytes"
+                )
+        result = bytes(self.buffer[:size])
+        del self.buffer[:size]
+        return result
 
-def capture_framebuffer(device, timeout: float = 10.0) -> tuple[int, int, bytes]:
-    device.reset_input_buffer()
-    send_command(device, "screenshot")
-    width, height, pixel_format, payload_size = read_header(device, timeout)
-    if pixel_format != SUPPORTED_FORMAT:
-        raise ValueError(f"unsupported pixel format: {pixel_format}")
-    expected_size = width * height * 2
-    if payload_size != expected_size:
-        raise ValueError(
-            f"header payload size is {payload_size}, expected {expected_size}"
+    def read_header(self, request_id: int, timeout: float) -> tuple[int, int, int]:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            magic_index = self.buffer.find(FRAME_MAGIC)
+            if magic_index < 0:
+                if len(self.buffer) > len(FRAME_MAGIC) - 1:
+                    del self.buffer[: -(len(FRAME_MAGIC) - 1)]
+                self._fill(max(0.0, deadline - time.monotonic()))
+                continue
+            if magic_index > 0:
+                del self.buffer[:magic_index]
+            if len(self.buffer) < FRAME_HEADER_STRUCT.size:
+                self._fill(max(0.0, deadline - time.monotonic()))
+                continue
+
+            fields = FRAME_HEADER_STRUCT.unpack(
+                bytes(self.buffer[: FRAME_HEADER_STRUCT.size])
+            )
+            (
+                magic,
+                version,
+                pixel_format,
+                header_bytes,
+                width,
+                height,
+                payload_size,
+                frame_request_id,
+                sequence,
+            ) = fields
+            if (
+                magic != FRAME_MAGIC
+                or version != FRAME_VERSION
+                or pixel_format != PIXEL_FORMAT_RGB565BE
+                or header_bytes != FRAME_HEADER_STRUCT.size
+                or width != 320
+                or height != 240
+                or payload_size != width * height * 2
+            ):
+                del self.buffer[:1]
+                continue
+            del self.buffer[: FRAME_HEADER_STRUCT.size]
+            if frame_request_id != request_id:
+                # A stale frame from an earlier timed-out capture.  Its
+                # payload remains in the stream; scan through it until the
+                # next PGS2 header rather than treating it as this request.
+                continue
+            return payload_size, frame_request_id, sequence
+        raise TimeoutError("screenshot frame header not received")
+
+    def read_trailer(self, request_id: int, sequence: int, timeout: float) -> int:
+        raw = self.read_exact(FRAME_TRAILER_STRUCT.size, timeout)
+        magic, trailer_request_id, trailer_sequence, payload_crc = (
+            FRAME_TRAILER_STRUCT.unpack(raw)
         )
-    payload = read_exact(device, payload_size, timeout)
-    read_footer(device, timeout)
+        if (
+            magic != TRAILER_MAGIC
+            or trailer_request_id != request_id
+            or trailer_sequence != sequence
+        ):
+            raise ValueError(f"invalid screenshot trailer: {raw!r}")
+        return payload_crc
+
+
+def capture_framebuffer(device, timeout: float = 30.0) -> tuple[int, int, bytes]:
+    device.reset_input_buffer()
+    request_id = int(time.monotonic_ns() & 0x7FFFFFFF) or 1
+    send_command(device, f"screenshot {request_id}")
+    reader = _BufferedSerialReader(device)
+    payload_size, frame_request_id, sequence = reader.read_header(
+        request_id, timeout
+    )
+    payload = reader.read_exact(payload_size, timeout)
+    received_crc = reader.read_trailer(
+        frame_request_id, sequence, timeout
+    )
+    actual_crc = zlib.crc32(payload) & 0xFFFFFFFF
+    if received_crc != actual_crc:
+        raise ValueError(
+            f"screenshot CRC mismatch: received {received_crc:08X}, "
+            f"calculated {actual_crc:08X}"
+        )
+    width, height = 320, 240
     return width, height, payload
 
 
@@ -256,7 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--command-delay", type=float, default=0.15)
     parser.add_argument("--settle", type=float, default=0.3)
-    parser.add_argument("--timeout", type=float, default=10.0)
+    parser.add_argument("--timeout", type=float, default=30.0)
     return parser
 
 

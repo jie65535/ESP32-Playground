@@ -87,10 +87,22 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageConsole;
     } else if (lower == "page network") {
         command.type = AppCommandType::PageNetwork;
+    } else if (lower == "page snake" || lower == "game snake") {
+        command.type = AppCommandType::PageSnake;
     } else if (lower == "color_test") {
         command.type = AppCommandType::ColorTest;
     } else if (lower == "screenshot") {
         command.type = AppCommandType::Screenshot;
+    } else if (lower.startsWith("screenshot ")) {
+        String argument = line.substring(11);
+        argument.trim();
+        if (!isUnsignedInteger(argument)) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            command.type = AppCommandType::Screenshot;
+            command.number = argument.toInt();
+        }
     } else if (lower == "status") {
         command.type = AppCommandType::Status;
     } else if (lower == "help" || lower == "?") {
@@ -226,7 +238,8 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("         page system | page time | page display | page settings"));
     output.println(F("         page sound | page rgb | page controller | page console"));
     output.println(F("         page network"));
-    output.println(F("          color_test | screenshot | status | help"));
+    output.println(F("         page snake"));
+    output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));
     output.println(F("Gamepad:  gamepad status | gamepad scan | gamepad stop"));
