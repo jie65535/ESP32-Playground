@@ -89,6 +89,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageNetwork;
     } else if (lower == "page snake" || lower == "game snake") {
         command.type = AppCommandType::PageSnake;
+    } else if (lower == "page tetris" || lower == "game tetris") {
+        command.type = AppCommandType::PageTetris;
     } else if (lower == "color_test") {
         command.type = AppCommandType::ColorTest;
     } else if (lower == "screenshot") {
@@ -239,6 +241,7 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("         page sound | page rgb | page controller | page console"));
     output.println(F("         page network"));
     output.println(F("         page snake"));
+    output.println(F("         page tetris"));
     output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));

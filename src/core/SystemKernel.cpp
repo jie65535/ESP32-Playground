@@ -68,6 +68,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageConsole:
         case AppCommandType::PageNetwork:
         case AppCommandType::PageSnake:
+        case AppCommandType::PageTetris:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
@@ -127,7 +128,7 @@ bool countsAsDisplayActivity(AppCommandType type) {
 SystemKernel::SystemKernel()
     : ui_(display_),
       context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
-               snakeScore_, Serial, ui_, runtime_},
+               snakeScore_, tetrisScore_, Serial, ui_, runtime_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
@@ -153,6 +154,7 @@ void SystemKernel::setup() {
     server_.begin(Serial);
     gamepad_.begin(Serial);
     snakeScore_.begin(Serial);
+    tetrisScore_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -169,6 +171,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(consoleSettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(snakeApp_);
+        appManager_.registerApp(tetrisApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
         ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
@@ -396,6 +399,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageSnake:
             appManager_.activate(AppId::Snake);
+            break;
+        case AppCommandType::PageTetris:
+            appManager_.activate(AppId::Tetris);
             break;
         case AppCommandType::ColorTest:
             appManager_.activate(AppId::DisplayTest);
