@@ -68,6 +68,7 @@ void BleGamepadService::tick(uint32_t nowMs) {
     }
 
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
+    processPendingRumble();
     if (scanning_ && static_cast<int32_t>(nowMs - scanDeadlineMs_) >= 0) {
         stopPairingScan();
     }
@@ -115,15 +116,17 @@ bool BleGamepadService::requestRumble(uint16_t durationMs,
                                       uint8_t weakMagnitude,
                                       uint8_t strongMagnitude) {
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
-    for (ControllerPtr controller : controllers_) {
-        if (controller == nullptr || !controller->isConnected() ||
-            !controller->isGamepad()) {
-            continue;
-        }
-        controller->playDualRumble(0, durationMs, weakMagnitude,
-                                   strongMagnitude);
-        return true;
+    if (!snapshot_.connected) {
+        return false;
     }
+    // The Arduino Bluepad32 bridge queues this request for the Bluetooth
+    // task. Defer it until the next gamepad tick so every caller (UI, game,
+    // USB command) uses the same safe handoff point before BP32.update().
+    rumbleDurationMs_ = durationMs;
+    rumbleWeakMagnitude_ = weakMagnitude;
+    rumbleStrongMagnitude_ = strongMagnitude;
+    rumblePending_ = true;
+    return true;
 #else
     (void)durationMs;
     (void)weakMagnitude;
@@ -152,6 +155,25 @@ bool BleGamepadService::startPairingScan() {
     return true;
 #else
     return false;
+#endif
+}
+
+void BleGamepadService::processPendingRumble() {
+#if defined(PGOS_BLE_GAMEPAD_BACKEND)
+    if (!rumblePending_) {
+        return;
+    }
+    rumblePending_ = false;
+    for (ControllerPtr controller : controllers_) {
+        if (controller == nullptr || !controller->isConnected() ||
+            !controller->isGamepad()) {
+            continue;
+        }
+        controller->playDualRumble(0, rumbleDurationMs_,
+                                   rumbleWeakMagnitude_,
+                                   rumbleStrongMagnitude_);
+        return;
+    }
 #endif
 }
 

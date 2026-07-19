@@ -114,8 +114,9 @@ void TetrisApp::onTick(uint32_t nowMs, AppContext& context) {
             invalidate();
             return;
         }
-        clearEffectUntilMs_ = 0;
-        clearEffectCount_ = 0;
+        finishClearEffect(context);
+        invalidate();
+        return;
     }
     const GamepadSnapshot gamepad = context.gamepad.snapshot();
     sampleAnalog(gamepad, nowMs);
@@ -223,7 +224,8 @@ void TetrisApp::draw(lv_event_t* event) {
                      value == 0 ? 1 : 2);
         }
     }
-    if (phase_ == Phase::Running || phase_ == Phase::Paused) {
+    if ((phase_ == Phase::Running || phase_ == Phase::Paused) &&
+        clearEffectUntilMs_ == 0) {
         Piece ghost = current_;
         while (true) {
             Piece candidate = ghost;
@@ -275,17 +277,32 @@ void TetrisApp::draw(lv_event_t* event) {
     }
     if (clearEffectUntilMs_ != 0) {
         const uint32_t elapsed = millis() - clearEffectStartMs_;
-        const bool bright = ((elapsed / 45U) & 1U) == 0;
-        const lv_opa_t opacity = bright ? LV_OPA_90 : LV_OPA_50;
+        const uint32_t progress = std::min<uint32_t>(1000U,
+            (elapsed * 1000U) / CLEAR_EFFECT_DURATION_MS);
+        const uint32_t maxRadius = BOARD_WIDTH / 2U + 1U;
+        const uint32_t radius = (maxRadius * progress) / 1000U;
         for (uint8_t index = 0; index < clearEffectCount_; ++index) {
             const uint8_t row = clearEffectRows_[index];
-            lv_area_t flash = {
-                static_cast<lv_coord_t>(board.x1 + 1),
-                static_cast<lv_coord_t>(board.y1 + row * CELL_SIZE + 1),
-                static_cast<lv_coord_t>(board.x2 - 1),
-                static_cast<lv_coord_t>(board.y1 + (row + 1) * CELL_SIZE - 2),
-            };
-            drawRect(layer, flash, lv_color_hex(0xFFFFFF), 2, opacity);
+            for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
+                const uint8_t distance = static_cast<uint8_t>(
+                    std::abs(static_cast<int>(column) -
+                             static_cast<int>(clearEffectAnchorX_)));
+                if (distance > radius + 1U) {
+                    continue;
+                }
+                lv_area_t cell = {
+                    static_cast<lv_coord_t>(board.x1 + column * CELL_SIZE + 1),
+                    static_cast<lv_coord_t>(board.y1 + row * CELL_SIZE + 1),
+                    static_cast<lv_coord_t>(board.x1 + (column + 1) * CELL_SIZE - 2),
+                    static_cast<lv_coord_t>(board.y1 + (row + 1) * CELL_SIZE - 2),
+                };
+                if (distance <= radius) {
+                    drawRect(layer, cell, backgroundColor_, 2, LV_OPA_COVER);
+                } else {
+                    drawRect(layer, cell, lv_color_hex(0xFFFFFF), 2,
+                             LV_OPA_90);
+                }
+            }
         }
     }
 
@@ -425,6 +442,7 @@ void TetrisApp::resetGame() {
     gravityIntervalMs_ = INITIAL_GRAVITY_MS;
     nextSoftDropMs_ = 0;
     clearEffectCount_ = 0;
+    clearEffectAnchorX_ = BOARD_WIDTH / 2U;
     clearEffectStartMs_ = 0;
     clearEffectUntilMs_ = 0;
     nextHorizontalRepeatMs_ = 0;
@@ -491,6 +509,29 @@ void TetrisApp::lockPiece(AppContext& context) {
                 260U + cleared * 35U, 255, 255);
         }
     }
+    if (cleared != 0) {
+        uint8_t minColumn = BOARD_WIDTH - 1U;
+        uint8_t maxColumn = 0;
+        bool foundCell = false;
+        for (uint8_t row = 0; row < 4; ++row) {
+            for (uint8_t column = 0; column < 4; ++column) {
+                if (!hasCell(current_.type, current_.rotation, row, column)) {
+                    continue;
+                }
+                minColumn = std::min<uint8_t>(minColumn,
+                                              current_.x + column);
+                maxColumn = std::max<uint8_t>(maxColumn,
+                                              current_.x + column);
+                foundCell = true;
+            }
+        }
+        clearEffectAnchorX_ = foundCell
+            ? static_cast<uint8_t>((minColumn + maxColumn) / 2U)
+            : BOARD_WIDTH / 2U;
+        // Keep the full rows in place while the center-out erase animation
+        // runs. The rows are compacted only when the effect completes.
+        return;
+    }
     spawnPiece();
     nextGravityMs_ = millis() + gravityIntervalMs_;
     if (phase_ == Phase::GameOver) {
@@ -551,6 +592,21 @@ uint8_t TetrisApp::clearLines() {
         return 0;
     }
 
+    clearEffectStartMs_ = millis();
+    clearEffectUntilMs_ = clearEffectStartMs_ + CLEAR_EFFECT_DURATION_MS;
+
+    static constexpr uint16_t lineScores[] = {0, 100, 300, 500, 800};
+    score_ = std::min<uint32_t>(65535U,
+                                score_ + lineScores[cleared] * level_);
+    lines_ = std::min<uint16_t>(999U, lines_ + cleared);
+    level_ = static_cast<uint8_t>(1U + lines_ / 10U);
+    gravityIntervalMs_ = std::max<uint32_t>(MIN_GRAVITY_MS,
+        INITIAL_GRAVITY_MS - static_cast<uint32_t>(level_ - 1U) * 55U);
+    bestScore_ = std::max(bestScore_, score_);
+    return cleared;
+}
+
+void TetrisApp::applyClearedLines() {
     int writeRow = BOARD_HEIGHT - 1;
     for (int readRow = BOARD_HEIGHT - 1; readRow >= 0; --readRow) {
         bool remove = false;
@@ -576,18 +632,22 @@ uint8_t TetrisApp::clearLines() {
         }
         --writeRow;
     }
-    clearEffectStartMs_ = millis();
-    clearEffectUntilMs_ = clearEffectStartMs_ + CLEAR_EFFECT_DURATION_MS;
+}
 
-    static constexpr uint16_t lineScores[] = {0, 100, 300, 500, 800};
-    score_ = std::min<uint32_t>(65535U,
-                                score_ + lineScores[cleared] * level_);
-    lines_ = std::min<uint16_t>(999U, lines_ + cleared);
-    level_ = static_cast<uint8_t>(1U + lines_ / 10U);
-    gravityIntervalMs_ = std::max<uint32_t>(MIN_GRAVITY_MS,
-        INITIAL_GRAVITY_MS - static_cast<uint32_t>(level_ - 1U) * 55U);
-    bestScore_ = std::max(bestScore_, score_);
-    return cleared;
+void TetrisApp::finishClearEffect(AppContext& context) {
+    applyClearedLines();
+    clearEffectUntilMs_ = 0;
+    clearEffectStartMs_ = 0;
+    clearEffectCount_ = 0;
+    spawnPiece();
+    nextGravityMs_ = millis() + gravityIntervalMs_;
+    if (phase_ == Phase::GameOver) {
+        saveHighScore(context);
+        context.audio.playFeedback();
+        if (context.gamepad.snapshot().connected) {
+            context.gamepad.requestRumble(260, 200, 255);
+        }
+    }
 }
 
 bool TetrisApp::tryMove(int8_t dx, int8_t dy) {

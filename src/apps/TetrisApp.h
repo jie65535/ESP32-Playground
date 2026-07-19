@@ -55,6 +55,7 @@ private:
     uint16_t leaderboard_[LEADERBOARD_COUNT] = {};
     uint8_t clearEffectRows_[4] = {};
     uint8_t clearEffectCount_ = 0;
+    uint8_t clearEffectAnchorX_ = BOARD_WIDTH / 2U;
     uint32_t clearEffectStartMs_ = 0;
     uint32_t clearEffectUntilMs_ = 0;
     int8_t analogXSign_ = 0;
@@ -89,6 +90,8 @@ private:
     void hardDrop(AppContext& context);
     void dropOne(uint32_t nowMs, AppContext& context, bool softDrop);
     uint8_t clearLines();
+    void applyClearedLines();
+    void finishClearEffect(AppContext& context);
     bool tryMove(int8_t dx, int8_t dy);
     bool tryRotate();
     bool collides(const Piece& piece) const;
