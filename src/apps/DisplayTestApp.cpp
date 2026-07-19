@@ -67,6 +67,10 @@ lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
                            context.ui.muted());
     context.ui.createLabel(root_, "320 x 240  /  40 MHz SPI", 168, 165, 12,
                            context.ui.text());
+    lv_obj_t* chineseLabel = context.ui.createLabel(
+        root_, "屏幕测试 中文", 18, 190, 12, context.ui.text());
+    lv_obj_set_style_text_font(
+        chineseLabel, context.ui.bitmapFont(BitmapFontSize::Small12), 0);
     return root_;
 }
 

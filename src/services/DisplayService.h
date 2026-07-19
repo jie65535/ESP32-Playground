@@ -2,7 +2,9 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
-#include <TFT_eSPI.h>
+#include <esp_lcd_panel_io.h>
+#include <esp_lcd_panel_ops.h>
+#include <freertos/semphr.h>
 
 #include <lvgl.h>
 
@@ -11,6 +13,8 @@ public:
     struct FlushMetrics {
         uint32_t copyUs = 0;
         uint32_t transferUs = 0;
+        uint32_t wallUs = 0;
+        uint32_t waitUs = 0;
         uint32_t pixels = 0;
         uint16_t areas = 0;
     };
@@ -60,13 +64,14 @@ private:
     static constexpr size_t SCREENSHOT_CHUNK = 1024;
     static constexpr uint8_t DEFAULT_BRIGHTNESS_PERCENT = 100;
     static constexpr uint32_t DEFAULT_TIMEOUT_SECONDS = 0;
-    static constexpr size_t DMA_BUFFER_PIXELS =
-        static_cast<size_t>(SCREEN_WIDTH) * 40U;
 
-    TFT_eSPI display_;
+    esp_lcd_panel_io_handle_t panelIo_ = nullptr;
+    esp_lcd_panel_handle_t panel_ = nullptr;
+    SemaphoreHandle_t dmaDoneSemaphore_ = nullptr;
+    volatile bool dmaDone_ = false;
+    volatile uint64_t dmaCompletedUs_ = 0;
     Preferences preferences_;
     uint16_t* shadow_ = nullptr;
-    uint16_t* dmaBuffer_ = nullptr;
     bool ready_ = false;
     bool screenshotInProgress_ = false;
     bool backlightArmed_ = false;
@@ -86,10 +91,14 @@ private:
     bool asyncFlushEnabled_ = false;
     bool dmaPending_ = false;
     bool dmaPendingLast_ = false;
-    bool dmaTransactionOpen_ = false;
     uint64_t dmaStartedUs_ = 0;
+    uint64_t flushFrameStartedUs_ = 0;
 
     void holdBacklightOff();
+    bool beginNativePanel();
+    static bool IRAM_ATTR onNativeColorTransferDone(
+        esp_lcd_panel_io_handle_t panelIo,
+        esp_lcd_panel_io_event_data_t* eventData, void* userContext);
     void applyBacklight();
     void saveSettings();
     void completeDmaTransfer();

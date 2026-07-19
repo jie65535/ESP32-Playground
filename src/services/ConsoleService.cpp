@@ -81,6 +81,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageSound;
     } else if (lower == "page rgb") {
         command.type = AppCommandType::PageRgb;
+    } else if (lower == "page controller" || lower == "page gamepad") {
+        command.type = AppCommandType::PageGamepad;
     } else if (lower == "page console") {
         command.type = AppCommandType::PageConsole;
     } else if (lower == "page network") {
@@ -100,6 +102,16 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.value = line.substring(9);
     } else if (lower == "i2c scan") {
         command.type = AppCommandType::I2cScan;
+    } else if (lower == "gamepad status") {
+        command.type = AppCommandType::GamepadStatus;
+    } else if (lower == "gamepad rumble") {
+        command.type = AppCommandType::GamepadRumble;
+    } else if (lower == "gamepad scan") {
+        command.type = AppCommandType::GamepadScan;
+    } else if (lower == "gamepad stop") {
+        command.type = AppCommandType::GamepadStopScan;
+    } else if (lower == "gamepad disconnect") {
+        command.type = AppCommandType::GamepadDisconnect;
     } else if (lower == "wifi scan") {
         command.type = AppCommandType::WifiScan;
     } else if (lower == "wifi status") {
@@ -212,10 +224,13 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
 void ConsoleService::printHelp(Print& output) {
     output.println(F("Commands: up | down | left | right | ok | back | home"));
     output.println(F("         page system | page time | page display | page settings"));
-    output.println(F("         page sound | page rgb | page console | page network"));
+    output.println(F("         page sound | page rgb | page controller | page console"));
+    output.println(F("         page network"));
     output.println(F("          color_test | screenshot | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));
+    output.println(F("Gamepad:  gamepad status | gamepad scan | gamepad stop"));
+    output.println(F("          gamepad rumble | gamepad disconnect"));
     output.println(F("Wi-Fi:    wifi scan | wifi select <index> | wifi ssid <name>"));
     output.println(F("          wifi password <password> | wifi open"));
     output.println(F("          wifi status | wifi reconnect | wifi clear"));

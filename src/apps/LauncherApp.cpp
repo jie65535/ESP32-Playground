@@ -12,8 +12,9 @@ const char* itemName(uint8_t index) {
         case 3: return "Display";
         case 4: return "Sound";
         case 5: return "RGB Light";
-        case 6: return "Console";
-        case 7: return "Connectivity";
+        case 6: return "Controller";
+        case 7: return "Console";
+        case 8: return "Connectivity";
         default: return "Unknown";
     }
 }
@@ -26,8 +27,9 @@ const char* itemDescription(uint8_t index) {
         case 3: return "brightness and screen timeout";
         case 4: return "volume and interaction feedback";
         case 5: return "color, brightness and animated effects";
-        case 6: return "server address and wireless control";
-        case 7: return "Wi-Fi, IP and network services";
+        case 6: return "Bluetooth gamepad and power policy";
+        case 7: return "server address and wireless control";
+        case 8: return "Wi-Fi, IP and network services";
         default: return "";
     }
 }
@@ -40,8 +42,9 @@ const char* itemSymbol(uint8_t index) {
         case 3: return LV_SYMBOL_EYE_OPEN;
         case 4: return LV_SYMBOL_VOLUME_MAX;
         case 5: return LV_SYMBOL_TINT;
-        case 6: return LV_SYMBOL_UPLOAD;
-        case 7: return LV_SYMBOL_WIFI;
+        case 6: return LV_SYMBOL_BLUETOOTH;
+        case 7: return LV_SYMBOL_UPLOAD;
+        case 8: return LV_SYMBOL_WIFI;
         default: return LV_SYMBOL_LIST;
     }
 }
@@ -54,8 +57,9 @@ AppId itemApp(uint8_t index) {
         case 3: return AppId::DisplaySettings;
         case 4: return AppId::SoundSettings;
         case 5: return AppId::RgbSettings;
-        case 6: return AppId::ConsoleSettings;
-        case 7: return AppId::NetworkSettings;
+        case 6: return AppId::ControllerSettings;
+        case 7: return AppId::ConsoleSettings;
+        case 8: return AppId::NetworkSettings;
         default: return AppId::Count;
     }
 }

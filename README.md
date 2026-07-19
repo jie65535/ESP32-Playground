@@ -8,12 +8,13 @@
 
 当前固件点亮 ILI9341 屏幕，显示芯片、内存、运行时间和板卡信息，并开始 Wi-Fi Station 实验：通过 USB 控制台扫描/选择网络、输入密码并保存到设备 NVS，连接状态、IP 和 RSSI 同时显示在屏幕与控制台。
 
-当前固件使用 LVGL 9.5 retained-mode UI：系统桌面、系统信息、时间、显示实验、显示设置、声音、RGB Light、控制台和网络设置由统一主题、可滚动页面、状态栏、页面转场和焦点卡片组成。时间页通过共享 GPIO15/16 I²C 总线读取 PCF8563 电池时钟；联网后自动以 SNTP 校时并写回 RTC，设置时间也可使用 USB 的 `time set YYYY-MM-DD HH:MM:SS` 命令；状态栏右上角显示有效时间源的 24 小时制 `HH:MM`，回退顺序为 NTP（本次开机已校时）→ PCF8563 → `--:--`。显示设置支持 GPIO45 PWM 亮度、空闲息屏、活动唤醒和 NVS 持久化；声音页支持 ES8311 音量、反馈音和试听；RGB Light 通过 GPIO42 非阻塞驱动板载 WS2812，提供静态、呼吸、彩虹、心跳和闪烁灯效。控制台页只显示 Wi-Fi 模式下的目标服务器和连接状态；镜像、画面推送、音频流等上位机功能不作为设备设置。LVGL 使用 40 行 RGB565 局部缓冲，显示服务在 PSRAM 中维护完整 shadow framebuffer，因此仍保留无损截图与无线镜像能力；USB 状态日志只低频输出。
+当前固件使用 LVGL 9.5 retained-mode UI：系统桌面、系统信息、时间、显示实验、显示设置、声音、RGB Light、Controller、控制台和网络设置由统一主题、可滚动页面、状态栏、页面转场和焦点卡片组成。时间页通过共享 GPIO15/16 I²C 总线读取 PCF8563 电池时钟；联网后自动以 SNTP 校时并写回 RTC，设置时间也可使用 USB 的 `time set YYYY-MM-DD HH:MM:SS` 命令；状态栏右上角显示有效时间源的 24 小时制 `HH:MM`，回退顺序为 NTP（本次开机已校时）→ PCF8563 → `--:--`。状态栏同时显示 Wi-Fi、服务端和蓝牙手柄状态。Controller 页面显示 Xbox BLE 手柄的连接、型号、电量和配对扫描倒计时，默认只在启动或用户请求时扫描 60 秒，连接后立即停止发现扫描；空闲断开可设为 Never / 5 / 15 / 30 分钟并持久化。显示设置支持 GPIO45 PWM 亮度、空闲息屏、活动唤醒和 NVS 持久化；声音页支持 ES8311 音量、反馈音和试听；RGB Light 通过 GPIO42 非阻塞驱动板载 WS2812，提供静态、呼吸、彩虹、心跳和闪烁灯效。LVGL 使用 40 行 RGB565 局部缓冲，显示服务在 PSRAM 中维护完整 shadow framebuffer，因此仍保留无损截图与无线镜像能力；USB 状态日志只低频输出。
 
 ## 当前环境
 
 - PlatformIO + Arduino
-- `espressif32 @ 7.0.1`
+- `pioarduino/platform-espressif32 55.03.39`
+- `Arduino-ESP32 3.3.9` / `ESP-IDF 5.5.4`
 - `es3n28p_r8n16`
 - `lvgl @ 9.5.0`
 - ESP32-S3，16MB QIO Flash，8MB OPI PSRAM
@@ -42,7 +43,7 @@ python tools/playground_console.py --port COM3 --wifi-setup
 python tools/capture_screen.py --port COM3 --output captures/home.png
 ```
 
-USB 调试控制台的显式 `page system`、`page time`、`page display`、`page settings`、`page sound`、`page rgb`、`page console` 和 `page network` 可直达页面，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `back`、`home`、`time status`、`time set YYYY-MM-DD HH:MM:SS`、`wifi scan`、`wifi select <index>`、`wifi password <value>`、`wifi status`、`wifi reconnect` 和 `wifi clear` 等换行命令；密码不会由固件或控制台回显。推荐用 `--wifi-setup` 的隐藏输入流程，不要把密码直接写在 shell 命令行中，以免进入主机历史记录。
+USB 调试控制台的显式 `page system`、`page time`、`page display`、`page settings`、`page sound`、`page rgb`、`page controller`、`page console` 和 `page network` 可直达页面，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `gamepad status`、`gamepad scan`、`gamepad stop`、`gamepad rumble`、`gamepad disconnect`、`back`、`home`、`time status`、`time set YYYY-MM-DD HH:MM:SS` 和 Wi-Fi 配置命令；密码不会由固件或控制台回显。
 
 ## PGOS Studio 无线上位机
 
@@ -91,7 +92,9 @@ python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 - [实验记录：LCD 异步 DMA flush](docs/experiments/010_lcd_dma.md)
 - [实验记录：板载 RGB LED](docs/experiments/011_rgb_led.md)
 - [实验记录：PCF8563 I²C 实时时钟](docs/experiments/012_pcf8563_rtc.md)
+- [实验记录：Xbox Series 手柄 BLE HID 可行性](docs/experiments/013_ble_xbox_gamepad.md)
 - [可复用经验知识库](docs/knowledge/README.md)
+- [第三方依赖与源码策略](docs/DEPENDENCIES.md)
 - [厂商原始资料说明](docs/vendor/README.md)
 
 原始厂商资料包位于 `docs/vendor/2.8inch_IPS_ESP32-S3_ILI9341V_ES3C28P_ES3N28P_V1.0`。该目录是参考资料，不是程序依赖；缺失时不应复制或修改其内容。

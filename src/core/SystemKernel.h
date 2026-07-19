@@ -4,6 +4,7 @@
 #include "apps/DisplaySettingsApp.h"
 #include "apps/SoundSettingsApp.h"
 #include "apps/RgbSettingsApp.h"
+#include "apps/ControllerSettingsApp.h"
 #include "apps/ConsoleSettingsApp.h"
 #include "apps/LauncherApp.h"
 #include "apps/NetworkSettingsApp.h"
@@ -14,6 +15,7 @@
 #include "services/ConsoleService.h"
 #include "services/BenchmarkService.h"
 #include "services/AudioService.h"
+#include "services/BleGamepadService.h"
 #include "services/DisplayService.h"
 #include "services/I2cBusService.h"
 #include "services/RgbService.h"
@@ -39,6 +41,7 @@ private:
     RgbService rgb_;
     WifiService wifi_;
     ServerService server_;
+    BleGamepadService gamepad_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -52,6 +55,7 @@ private:
     DisplaySettingsApp displaySettingsApp_;
     SoundSettingsApp soundSettingsApp_;
     RgbSettingsApp rgbSettingsApp_;
+    ControllerSettingsApp controllerSettingsApp_;
     ConsoleSettingsApp consoleSettingsApp_;
     NetworkSettingsApp networkSettingsApp_;
     LauncherApp launcherApp_;

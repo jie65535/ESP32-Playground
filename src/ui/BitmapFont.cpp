@@ -36,6 +36,39 @@ uint8_t fontRows(BitmapFontSize) {
     return 16;
 }
 
+void drawSpan(BitmapCanvas& canvas, int16_t x, int16_t y, int16_t length,
+              uint16_t color) {
+    if (canvas.pixels == nullptr || canvas.width <= 0 || canvas.height <= 0 ||
+        y < 0 || y >= canvas.height || length <= 0) {
+        return;
+    }
+
+    int16_t x1 = x;
+    int16_t x2 = static_cast<int16_t>(x + length - 1);
+    if (x2 < 0 || x1 >= canvas.width) {
+        return;
+    }
+    if (x1 < 0) x1 = 0;
+    if (x2 >= canvas.width) x2 = canvas.width - 1;
+    const uint16_t stride = canvas.stride == 0
+                                ? static_cast<uint16_t>(canvas.width)
+                                : canvas.stride;
+    uint16_t* target = canvas.pixels + static_cast<size_t>(y) * stride + x1;
+    for (int16_t column = x1; column <= x2; ++column) {
+        *target++ = color;
+    }
+}
+
+void drawMissingGlyph(BitmapCanvas& canvas, int16_t x, int16_t y,
+                      uint8_t columns, uint8_t rows, uint16_t color) {
+    drawSpan(canvas, x + 1, y + 1, columns - 2, color);
+    drawSpan(canvas, x + 1, y + rows - 2, columns - 2, color);
+    for (int16_t row = y + 2; row < y + rows - 2; ++row) {
+        drawSpan(canvas, x + 1, row, 1, color);
+        drawSpan(canvas, x + columns - 2, row, 1, color);
+    }
+}
+
 }  // namespace
 
 int16_t BitmapFont::textWidth(const char* utf8, BitmapFontSize size) const {
@@ -53,7 +86,7 @@ int16_t BitmapFont::lineHeight(BitmapFontSize size) const {
     return fontRows(size);
 }
 
-void BitmapFont::draw(TFT_eSPI& display, const char* utf8, int16_t x,
+void BitmapFont::draw(BitmapCanvas& canvas, const char* utf8, int16_t x,
                       int16_t y, uint16_t color, BitmapFontSize size,
                       BitmapTextAlign align) const {
     const uint8_t columns = fontColumns(size);
@@ -65,12 +98,11 @@ void BitmapFont::draw(TFT_eSPI& display, const char* utf8, int16_t x,
         x -= width;
     }
 
-    display.startWrite();
     while (*utf8 != '\0') {
         const uint32_t codepoint = nextCodepoint(utf8);
         const BitmapGlyph* glyph = findGlyph(codepoint, size);
         if (glyph == nullptr) {
-            display.drawRect(x + 1, y + 1, columns - 2, rows - 2, color);
+            drawMissingGlyph(canvas, x, y, columns, rows, color);
             x += columns;
             continue;
         }
@@ -91,14 +123,13 @@ void BitmapFont::draw(TFT_eSPI& display, const char* utf8, int16_t x,
                     ++column;
                 }
                 if (column > runStart) {
-                    display.drawFastHLine(x + runStart, y + row,
-                                          column - runStart, color);
+                    drawSpan(canvas, x + runStart, y + row,
+                             column - runStart, color);
                 }
             }
         }
         x += pgm_read_byte(&glyph->advance);
     }
-    display.endWrite();
 }
 
 uint32_t BitmapFont::nextCodepoint(const char*& cursor) {

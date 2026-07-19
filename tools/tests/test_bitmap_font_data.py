@@ -15,14 +15,16 @@ SPEC.loader.exec_module(GENERATOR)
 
 FONT_DATA_PATH = TOOLS_DIR.parent / "src" / "ui" / "BitmapFontData.h"
 CHARACTERS_PATH = TOOLS_DIR / "font_chars.txt"
-UI_SOURCE_PATH = TOOLS_DIR.parent / "src" / "main.cpp"
+SOURCE_ROOT = TOOLS_DIR.parent / "src"
 
 
 class BitmapFontDataTests(unittest.TestCase):
     def setUp(self) -> None:
         self.expected = [
             ord(character)
-            for character in GENERATOR.collect_characters(CHARACTERS_PATH)
+            for character in GENERATOR.collect_characters(
+                CHARACTERS_PATH, SOURCE_ROOT
+            )
         ]
         source = FONT_DATA_PATH.read_text(encoding="utf-8")
         self.glyphs = [
@@ -77,14 +79,20 @@ class BitmapFontDataTests(unittest.TestCase):
         self.assertGreater(min(occupied), 0)
         self.assertLess(max(occupied), 15)
 
-    def test_ui_does_not_reference_missing_chinese_glyphs(self) -> None:
+    def test_ui_string_literals_do_not_reference_missing_glyphs(self) -> None:
         available = set(self.expected)
         used = {
             ord(character)
-            for character in UI_SOURCE_PATH.read_text(encoding="utf-8")
-            if ord(character) > 0x7F
+            for character in GENERATOR.collect_source_characters(SOURCE_ROOT)
         }
         self.assertEqual(used - available, set())
+
+    def test_source_scan_discovers_new_chinese_without_manifest_edits(self) -> None:
+        manifest = CHARACTERS_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("中", manifest)
+        self.assertNotIn("文", manifest)
+        self.assertIn(ord("中"), self.expected)
+        self.assertIn(ord("文"), self.expected)
 
 
 if __name__ == "__main__":

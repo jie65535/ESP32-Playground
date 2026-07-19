@@ -7,6 +7,12 @@
 void RuntimeMonitorService::begin(Print& log) {
     log_ = &log;
     windowStartedUs_ = esp_timer_get_time();
+    // Flash layout is static for the lifetime of the firmware. Arduino 3.x
+    // validates the complete application image when getSketchSize() runs, so
+    // doing it every 500 ms needlessly competes with UI and BLE work.
+    snapshot_.flashSize = ESP.getFlashChipSize();
+    snapshot_.sketchSize = ESP.getSketchSize();
+    snapshot_.freeSketchSpace = ESP.getFreeSketchSpace();
     sampleResources(millis());
     if (log_ != nullptr) {
         log_->println(F("[runtime] monitor ready; main-loop duty is sampled"));
@@ -45,6 +51,7 @@ void RuntimeMonitorService::endLoop() {
 
 void RuntimeMonitorService::recordStage(Stage stage, uint32_t elapsedUs) {
     switch (stage) {
+        case Stage::Gamepad: snapshot_.lastGamepadUs = elapsedUs; break;
         case Stage::Wifi: snapshot_.lastWifiUs = elapsedUs; break;
         case Stage::Server: snapshot_.lastServerUs = elapsedUs; break;
         case Stage::Mirror: snapshot_.lastMirrorUs = elapsedUs; break;
@@ -58,10 +65,14 @@ void RuntimeMonitorService::recordStage(Stage stage, uint32_t elapsedUs) {
 
 void RuntimeMonitorService::recordFlushMetrics(uint32_t copyUs,
                                                 uint32_t transferUs,
+                                                uint32_t wallUs,
+                                                uint32_t waitUs,
                                                 uint32_t pixels,
                                                 uint16_t areas) {
     snapshot_.lastFlushCopyUs = copyUs;
     snapshot_.lastFlushTransferUs = transferUs;
+    snapshot_.lastFlushWallUs = wallUs;
+    snapshot_.lastFlushWaitUs = waitUs;
     snapshot_.lastFlushPixels = pixels;
     snapshot_.lastFlushAreas = areas;
 }
@@ -85,7 +96,9 @@ void RuntimeMonitorService::printStatus(Print& output) const {
     output.print(snapshot_.psramSize);
     output.print(F(" tasks="));
     output.print(snapshot_.taskCount);
-    output.print(F(" stages_us wifi="));
+    output.print(F(" stages_us gamepad="));
+    output.print(snapshot_.lastGamepadUs);
+    output.print(F(" wifi="));
     output.print(snapshot_.lastWifiUs);
     output.print(F(" server="));
     output.print(snapshot_.lastServerUs);
@@ -99,6 +112,10 @@ void RuntimeMonitorService::printStatus(Print& output) const {
     output.print(snapshot_.lastUiUs);
     output.print(F(" flush_us spi="));
     output.print(snapshot_.lastFlushTransferUs);
+    output.print(F(" wall="));
+    output.print(snapshot_.lastFlushWallUs);
+    output.print(F(" wait="));
+    output.print(snapshot_.lastFlushWaitUs);
     output.print(F(" copy="));
     output.print(snapshot_.lastFlushCopyUs);
     output.print(F(" areas="));
@@ -114,8 +131,5 @@ void RuntimeMonitorService::sampleResources(uint32_t nowMs) {
     snapshot_.minimumFreeHeap = ESP.getMinFreeHeap();
     snapshot_.freePsram = ESP.getFreePsram();
     snapshot_.psramSize = ESP.getPsramSize();
-    snapshot_.flashSize = ESP.getFlashChipSize();
-    snapshot_.sketchSize = ESP.getSketchSize();
-    snapshot_.freeSketchSpace = ESP.getFreeSketchSpace();
     snapshot_.taskCount = uxTaskGetNumberOfTasks();
 }

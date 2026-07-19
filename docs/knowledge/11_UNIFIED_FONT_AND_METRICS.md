@@ -2,14 +2,17 @@
 
 ## 当前决定
 
-英文、数字、符号和中文统一使用 Fusion Pixel Font 生成的 BitmapFont：
+Fusion Pixel Font 生成的 BitmapFont 同时支持 RGB565 画布和 LVGL
+`lv_font_t` 两种绘制路径：
 
 - 普通信息：Fusion Pixel Font 12px proportional。
 - 标题和动态值：Fusion Bold Pixel Font 12px proportional。
 - 所有字形共享 16px 行盒和 baseline。
 - ASCII、中文和符号由同一个 UTF-8 解码器处理。
 
-当前页面不使用 TFT_eSPI Font2，因此不会出现标题、英文、数字和中文各自一套视觉度量的问题。
+当前页面不使用 TFT_eSPI Font2。Color Lab 已作为第一处 LVGL 中文验证入口；
+其它 PGOS 页面仍主要使用 Montserrat，后续迁移时必须显式选择字体，不能假定
+整个 Shell 已经统一为 Fusion 字体。
 
 ## 为什么使用比例字体
 

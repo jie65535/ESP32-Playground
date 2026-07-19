@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AppTypes.h"
+#include "ui/BitmapFont.h"
 
 #include <lvgl.h>
 
@@ -54,6 +55,7 @@ public:
     lv_obj_t* currentPage() const;
 
     void updateStatus(const WifiSnapshot& wifi, const ServerSnapshot& server,
+                      const GamepadSnapshot& gamepad,
                       const TimeSnapshot& time, uint32_t nowMs);
 
     lv_color_t background() const;
@@ -65,6 +67,7 @@ public:
     lv_color_t muted() const;
     lv_color_t dim() const;
     const lv_font_t* font(uint16_t size) const;
+    const lv_font_t* bitmapFont(BitmapFontSize size) const;
 
 private:
     static constexpr uint16_t DRAW_BUFFER_LINES = 40;
@@ -76,6 +79,7 @@ private:
     lv_obj_t* statusBar_ = nullptr;
     lv_obj_t* statusWifiIcon_ = nullptr;
     lv_obj_t* statusServerIcon_ = nullptr;
+    lv_obj_t* statusBluetoothIcon_ = nullptr;
     lv_obj_t* statusTimeLabel_ = nullptr;
     lv_obj_t* activePage_ = nullptr;
     lv_obj_t* previousPage_ = nullptr;

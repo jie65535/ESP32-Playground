@@ -1,5 +1,7 @@
 #include "ui/UiRuntime.h"
 
+#include "ui/LvglBitmapFont.h"
+
 #include "services/DisplayService.h"
 #include "services/TimeService.h"
 
@@ -8,6 +10,9 @@
 namespace {
 
 constexpr uint32_t STATUS_UPDATE_INTERVAL_MS = 250;
+// The native ESP-IDF esp_lcd transport owns the SPI DMA queue and completion
+// callback. It is the only display transport in the production build.
+constexpr bool ENABLE_ASYNC_DMA = true;
 
 }  // namespace
 
@@ -27,7 +32,7 @@ bool UiRuntime::begin() {
         bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
     drawBuffer2_ = static_cast<uint8_t*>(heap_caps_malloc(
         bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
-    if (drawBuffer_ != nullptr && drawBuffer2_ != nullptr) {
+    if (ENABLE_ASYNC_DMA && drawBuffer_ != nullptr && drawBuffer2_ != nullptr) {
         asyncFlush_ = display_.initDma();
     }
     if (!asyncFlush_) {
@@ -322,6 +327,7 @@ lv_obj_t* UiRuntime::currentPage() const {
 
 void UiRuntime::updateStatus(const WifiSnapshot& wifi,
                              const ServerSnapshot& server,
+                             const GamepadSnapshot& gamepad,
                              const TimeSnapshot& time, uint32_t nowMs) {
     if (!ready_ || statusWifiIcon_ == nullptr ||
         nowMs - lastStatusMs_ < STATUS_UPDATE_INTERVAL_MS) {
@@ -353,6 +359,17 @@ void UiRuntime::updateStatus(const WifiSnapshot& wifi,
             server.state == ServerState::Connected ? accent() : muted(), 0);
     } else {
         lv_obj_add_flag(statusServerIcon_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (gamepad.enabled) {
+        lv_obj_clear_flag(statusBluetoothIcon_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(
+            statusBluetoothIcon_,
+            gamepad.connected ? accent()
+                : gamepad.scanning ? muted() : dim(),
+            0);
+    } else {
+        lv_obj_add_flag(statusBluetoothIcon_, LV_OBJ_FLAG_HIDDEN);
     }
 
     char timeText[6] = "--:--";
@@ -508,7 +525,14 @@ void UiRuntime::createStatusBar() {
     lv_obj_add_flag(statusWifiIcon_, LV_OBJ_FLAG_HIDDEN);
     statusServerIcon_ = createLabel(statusBar_, LV_SYMBOL_UPLOAD, 116, 2, 16,
                                     muted());
+    statusBluetoothIcon_ = createLabel(statusBar_, LV_SYMBOL_BLUETOOTH, 151, 2,
+                                       16, dim());
+    lv_obj_add_flag(statusBluetoothIcon_, LV_OBJ_FLAG_HIDDEN);
     statusTimeLabel_ = createLabel(statusBar_, "--:--", 247, 3, 14, dim());
     lv_obj_set_width(statusTimeLabel_, 63);
     lv_obj_set_style_text_align(statusTimeLabel_, LV_TEXT_ALIGN_RIGHT, 0);
+}
+
+const lv_font_t* UiRuntime::bitmapFont(BitmapFontSize size) const {
+    return PgosBitmapFont::font(size);
 }

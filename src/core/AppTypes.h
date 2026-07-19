@@ -9,6 +9,7 @@ enum class AppId : uint8_t {
     DisplaySettings,
     SoundSettings,
     RgbSettings,
+    ControllerSettings,
     ConsoleSettings,
     NetworkSettings,
     Launcher,
@@ -31,6 +32,7 @@ enum class AppCommandType : uint8_t {
     PageDisplaySettings,
     PageSound,
     PageRgb,
+    PageGamepad,
     PageConsole,
     PageNetwork,
     ColorTest,
@@ -40,6 +42,11 @@ enum class AppCommandType : uint8_t {
     TimeStatus,
     TimeSet,
     I2cScan,
+    GamepadStatus,
+    GamepadRumble,
+    GamepadScan,
+    GamepadStopScan,
+    GamepadDisconnect,
     WifiScan,
     WifiSelect,
     WifiSsid,
@@ -102,6 +109,81 @@ enum class InputSource : uint8_t {
     Tcp,
     Ble,
     Local,
+};
+
+// A gamepad is a continuous input source.  Keep its latest state separate
+// from InputRouter's low-rate AppCommand queue so games can sample it at their
+// own frame rate without allocating or flooding the shell queue.
+enum GamepadButtonMask : uint16_t {
+    GamepadButtonA = 1U << 0U,
+    GamepadButtonB = 1U << 1U,
+    GamepadButtonX = 1U << 2U,
+    GamepadButtonY = 1U << 3U,
+    GamepadButtonShoulderL = 1U << 4U,
+    GamepadButtonShoulderR = 1U << 5U,
+    GamepadButtonTriggerL = 1U << 6U,
+    GamepadButtonTriggerR = 1U << 7U,
+    GamepadButtonThumbL = 1U << 8U,
+    GamepadButtonThumbR = 1U << 9U,
+};
+
+enum GamepadMiscButtonMask : uint8_t {
+    GamepadMiscSystem = 1U << 0U,
+    GamepadMiscSelect = 1U << 1U,
+    GamepadMiscStart = 1U << 2U,
+    GamepadMiscCapture = 1U << 3U,
+};
+
+enum GamepadDpadMask : uint8_t {
+    GamepadDpadUp = 1U << 0U,
+    GamepadDpadDown = 1U << 1U,
+    GamepadDpadRight = 1U << 2U,
+    GamepadDpadLeft = 1U << 3U,
+};
+
+enum class GamepadEventType : uint8_t {
+    Connected,
+    Disconnected,
+    ButtonDown,
+    ButtonUp,
+    DpadDown,
+    DpadUp,
+    MiscDown,
+    MiscUp,
+};
+
+struct GamepadSnapshot {
+    bool enabled = false;
+    bool connected = false;
+    bool scanning = false;
+    uint8_t slot = 0xFF;
+    uint16_t vendorId = 0;
+    uint16_t productId = 0;
+    uint16_t buttons = 0;
+    uint8_t miscButtons = 0;
+    uint8_t dpad = 0;
+    int16_t axisX = 0;
+    int16_t axisY = 0;
+    int16_t axisRX = 0;
+    int16_t axisRY = 0;
+    uint16_t brake = 0;
+    uint16_t throttle = 0;
+    uint8_t battery = 0;
+    uint32_t packetCount = 0;
+    uint32_t lastUpdateMs = 0;
+    uint32_t lastInputMs = 0;
+    uint32_t connectedSinceMs = 0;
+    uint32_t scanRemainingMs = 0;
+    uint32_t autoDisconnectMs = 0;
+    uint32_t disconnectCount = 0;
+    uint32_t scanStartCount = 0;
+    char model[32] = {};
+};
+
+struct GamepadEvent {
+    GamepadEventType type = GamepadEventType::Disconnected;
+    uint8_t slot = 0xFF;
+    uint16_t code = 0;
 };
 
 struct RoutedCommand {
@@ -170,6 +252,7 @@ struct RuntimeSnapshot {
     uint32_t sketchSize = 0;
     uint32_t freeSketchSpace = 0;
     uint32_t taskCount = 0;
+    uint32_t lastGamepadUs = 0;
     uint32_t lastWifiUs = 0;
     uint32_t lastServerUs = 0;
     uint32_t lastMirrorUs = 0;
@@ -180,6 +263,8 @@ struct RuntimeSnapshot {
     uint32_t lastUiUs = 0;
     uint32_t lastFlushCopyUs = 0;
     uint32_t lastFlushTransferUs = 0;
+    uint32_t lastFlushWallUs = 0;
+    uint32_t lastFlushWaitUs = 0;
     uint32_t lastFlushPixels = 0;
     uint16_t lastFlushAreas = 0;
 };

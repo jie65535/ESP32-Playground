@@ -1,9 +1,14 @@
 #pragma once
 
-#include <TFT_eSPI.h>
-
 #include <stddef.h>
 #include <stdint.h>
+
+struct BitmapCanvas {
+    uint16_t* pixels = nullptr;
+    int16_t width = 0;
+    int16_t height = 0;
+    uint16_t stride = 0;
+};
 
 enum class BitmapFontSize : uint8_t {
     Small12,
@@ -20,7 +25,7 @@ class BitmapFont {
 public:
     int16_t textWidth(const char* utf8, BitmapFontSize size) const;
     int16_t lineHeight(BitmapFontSize size) const;
-    void draw(TFT_eSPI& display, const char* utf8, int16_t x, int16_t y,
+    void draw(BitmapCanvas& canvas, const char* utf8, int16_t x, int16_t y,
               uint16_t color, BitmapFontSize size = BitmapFontSize::Bold12,
               BitmapTextAlign align = BitmapTextAlign::Left) const;
 

@@ -1,8 +1,15 @@
 .pio/
+components/
 .venv/
 __pycache__/
 *.pyc
+*.map
 .vscode/
+sdkconfig
+sdkconfig.old
+sdkconfig.*
+!sdkconfig.defaults
+managed_components/
 
 # The vendor board package is a large local reference archive.
 # Keep its README tracked, but do not commit PDFs, ZIPs, EXEs, images,

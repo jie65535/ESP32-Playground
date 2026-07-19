@@ -1,9 +1,128 @@
 #include "services/DisplayService.h"
 
-#include <esp_timer.h>
 #include <esp_heap_caps.h>
+#include <esp_timer.h>
+
+#include <driver/spi_master.h>
+#include <esp_err.h>
+#include <esp_lcd_ili9341.h>
+
+namespace {
+
+constexpr spi_host_device_t LCD_SPI_HOST = SPI2_HOST;
+constexpr int LCD_CS_PIN = 10;
+constexpr int LCD_MOSI_PIN = 11;
+constexpr int LCD_CLOCK_PIN = 12;
+constexpr int LCD_MISO_PIN = 13;
+constexpr int LCD_DC_PIN = 46;
+constexpr uint32_t LCD_PIXEL_CLOCK_HZ = 40U * 1000U * 1000U;
+constexpr size_t LCD_MAX_TRANSFER_BYTES =
+    static_cast<size_t>(DisplayService::SCREEN_WIDTH) * 40U * sizeof(uint16_t);
+
+bool logEspError(const __FlashStringHelper* operation, esp_err_t error) {
+    if (error == ESP_OK) {
+        return true;
+    }
+    Serial.print(F("[display] "));
+    Serial.print(operation);
+    Serial.print(F(" failed: "));
+    Serial.println(esp_err_to_name(error));
+    return false;
+}
+
+}  // namespace
 
 DisplayService::DisplayService() = default;
+
+bool DisplayService::beginNativePanel() {
+    dmaDoneSemaphore_ = xSemaphoreCreateBinary();
+    if (dmaDoneSemaphore_ == nullptr) {
+        Serial.println(F("[display] native DMA semaphore allocation failed"));
+        return false;
+    }
+
+    spi_bus_config_t busConfig = {};
+    busConfig.sclk_io_num = LCD_CLOCK_PIN;
+    busConfig.mosi_io_num = LCD_MOSI_PIN;
+    busConfig.miso_io_num = LCD_MISO_PIN;
+    busConfig.quadwp_io_num = -1;
+    busConfig.quadhd_io_num = -1;
+    busConfig.max_transfer_sz = LCD_MAX_TRANSFER_BYTES;
+    if (!logEspError(F("SPI2 DMA bus initialization"),
+                     spi_bus_initialize(LCD_SPI_HOST, &busConfig,
+                                        SPI_DMA_CH_AUTO))) {
+        return false;
+    }
+
+    esp_lcd_panel_io_spi_config_t ioConfig = {};
+    ioConfig.dc_gpio_num = LCD_DC_PIN;
+    ioConfig.cs_gpio_num = LCD_CS_PIN;
+    ioConfig.pclk_hz = LCD_PIXEL_CLOCK_HZ;
+    ioConfig.lcd_cmd_bits = 8;
+    ioConfig.lcd_param_bits = 8;
+    ioConfig.spi_mode = 0;
+    ioConfig.trans_queue_depth = 2;
+    ioConfig.on_color_trans_done = onNativeColorTransferDone;
+    ioConfig.user_ctx = this;
+    if (!logEspError(F("ILI9341 panel IO installation"),
+                     esp_lcd_new_panel_io_spi(
+                         static_cast<esp_lcd_spi_bus_handle_t>(LCD_SPI_HOST),
+                         &ioConfig, &panelIo_))) {
+        return false;
+    }
+
+    esp_lcd_panel_dev_config_t panelConfig = {};
+    panelConfig.reset_gpio_num = -1;
+    panelConfig.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR;
+    panelConfig.bits_per_pixel = 16;
+    if (!logEspError(F("ILI9341 panel installation"),
+                     esp_lcd_new_panel_ili9341(panelIo_, &panelConfig,
+                                               &panel_))) {
+        return false;
+    }
+
+    if (!logEspError(F("ILI9341 panel reset"),
+                     esp_lcd_panel_reset(panel_)) ||
+        !logEspError(F("ILI9341 panel initialization"),
+                     esp_lcd_panel_init(panel_)) ||
+        !logEspError(F("ILI9341 inversion enable"),
+                     esp_lcd_panel_invert_color(panel_, true)) ||
+        !logEspError(F("ILI9341 landscape rotation"),
+                     esp_lcd_panel_swap_xy(panel_, true)) ||
+        !logEspError(F("ILI9341 mirror configuration"),
+                     esp_lcd_panel_mirror(panel_, false, false)) ||
+        !logEspError(F("ILI9341 display enable"),
+                     esp_lcd_panel_disp_on_off(panel_, true))) {
+        return false;
+    }
+
+    dmaEnabled_ = true;
+    Serial.println(F("[display] backend=esp_lcd host=SPI2 pins=10/11/12/13/46 "
+                     "clock=40MHz queue=2"));
+    return true;
+}
+
+bool IRAM_ATTR DisplayService::onNativeColorTransferDone(
+    esp_lcd_panel_io_handle_t panelIo,
+    esp_lcd_panel_io_event_data_t* eventData, void* userContext) {
+    (void)panelIo;
+    (void)eventData;
+    auto* display = static_cast<DisplayService*>(userContext);
+    if (display == nullptr) {
+        return false;
+    }
+
+    display->dmaDone_ = true;
+    display->dmaCompletedUs_ = static_cast<uint64_t>(esp_timer_get_time());
+    if (display->dmaDoneSemaphore_ == nullptr) {
+        return false;
+    }
+
+    BaseType_t highPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(display->dmaDoneSemaphore_,
+                           &highPriorityTaskWoken);
+    return highPriorityTaskWoken == pdTRUE;
+}
 
 void DisplayService::holdBacklightOff() {
     pinMode(LCD_BACKLIGHT_PIN, OUTPUT);
@@ -29,14 +148,16 @@ void DisplayService::begin() {
         Serial.println(F("[display] NVS settings unavailable; using defaults"));
     }
 
-    display_.begin();
-    display_.setRotation(1);
-    display_.setTextWrap(false);
+    if (!beginNativePanel()) {
+        return;
+    }
 
-    ledcSetup(BACKLIGHT_PWM_CHANNEL, BACKLIGHT_PWM_FREQUENCY,
-              BACKLIGHT_PWM_RESOLUTION);
-    ledcAttachPin(LCD_BACKLIGHT_PIN, BACKLIGHT_PWM_CHANNEL);
-    ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
+    if (!ledcAttachChannel(LCD_BACKLIGHT_PIN, BACKLIGHT_PWM_FREQUENCY,
+                           BACKLIGHT_PWM_RESOLUTION,
+                           BACKLIGHT_PWM_CHANNEL)) {
+        Serial.println(F("[display] backlight PWM attach failed"));
+    }
+    ledcWriteChannel(BACKLIGHT_PWM_CHANNEL, 0);
 
     const size_t pixels = static_cast<size_t>(SCREEN_WIDTH) * SCREEN_HEIGHT;
     shadow_ = static_cast<uint16_t*>(heap_caps_malloc(
@@ -128,24 +249,10 @@ bool DisplayService::initDma() {
         return true;
     }
 
-    dmaBuffer_ = static_cast<uint16_t*>(heap_caps_malloc(
-        DMA_BUFFER_PIXELS * sizeof(uint16_t),
-        MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
-    if (dmaBuffer_ == nullptr) {
-        Serial.println(F("[display] DMA staging buffer unavailable"));
-        return false;
-    }
-
-    dmaEnabled_ = display_.initDMA();
-    if (!dmaEnabled_) {
-        heap_caps_free(dmaBuffer_);
-        dmaBuffer_ = nullptr;
-        Serial.println(F("[display] SPI DMA unavailable"));
-        return false;
-    }
-    display_.setSwapBytes(true);
-    Serial.println(dmaEnabled_ ? F("[display] SPI DMA enabled")
-                               : F("[display] SPI DMA unavailable"));
+    dmaEnabled_ = panel_ != nullptr && panelIo_ != nullptr &&
+                  dmaDoneSemaphore_ != nullptr;
+    Serial.println(dmaEnabled_ ? F("[display] native SPI DMA enabled")
+                               : F("[display] native SPI DMA unavailable"));
     return dmaEnabled_;
 }
 
@@ -164,8 +271,11 @@ bool DisplayService::asyncFlushEnabled() const {
 }
 
 bool DisplayService::finishDmaIfReady() {
-    if (!dmaPending_ || display_.dmaBusy()) {
+    if (!dmaPending_ || !dmaDone_) {
         return false;
+    }
+    if (dmaDoneSemaphore_ != nullptr) {
+        (void)xSemaphoreTake(dmaDoneSemaphore_, 0);
     }
 
     completeDmaTransfer();
@@ -177,26 +287,38 @@ void DisplayService::waitForDma() {
         return;
     }
 
-    display_.dmaWait();
+    const uint64_t waitStartedUs = esp_timer_get_time();
+    if (!dmaDone_ && dmaDoneSemaphore_ != nullptr) {
+        (void)xSemaphoreTake(dmaDoneSemaphore_, portMAX_DELAY);
+    } else if (dmaDoneSemaphore_ != nullptr) {
+        (void)xSemaphoreTake(dmaDoneSemaphore_, 0);
+    }
+    activeFlushMetrics_.waitUs += static_cast<uint32_t>(min<uint64_t>(
+        esp_timer_get_time() - waitStartedUs, UINT32_MAX));
     completeDmaTransfer();
 }
 
 void DisplayService::completeDmaTransfer() {
     const bool completedLastArea = dmaPendingLast_;
     dmaPending_ = false;
+    dmaDone_ = false;
+    const uint64_t completedUs =
+        dmaCompletedUs_ != 0 ? dmaCompletedUs_ : esp_timer_get_time();
+    dmaCompletedUs_ = 0;
     activeFlushMetrics_.transferUs += static_cast<uint32_t>(min<uint64_t>(
-        esp_timer_get_time() - dmaStartedUs_, UINT32_MAX));
+        completedUs - dmaStartedUs_, UINT32_MAX));
     dmaPendingLast_ = false;
     if (completedLastArea) {
-        if (dmaTransactionOpen_) {
-            display_.endWrite();
-            dmaTransactionOpen_ = false;
-        }
         finishFlushFrame();
     }
 }
 
 void DisplayService::finishFlushFrame() {
+    if (flushFrameStartedUs_ != 0) {
+        activeFlushMetrics_.wallUs = static_cast<uint32_t>(min<uint64_t>(
+            esp_timer_get_time() - flushFrameStartedUs_, UINT32_MAX));
+        flushFrameStartedUs_ = 0;
+    }
     lastFlushMetrics_ = activeFlushMetrics_;
     activeFlushMetrics_ = FlushMetrics{};
 }
@@ -254,8 +376,17 @@ void DisplayService::printStatus(Print& output) const {
     }
     output.print(F(" backlight="));
     output.print(screenOff_ ? F("off") : F("on"));
+    output.print(F(" backend=esp_lcd"));
+    output.print(F(" dma="));
+    output.print(dmaEnabled_ ? F("on") : F("off"));
+    output.print(F(" async="));
+    output.print(asyncFlushEnabled_ ? F("on") : F("off"));
     output.print(F(" flush_us spi="));
     output.print(lastFlushMetrics_.transferUs);
+    output.print(F(" wall="));
+    output.print(lastFlushMetrics_.wallUs);
+    output.print(F(" wait="));
+    output.print(lastFlushMetrics_.waitUs);
     output.print(F(" copy="));
     output.print(lastFlushMetrics_.copyUs);
     output.print(F(" areas="));
@@ -287,6 +418,10 @@ bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
     const int32_t height = y2 - y1 + 1;
     const size_t screenWidth = SCREEN_WIDTH;
 
+    if (activeFlushMetrics_.areas == 0 && flushFrameStartedUs_ == 0) {
+        flushFrameStartedUs_ = esp_timer_get_time();
+    }
+
     const uint16_t* colors = reinterpret_cast<const uint16_t*>(pixels);
     if (captureEnabled_) {
         const uint64_t copyStartedUs = esp_timer_get_time();
@@ -309,34 +444,60 @@ bool DisplayService::flush(const lv_area_t& area, const uint8_t* pixels,
         }
 
         dmaStartedUs_ = esp_timer_get_time();
-        if (!dmaTransactionOpen_) {
-            display_.startWrite();
-            dmaTransactionOpen_ = true;
+        dmaDone_ = false;
+        dmaCompletedUs_ = 0;
+        if (dmaDoneSemaphore_ != nullptr) {
+            (void)xSemaphoreTake(dmaDoneSemaphore_, 0);
         }
-        display_.pushImageDMA(
-            x1, y1, width, height,
-            const_cast<uint16_t*>(reinterpret_cast<const uint16_t*>(pixels)),
-            dmaBuffer_);
+        lv_draw_sw_rgb565_swap(const_cast<uint8_t*>(pixels),
+                               static_cast<uint32_t>(width * height));
         dmaPending_ = true;
         dmaPendingLast_ = lastArea;
+        const esp_err_t error = esp_lcd_panel_draw_bitmap(
+            panel_, x1, y1, x2 + 1, y2 + 1, pixels);
+        if (error != ESP_OK) {
+            dmaPending_ = false;
+            dmaPendingLast_ = false;
+            Serial.print(F("[display] native DMA flush failed: "));
+            Serial.println(esp_err_to_name(error));
+            if (lastArea) {
+                finishFlushFrame();
+            }
+            return false;
+        }
         activeFlushMetrics_.pixels += static_cast<uint32_t>(width * height);
         activeFlushMetrics_.areas++;
         return true;
     }
 
-    const uint64_t transferStartedUs = esp_timer_get_time();
-    display_.startWrite();
-    display_.setAddrWindow(x1, y1, width, height);
-    display_.pushColors(const_cast<uint16_t*>(colors),
-                         width * height, true);
-    display_.endWrite();
-    activeFlushMetrics_.transferUs += static_cast<uint32_t>(
-        min<uint64_t>(esp_timer_get_time() - transferStartedUs, UINT32_MAX));
+    if (dmaPending_) {
+        waitForDma();
+    }
+    dmaStartedUs_ = esp_timer_get_time();
+    dmaDone_ = false;
+    dmaCompletedUs_ = 0;
+    if (dmaDoneSemaphore_ != nullptr) {
+        (void)xSemaphoreTake(dmaDoneSemaphore_, 0);
+    }
+    lv_draw_sw_rgb565_swap(const_cast<uint8_t*>(pixels),
+                           static_cast<uint32_t>(width * height));
+    dmaPending_ = true;
+    dmaPendingLast_ = lastArea;
+    const esp_err_t error = esp_lcd_panel_draw_bitmap(
+        panel_, x1, y1, x2 + 1, y2 + 1, pixels);
+    if (error != ESP_OK) {
+        dmaPending_ = false;
+        dmaPendingLast_ = false;
+        Serial.print(F("[display] native sync flush failed: "));
+        Serial.println(esp_err_to_name(error));
+        if (lastArea) {
+            finishFlushFrame();
+        }
+        return false;
+    }
     activeFlushMetrics_.pixels += static_cast<uint32_t>(width * height);
     activeFlushMetrics_.areas++;
-    if (lastArea) {
-        finishFlushFrame();
-    }
+    waitForDma();
     return false;
 }
 
@@ -428,11 +589,11 @@ String DisplayService::formatBytes(size_t bytes) {
 
 void DisplayService::applyBacklight() {
     if (!backlightArmed_ || screenOff_) {
-        ledcWrite(BACKLIGHT_PWM_CHANNEL, 0);
+        ledcWriteChannel(BACKLIGHT_PWM_CHANNEL, 0);
         return;
     }
     const uint32_t duty = static_cast<uint32_t>(brightnessPercent_) * 255U / 100U;
-    ledcWrite(BACKLIGHT_PWM_CHANNEL, duty);
+    ledcWriteChannel(BACKLIGHT_PWM_CHANNEL, duty);
 }
 
 void DisplayService::saveSettings() {

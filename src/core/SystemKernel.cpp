@@ -1,5 +1,8 @@
 #include "core/SystemKernel.h"
 
+#include <esp_arduino_version.h>
+#include <esp_log.h>
+#include <esp_system.h>
 #include <esp_timer.h>
 
 namespace {
@@ -61,6 +64,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageDisplaySettings:
         case AppCommandType::PageSound:
         case AppCommandType::PageRgb:
+        case AppCommandType::PageGamepad:
         case AppCommandType::PageConsole:
         case AppCommandType::PageNetwork:
         case AppCommandType::ColorTest:
@@ -121,12 +125,23 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
-      context_{display_, audio_, time_, rgb_, wifi_, server_, Serial, ui_, runtime_},
+      context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_, Serial,
+               ui_, runtime_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
     Serial.begin(SERIAL_BAUD);
+    // USB CDC is a diagnostic channel, never a real-time dependency. With
+    // the default HWCDC timeout, a host that opens COM3 but stops reading can
+    // block loopTask behind a full TX ring and freeze UI/BLE/RTC progress.
+    Serial.setTxTimeoutMs(0);
     delay(50);
+    Serial.printf("[system] arduino=%s idf=%s\n", ESP_ARDUINO_VERSION_STR,
+                  esp_get_idf_version());
+    // Arduino resets the global log level during initArduino(). Apply this
+    // after setup() starts so ESP.getSketchSize() cannot flood the console
+    // with one INFO line per image segment on every resource sample.
+    esp_log_level_set("esp_image", ESP_LOG_ERROR);
     display_.begin();
     uiReady_ = ui_.begin();
     i2c_.begin(Serial);
@@ -135,6 +150,7 @@ void SystemKernel::setup() {
     rgb_.begin(Serial);
     wifi_.begin(Serial);
     server_.begin(Serial);
+    gamepad_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -147,12 +163,13 @@ void SystemKernel::setup() {
         appManager_.registerApp(displaySettingsApp_);
         appManager_.registerApp(soundSettingsApp_);
         appManager_.registerApp(rgbSettingsApp_);
+        appManager_.registerApp(controllerSettingsApp_);
         appManager_.registerApp(consoleSettingsApp_);
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
         ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
-                         time_.snapshot(), millis());
+                         gamepad_.snapshot(), time_.snapshot(), millis());
         ui_.tick();
         display_.pushBacklightOn();
     } else {
@@ -183,6 +200,50 @@ void SystemKernel::loop() {
         }
     }
 
+    stageStartedUs = esp_timer_get_time();
+    gamepad_.tick(nowMs);
+    GamepadEvent gamepadEvent;
+    while (gamepad_.pollEvent(gamepadEvent)) {
+        AppCommand gamepadCommand;
+        switch (gamepadEvent.type) {
+            case GamepadEventType::ButtonDown:
+                if (gamepadEvent.code == GamepadButtonA) {
+                    gamepadCommand.type = AppCommandType::Activate;
+                } else if (gamepadEvent.code == GamepadButtonB) {
+                    gamepadCommand.type = AppCommandType::Back;
+                }
+                break;
+            case GamepadEventType::DpadDown:
+                if (gamepadEvent.code == GamepadDpadUp) {
+                    gamepadCommand.type = AppCommandType::Previous;
+                } else if (gamepadEvent.code == GamepadDpadDown) {
+                    gamepadCommand.type = AppCommandType::Next;
+                } else if (gamepadEvent.code == GamepadDpadLeft) {
+                    gamepadCommand.type = AppCommandType::Left;
+                } else if (gamepadEvent.code == GamepadDpadRight) {
+                    gamepadCommand.type = AppCommandType::Right;
+                }
+                break;
+            case GamepadEventType::MiscDown:
+                if (gamepadEvent.code == GamepadMiscSystem) {
+                    gamepadCommand.type = AppCommandType::Home;
+                } else if (gamepadEvent.code == GamepadMiscSelect) {
+                    gamepadCommand.type = AppCommandType::Back;
+                }
+                break;
+            default:
+                break;
+        }
+        if (gamepadCommand.type != AppCommandType::None &&
+            !inputRouter_.push(gamepadCommand, InputSource::Ble)) {
+            Serial.println(F("[input] BLE gamepad command dropped: queue full"));
+        }
+    }
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Gamepad,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+
+    stageStartedUs = esp_timer_get_time();
     wifi_.tick(nowMs);
     runtime_.recordStage(
         RuntimeMonitorService::Stage::Wifi,
@@ -219,7 +280,7 @@ void SystemKernel::loop() {
         RuntimeMonitorService::Stage::Display,
         static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
     ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
-                     time_.snapshot(), nowMs);
+                     gamepad_.snapshot(), time_.snapshot(), nowMs);
 
     uint32_t requestId = 0;
     String remoteLine;
@@ -254,7 +315,8 @@ void SystemKernel::loop() {
         lastRenderMs_ = nowMs;
         appManager_.render();
         redrawRequested_ = false;
-        if (nowMs - lastStatusMs_ >= SERIAL_STATUS_INTERVAL_MS) {
+        if (nowMs - lastStatusMs_ >= SERIAL_STATUS_INTERVAL_MS && Serial &&
+            Serial.availableForWrite() >= 2048) {
             lastStatusMs_ = nowMs;
             Serial.print(F("[status] uptime="));
             Serial.print(nowMs / 1000U);
@@ -280,6 +342,7 @@ void SystemKernel::loop() {
     ui_.tick();
     const DisplayService::FlushMetrics flushMetrics = display_.flushMetrics();
     runtime_.recordFlushMetrics(flushMetrics.copyUs, flushMetrics.transferUs,
+                                flushMetrics.wallUs, flushMetrics.waitUs,
                                 flushMetrics.pixels, flushMetrics.areas);
     runtime_.recordStage(
         RuntimeMonitorService::Stage::Ui,
@@ -319,6 +382,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
         case AppCommandType::PageRgb:
             appManager_.activate(AppId::RgbSettings);
             break;
+        case AppCommandType::PageGamepad:
+            appManager_.activate(AppId::ControllerSettings);
+            break;
         case AppCommandType::PageConsole:
             appManager_.activate(AppId::ConsoleSettings);
             break;
@@ -352,6 +418,23 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::I2cScan:
             i2c_.scan(Serial);
+            break;
+        case AppCommandType::GamepadStatus:
+            gamepad_.printStatus(Serial);
+            break;
+        case AppCommandType::GamepadRumble:
+            handled = gamepad_.requestRumble(500, 192, 192);
+            Serial.println(handled ? F("[gamepad] rumble requested")
+                                   : F("[gamepad] rumble unavailable: no connected controller"));
+            break;
+        case AppCommandType::GamepadScan:
+            handled = gamepad_.startPairingScan();
+            break;
+        case AppCommandType::GamepadStopScan:
+            gamepad_.stopPairingScan();
+            break;
+        case AppCommandType::GamepadDisconnect:
+            handled = gamepad_.disconnectController();
             break;
         case AppCommandType::MirrorOn:
             mirror_.setEnabled(true);
@@ -450,6 +533,7 @@ void SystemKernel::printStatus() {
     time_.printStatus(Serial);
     audio_.printStatus(Serial);
     rgb_.printStatus(Serial);
+    gamepad_.printStatus(Serial);
     runtime_.printStatus(Serial);
 }
 

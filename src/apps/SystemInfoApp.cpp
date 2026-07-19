@@ -88,6 +88,8 @@ void SystemInfoApp::onUpdateView(AppContext& context) {
                          String(runtime.lastFlushTransferUs / 1000.0F, 1) +
                          " ms / copy " +
                          String(runtime.lastFlushCopyUs / 1000.0F, 1) +
+                         " ms / wait " +
+                         String(runtime.lastFlushWaitUs / 1000.0F, 1) +
                          " ms / " + runtime.lastFlushAreas + " areas";
     const String heap = String(percent(runtime.freeHeap, runtime.heapSize)) +
                         "% free / min " +
