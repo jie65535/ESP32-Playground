@@ -109,6 +109,14 @@ void TetrisApp::onTick(uint32_t nowMs, AppContext& context) {
     if (surface_ == nullptr) {
         return;
     }
+    if (clearEffectUntilMs_ != 0) {
+        if (static_cast<int32_t>(nowMs - clearEffectUntilMs_) < 0) {
+            invalidate();
+            return;
+        }
+        clearEffectUntilMs_ = 0;
+        clearEffectCount_ = 0;
+    }
     const GamepadSnapshot gamepad = context.gamepad.snapshot();
     sampleAnalog(gamepad, nowMs);
     const bool softDropHeld = gamepad.connected &&
@@ -265,6 +273,21 @@ void TetrisApp::draw(lv_event_t* event) {
             }
         }
     }
+    if (clearEffectUntilMs_ != 0) {
+        const uint32_t elapsed = millis() - clearEffectStartMs_;
+        const bool bright = ((elapsed / 45U) & 1U) == 0;
+        const lv_opa_t opacity = bright ? LV_OPA_90 : LV_OPA_50;
+        for (uint8_t index = 0; index < clearEffectCount_; ++index) {
+            const uint8_t row = clearEffectRows_[index];
+            lv_area_t flash = {
+                static_cast<lv_coord_t>(board.x1 + 1),
+                static_cast<lv_coord_t>(board.y1 + row * CELL_SIZE + 1),
+                static_cast<lv_coord_t>(board.x2 - 1),
+                static_cast<lv_coord_t>(board.y1 + (row + 1) * CELL_SIZE - 2),
+            };
+            drawRect(layer, flash, lv_color_hex(0xFFFFFF), 2, opacity);
+        }
+    }
 
     lv_area_t leftPanel = {
         static_cast<lv_coord_t>(surfaceArea.x1 + 8),
@@ -401,6 +424,9 @@ void TetrisApp::resetGame() {
     level_ = 1;
     gravityIntervalMs_ = INITIAL_GRAVITY_MS;
     nextSoftDropMs_ = 0;
+    clearEffectCount_ = 0;
+    clearEffectStartMs_ = 0;
+    clearEffectUntilMs_ = 0;
     nextHorizontalRepeatMs_ = 0;
     current_ = {};
     refillBag();
@@ -459,11 +485,10 @@ void TetrisApp::lockPiece(AppContext& context) {
     context.audio.playGameTone(cleared == 0 ? 35U : 110U + cleared * 30U);
     if (context.gamepad.snapshot().connected) {
         if (cleared == 0) {
-            context.gamepad.requestRumble(45, 55, 70);
+            context.gamepad.requestRumble(110, 190, 190);
         } else {
             context.gamepad.requestRumble(
-                120U + cleared * 35U, 120U + cleared * 15U,
-                100U + cleared * 30U);
+                260U + cleared * 35U, 255, 255);
         }
     }
     spawnPiece();
@@ -505,8 +530,8 @@ void TetrisApp::dropOne(uint32_t nowMs, AppContext& context, bool softDrop) {
 }
 
 uint8_t TetrisApp::clearLines() {
-    uint8_t cleared = 0;
-    for (int row = BOARD_HEIGHT - 1; row >= 0; --row) {
+    clearEffectCount_ = 0;
+    for (uint8_t row = 0; row < BOARD_HEIGHT; ++row) {
         bool full = true;
         for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
             if (board_[row][column] == 0) {
@@ -517,20 +542,43 @@ uint8_t TetrisApp::clearLines() {
         if (!full) {
             continue;
         }
-        ++cleared;
-        for (int copyRow = row; copyRow > 0; --copyRow) {
-            for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
-                board_[copyRow][column] = board_[copyRow - 1][column];
-            }
+        if (clearEffectCount_ < 4U) {
+            clearEffectRows_[clearEffectCount_++] = row;
         }
-        for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
-            board_[0][column] = 0;
-        }
-        ++row;
     }
+    const uint8_t cleared = clearEffectCount_;
     if (cleared == 0) {
         return 0;
     }
+
+    int writeRow = BOARD_HEIGHT - 1;
+    for (int readRow = BOARD_HEIGHT - 1; readRow >= 0; --readRow) {
+        bool remove = false;
+        for (uint8_t index = 0; index < clearEffectCount_; ++index) {
+            if (clearEffectRows_[index] == readRow) {
+                remove = true;
+                break;
+            }
+        }
+        if (remove) {
+            continue;
+        }
+        if (writeRow != readRow) {
+            for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
+                board_[writeRow][column] = board_[readRow][column];
+            }
+        }
+        --writeRow;
+    }
+    while (writeRow >= 0) {
+        for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
+            board_[writeRow][column] = 0;
+        }
+        --writeRow;
+    }
+    clearEffectStartMs_ = millis();
+    clearEffectUntilMs_ = clearEffectStartMs_ + CLEAR_EFFECT_DURATION_MS;
+
     static constexpr uint16_t lineScores[] = {0, 100, 300, 500, 800};
     score_ = std::min<uint32_t>(65535U,
                                 score_ + lineScores[cleared] * level_);

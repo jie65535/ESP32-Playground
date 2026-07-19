@@ -34,6 +34,7 @@ private:
     static constexpr uint32_t SOFT_DROP_INTERVAL_MS = 45;
     static constexpr uint32_t HORIZONTAL_INITIAL_REPEAT_MS = 180;
     static constexpr uint32_t HORIZONTAL_REPEAT_INTERVAL_MS = 85;
+    static constexpr uint32_t CLEAR_EFFECT_DURATION_MS = 240;
     static constexpr int16_t ANALOG_THRESHOLD = 128;
 
     Phase phase_ = Phase::Title;
@@ -52,6 +53,10 @@ private:
     uint8_t level_ = 1;
     uint16_t bestScore_ = 0;
     uint16_t leaderboard_[LEADERBOARD_COUNT] = {};
+    uint8_t clearEffectRows_[4] = {};
+    uint8_t clearEffectCount_ = 0;
+    uint32_t clearEffectStartMs_ = 0;
+    uint32_t clearEffectUntilMs_ = 0;
     int8_t analogXSign_ = 0;
     int8_t analogYSign_ = 0;
 
