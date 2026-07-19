@@ -19,6 +19,7 @@ public:
     bool feedbackEnabled() const;
     void setFeedbackEnabled(bool enabled);
     void playFeedback();
+    void playGameTone(uint32_t durationMs);
     void playTestTone();
     void printStatus(Print& output) const;
 

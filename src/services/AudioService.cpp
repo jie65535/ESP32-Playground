@@ -198,6 +198,10 @@ void AudioService::playFeedback() {
     }
 }
 
+void AudioService::playGameTone(uint32_t durationMs) {
+    requestTone(durationMs);
+}
+
 void AudioService::playTestTone() {
     requestTone(300U);
 }

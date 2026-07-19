@@ -455,7 +455,17 @@ void TetrisApp::lockPiece(AppContext& context) {
             }
         }
     }
-    clearLines(context);
+    const uint8_t cleared = clearLines();
+    context.audio.playGameTone(cleared == 0 ? 35U : 110U + cleared * 30U);
+    if (context.gamepad.snapshot().connected) {
+        if (cleared == 0) {
+            context.gamepad.requestRumble(45, 55, 70);
+        } else {
+            context.gamepad.requestRumble(
+                120U + cleared * 35U, 120U + cleared * 15U,
+                100U + cleared * 30U);
+        }
+    }
     spawnPiece();
     nextGravityMs_ = millis() + gravityIntervalMs_;
     if (phase_ == Phase::GameOver) {
@@ -494,7 +504,7 @@ void TetrisApp::dropOne(uint32_t nowMs, AppContext& context, bool softDrop) {
     invalidate();
 }
 
-void TetrisApp::clearLines(AppContext& context) {
+uint8_t TetrisApp::clearLines() {
     uint8_t cleared = 0;
     for (int row = BOARD_HEIGHT - 1; row >= 0; --row) {
         bool full = true;
@@ -519,7 +529,7 @@ void TetrisApp::clearLines(AppContext& context) {
         ++row;
     }
     if (cleared == 0) {
-        return;
+        return 0;
     }
     static constexpr uint16_t lineScores[] = {0, 100, 300, 500, 800};
     score_ = std::min<uint32_t>(65535U,
@@ -529,10 +539,7 @@ void TetrisApp::clearLines(AppContext& context) {
     gravityIntervalMs_ = std::max<uint32_t>(MIN_GRAVITY_MS,
         INITIAL_GRAVITY_MS - static_cast<uint32_t>(level_ - 1U) * 55U);
     bestScore_ = std::max(bestScore_, score_);
-    context.audio.playFeedback();
-    if (context.gamepad.snapshot().connected) {
-        context.gamepad.requestRumble(50 + cleared * 20, 60, 100);
-    }
+    return cleared;
 }
 
 bool TetrisApp::tryMove(int8_t dx, int8_t dy) {

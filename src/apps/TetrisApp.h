@@ -83,7 +83,7 @@ private:
     void lockPiece(AppContext& context);
     void hardDrop(AppContext& context);
     void dropOne(uint32_t nowMs, AppContext& context, bool softDrop);
-    void clearLines(AppContext& context);
+    uint8_t clearLines();
     bool tryMove(int8_t dx, int8_t dy);
     bool tryRotate();
     bool collides(const Piece& piece) const;
