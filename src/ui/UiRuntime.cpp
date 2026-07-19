@@ -1,6 +1,7 @@
 #include "ui/UiRuntime.h"
 
 #include "services/DisplayService.h"
+#include "services/TimeService.h"
 
 #include <esp_heap_caps.h>
 
@@ -320,7 +321,8 @@ lv_obj_t* UiRuntime::currentPage() const {
 }
 
 void UiRuntime::updateStatus(const WifiSnapshot& wifi,
-                             const ServerSnapshot& server, uint32_t nowMs) {
+                             const ServerSnapshot& server,
+                             const TimeSnapshot& time, uint32_t nowMs) {
     if (!ready_ || statusWifiIcon_ == nullptr ||
         nowMs - lastStatusMs_ < STATUS_UPDATE_INTERVAL_MS) {
         return;
@@ -352,6 +354,17 @@ void UiRuntime::updateStatus(const WifiSnapshot& wifi,
     } else {
         lv_obj_add_flag(statusServerIcon_, LV_OBJ_FLAG_HIDDEN);
     }
+
+    char timeText[6] = "--:--";
+    const bool timeReady = time.effectiveTimeValid;
+    if (timeReady) {
+        snprintf(timeText, sizeof(timeText), "%02u:%02u",
+                 time.effectiveDateTime.hour,
+                 time.effectiveDateTime.minute);
+    }
+    lv_label_set_text(statusTimeLabel_, timeText);
+    lv_obj_set_style_text_color(statusTimeLabel_,
+                                timeReady ? text() : dim(), 0);
 }
 
 lv_color_t UiRuntime::background() const {
@@ -495,4 +508,7 @@ void UiRuntime::createStatusBar() {
     lv_obj_add_flag(statusWifiIcon_, LV_OBJ_FLAG_HIDDEN);
     statusServerIcon_ = createLabel(statusBar_, LV_SYMBOL_UPLOAD, 116, 2, 16,
                                     muted());
+    statusTimeLabel_ = createLabel(statusBar_, "--:--", 247, 3, 14, dim());
+    lv_obj_set_width(statusTimeLabel_, 63);
+    lv_obj_set_style_text_align(statusTimeLabel_, LV_TEXT_ALIGN_RIGHT, 0);
 }

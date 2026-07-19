@@ -1,7 +1,8 @@
 #include "services/AudioService.h"
 
-#include <Wire.h>
 #include <driver/i2s.h>
+
+#include "services/I2cBusService.h"
 
 namespace {
 
@@ -97,8 +98,9 @@ void printHalfDb(Print& output, int16_t halfDb) {
 
 }  // namespace
 
-bool AudioService::begin(Stream& log) {
+bool AudioService::begin(Stream& log, I2cBusService& i2c) {
     log_ = &log;
+    i2c_ = &i2c;
     pinMode(AMP_ENABLE_PIN, OUTPUT);
     digitalWrite(AMP_ENABLE_PIN, HIGH);  // Active-low amplifier stays off.
 
@@ -113,8 +115,8 @@ bool AudioService::begin(Stream& log) {
             "feedback", DEFAULT_FEEDBACK_ENABLED);
     }
 
-    if (!Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 400000U)) {
-        lastError_ = "i2c_init_failed";
+    if (!i2c.ready()) {
+        lastError_ = "i2c_unavailable";
         return false;
     }
     if (!initializeI2s()) {
@@ -305,21 +307,23 @@ bool AudioService::configureFixed8kClock() {
 }
 
 bool AudioService::writeRegister(uint8_t address, uint8_t value) {
-    Wire.beginTransmission(ES8311_ADDRESS);
-    Wire.write(address);
-    Wire.write(value);
-    return Wire.endTransmission(true) == 0;
+    TwoWire& wire = i2c_->wire();
+    wire.beginTransmission(ES8311_ADDRESS);
+    wire.write(address);
+    wire.write(value);
+    return wire.endTransmission(true) == 0;
 }
 
 bool AudioService::readRegister(uint8_t address, uint8_t& value) {
-    Wire.beginTransmission(ES8311_ADDRESS);
-    Wire.write(address);
-    if (Wire.endTransmission(false) != 0 ||
-        Wire.requestFrom(ES8311_ADDRESS, static_cast<uint8_t>(1),
+    TwoWire& wire = i2c_->wire();
+    wire.beginTransmission(ES8311_ADDRESS);
+    wire.write(address);
+    if (wire.endTransmission(false) != 0 ||
+        wire.requestFrom(ES8311_ADDRESS, static_cast<uint8_t>(1),
                          static_cast<uint8_t>(true)) != 1) {
         return false;
     }
-    value = static_cast<uint8_t>(Wire.read());
+    value = static_cast<uint8_t>(wire.read());
     return true;
 }
 

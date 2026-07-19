@@ -7,6 +7,7 @@
 
 class DisplayService;
 class AudioService;
+class TimeService;
 class RgbService;
 class WifiService;
 class ServerService;
@@ -16,6 +17,7 @@ class UiRuntime;
 struct AppContext {
     DisplayService& display;
     AudioService& audio;
+    TimeService& time;
     RgbService& rgb;
     WifiService& wifi;
     ServerService& server;

@@ -71,7 +71,8 @@ public:
 - `ServerService`：UDP/mDNS 发现、手工地址、TCP 会话和心跳。
 - `MirrorService`：由上位机控制的临时 framebuffer 上行通道，不持久化功能开关。
 - `RuntimeMonitorService`：采样主循环 duty、Heap/PSRAM、Flash/OTA 和任务数；不读取或修改具体 App 状态。
-- `TimeService`：单调时钟、NTP 和时区。
+- `I2cBusService`：拥有 GPIO15/16 的共享 `Wire` 总线，统一初始化和诊断。
+- `TimeService`：PCF8563 日历时钟快照、SNTP 校时和本地时区；未来再把时区做成设置项。
 - `AudioService`：ES8311 与 I²S、音量、反馈音和试听；需要实时性时可拥有独立任务。
 - `RgbService`：GPIO42 板载 WS2812 的电源、颜色和非阻塞灯效状态机；应用只修改参数，不直接发送 RMT 波形。
 

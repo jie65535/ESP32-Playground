@@ -4,6 +4,7 @@
 
 enum class AppId : uint8_t {
     SystemInfo,
+    Time,
     DisplayTest,
     DisplaySettings,
     SoundSettings,
@@ -25,6 +26,7 @@ enum class AppCommandType : uint8_t {
     Back,
     Home,
     PageSystem,
+    PageTime,
     PageDisplay,
     PageDisplaySettings,
     PageSound,
@@ -35,6 +37,9 @@ enum class AppCommandType : uint8_t {
     Screenshot,
     Status,
     Help,
+    TimeStatus,
+    TimeSet,
+    I2cScan,
     WifiScan,
     WifiSelect,
     WifiSsid,
@@ -169,6 +174,7 @@ struct RuntimeSnapshot {
     uint32_t lastServerUs = 0;
     uint32_t lastMirrorUs = 0;
     uint32_t lastBenchmarkUs = 0;
+    uint32_t lastTimeUs = 0;
     uint32_t lastAudioUs = 0;
     uint32_t lastDisplayUs = 0;
     uint32_t lastUiUs = 0;

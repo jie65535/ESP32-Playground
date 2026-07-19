@@ -49,6 +49,10 @@ class ConsoleMappingTests(unittest.TestCase):
             "page rgb",
         )
         self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "8")),
+            "page time",
+        )
+        self.assertEqual(
             CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "c")),
             "color_test",
         )
@@ -85,6 +89,8 @@ class ConsoleMappingTests(unittest.TestCase):
                     "server set 192.168.1.4 19000",
                     "mirror status",
                     "bench upload 4194304",
+                    "time set 2026-07-19 12:34:56",
+                    "i2c scan",
                 ]
             ),
             [
@@ -96,6 +102,8 @@ class ConsoleMappingTests(unittest.TestCase):
                 "server set 192.168.1.4 19000",
                 "mirror status",
                 "bench upload 4194304",
+                "time set 2026-07-19 12:34:56",
+                "i2c scan",
             ],
         )
         self.assertEqual(

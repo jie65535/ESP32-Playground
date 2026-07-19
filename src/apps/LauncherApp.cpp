@@ -7,12 +7,13 @@ namespace {
 const char* itemName(uint8_t index) {
     switch (index) {
         case 0: return "System";
-        case 1: return "Color Lab";
-        case 2: return "Display";
-        case 3: return "Sound";
-        case 4: return "RGB Light";
-        case 5: return "Console";
-        case 6: return "Connectivity";
+        case 1: return "Time";
+        case 2: return "Color Lab";
+        case 3: return "Display";
+        case 4: return "Sound";
+        case 5: return "RGB Light";
+        case 6: return "Console";
+        case 7: return "Connectivity";
         default: return "Unknown";
     }
 }
@@ -20,12 +21,13 @@ const char* itemName(uint8_t index) {
 const char* itemDescription(uint8_t index) {
     switch (index) {
         case 0: return "memory, silicon and runtime";
-        case 1: return "display and visual experiments";
-        case 2: return "brightness and screen timeout";
-        case 3: return "volume and interaction feedback";
-        case 4: return "color, brightness and animated effects";
-        case 5: return "server address and wireless control";
-        case 6: return "Wi-Fi, IP and network services";
+        case 1: return "battery-backed PCF8563 clock";
+        case 2: return "display and visual experiments";
+        case 3: return "brightness and screen timeout";
+        case 4: return "volume and interaction feedback";
+        case 5: return "color, brightness and animated effects";
+        case 6: return "server address and wireless control";
+        case 7: return "Wi-Fi, IP and network services";
         default: return "";
     }
 }
@@ -33,12 +35,13 @@ const char* itemDescription(uint8_t index) {
 const char* itemSymbol(uint8_t index) {
     switch (index) {
         case 0: return LV_SYMBOL_SETTINGS;
-        case 1: return LV_SYMBOL_IMAGE;
-        case 2: return LV_SYMBOL_EYE_OPEN;
-        case 3: return LV_SYMBOL_VOLUME_MAX;
-        case 4: return LV_SYMBOL_TINT;
-        case 5: return LV_SYMBOL_UPLOAD;
-        case 6: return LV_SYMBOL_WIFI;
+        case 1: return LV_SYMBOL_LOOP;
+        case 2: return LV_SYMBOL_IMAGE;
+        case 3: return LV_SYMBOL_EYE_OPEN;
+        case 4: return LV_SYMBOL_VOLUME_MAX;
+        case 5: return LV_SYMBOL_TINT;
+        case 6: return LV_SYMBOL_UPLOAD;
+        case 7: return LV_SYMBOL_WIFI;
         default: return LV_SYMBOL_LIST;
     }
 }
@@ -46,12 +49,13 @@ const char* itemSymbol(uint8_t index) {
 AppId itemApp(uint8_t index) {
     switch (index) {
         case 0: return AppId::SystemInfo;
-        case 1: return AppId::DisplayTest;
-        case 2: return AppId::DisplaySettings;
-        case 3: return AppId::SoundSettings;
-        case 4: return AppId::RgbSettings;
-        case 5: return AppId::ConsoleSettings;
-        case 6: return AppId::NetworkSettings;
+        case 1: return AppId::Time;
+        case 2: return AppId::DisplayTest;
+        case 3: return AppId::DisplaySettings;
+        case 4: return AppId::SoundSettings;
+        case 5: return AppId::RgbSettings;
+        case 6: return AppId::ConsoleSettings;
+        case 7: return AppId::NetworkSettings;
         default: return AppId::Count;
     }
 }

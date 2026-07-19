@@ -33,6 +33,8 @@ PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`Disp
 
 RGB 基座已加入最小实验：`RgbService` 通过 GPIO42/RMT 驱动板载 WS2812；Power 默认关闭且不持久化，灯效、基色、亮度和速度保存到独立 NVS namespace。RGB Light App 的静态、呼吸、彩虹、心跳和闪烁均由非阻塞状态机运行，离开页面后仍可继续作为后台灯光服务。
 
+PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16 共享总线，`TimeService` 以 `0x51` 探测并读取电池时钟，Time 页面显示本地时间，USB 支持 `time set`；Wi-Fi 连接后由 SNTP 自动校对并回写 RTC。模块缺失、VL、STOP 或非法字段时会降级；NTP 回退、运行中恢复、冷启动 RTC 读取和 RTC 回写已真机通过，电池保持和长期漂移仍待焊接后记录。
+
 ## 随后：PGOS Studio 媒体与工具能力
 
 - UDP 19003 / mDNS 服务发现：设备发现 Studio、Studio beacon 唤醒设备重连，并以持久化 `server_id` 防止误连。
@@ -68,7 +70,7 @@ RGB 基座已加入最小实验：`RgbService` 通过 GPIO42/RMT 驱动板载 WS
 - 实体按键
 - ES8311 播放
 - 麦克风采集
-- I²C 扫描和 PCF8563
+- I²C 扫描、PCF8563 真机保持与长期漂移
 - ADC 与功耗
 - BLE
 - TF/扩展接口（以原理图和实物为准）

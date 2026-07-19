@@ -56,6 +56,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::Back:
         case AppCommandType::Home:
         case AppCommandType::PageSystem:
+        case AppCommandType::PageTime:
         case AppCommandType::PageDisplay:
         case AppCommandType::PageDisplaySettings:
         case AppCommandType::PageSound:
@@ -64,6 +65,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageNetwork:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
+        case AppCommandType::TimeStatus:
         case AppCommandType::WifiStatus:
         case AppCommandType::ServerStatus:
         case AppCommandType::MirrorOn:
@@ -98,6 +100,8 @@ bool isWakeOnlyCommand(AppCommandType type) {
 bool countsAsDisplayActivity(AppCommandType type) {
     switch (type) {
         case AppCommandType::Status:
+        case AppCommandType::TimeStatus:
+        case AppCommandType::I2cScan:
         case AppCommandType::Help:
         case AppCommandType::Screenshot:
         case AppCommandType::WifiStatus:
@@ -117,7 +121,7 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
-      context_{display_, audio_, rgb_, wifi_, server_, Serial, ui_, runtime_},
+      context_{display_, audio_, time_, rgb_, wifi_, server_, Serial, ui_, runtime_},
       appManager_(context_) {}
 
 void SystemKernel::setup() {
@@ -125,7 +129,9 @@ void SystemKernel::setup() {
     delay(50);
     display_.begin();
     uiReady_ = ui_.begin();
-    audio_.begin(Serial);
+    i2c_.begin(Serial);
+    audio_.begin(Serial, i2c_);
+    time_.begin(Serial, i2c_);
     rgb_.begin(Serial);
     wifi_.begin(Serial);
     server_.begin(Serial);
@@ -136,6 +142,7 @@ void SystemKernel::setup() {
 
     if (uiReady_) {
         appManager_.registerApp(systemInfoApp_);
+        appManager_.registerApp(timeApp_);
         appManager_.registerApp(displayTestApp_);
         appManager_.registerApp(displaySettingsApp_);
         appManager_.registerApp(soundSettingsApp_);
@@ -144,7 +151,8 @@ void SystemKernel::setup() {
         appManager_.registerApp(networkSettingsApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
-        ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), millis());
+        ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
+                         time_.snapshot(), millis());
         ui_.tick();
         display_.pushBacklightOn();
     } else {
@@ -195,6 +203,11 @@ void SystemKernel::loop() {
         RuntimeMonitorService::Stage::Benchmark,
         static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
     stageStartedUs = esp_timer_get_time();
+    time_.tick(nowMs, wifi_.snapshot());
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Time,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
+    stageStartedUs = esp_timer_get_time();
     audio_.tick(nowMs);
     runtime_.recordStage(
         RuntimeMonitorService::Stage::Audio,
@@ -205,7 +218,8 @@ void SystemKernel::loop() {
     runtime_.recordStage(
         RuntimeMonitorService::Stage::Display,
         static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
-    ui_.updateStatus(wifi_.snapshot(), server_.snapshot(), nowMs);
+    ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
+                     time_.snapshot(), nowMs);
 
     uint32_t requestId = 0;
     String remoteLine;
@@ -255,6 +269,7 @@ void SystemKernel::loop() {
             mirror_.printStatus(Serial);
             benchmark_.printStatus(Serial);
             display_.printStatus(Serial);
+            time_.printStatus(Serial);
             audio_.printStatus(Serial);
             rgb_.printStatus(Serial);
             runtime_.printStatus(Serial);
@@ -289,6 +304,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
         case AppCommandType::PageSystem:
             appManager_.activate(AppId::SystemInfo);
             break;
+        case AppCommandType::PageTime:
+            appManager_.activate(AppId::Time);
+            break;
         case AppCommandType::PageDisplay:
             appManager_.activate(AppId::DisplayTest);
             break;
@@ -319,6 +337,21 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::Status:
             printStatus();
+            break;
+        case AppCommandType::TimeStatus:
+            time_.printStatus(Serial);
+            break;
+        case AppCommandType::TimeSet:
+            handled = time_.setDateTimeText(command.value);
+            if (!handled) {
+                Serial.println(F(
+                    "[time] usage: time set YYYY-MM-DD HH:MM:SS (2000-2099)"));
+            } else {
+                time_.printStatus(Serial);
+            }
+            break;
+        case AppCommandType::I2cScan:
+            i2c_.scan(Serial);
             break;
         case AppCommandType::MirrorOn:
             mirror_.setEnabled(true);
@@ -413,6 +446,8 @@ void SystemKernel::printStatus() {
     mirror_.printStatus(Serial);
     benchmark_.printStatus(Serial);
     display_.printStatus(Serial);
+    i2c_.printStatus(Serial);
+    time_.printStatus(Serial);
     audio_.printStatus(Serial);
     rgb_.printStatus(Serial);
     runtime_.printStatus(Serial);

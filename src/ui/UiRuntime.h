@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 class DisplayService;
+struct TimeSnapshot;
 
 struct UiCard {
     lv_obj_t* root = nullptr;
@@ -53,7 +54,7 @@ public:
     lv_obj_t* currentPage() const;
 
     void updateStatus(const WifiSnapshot& wifi, const ServerSnapshot& server,
-                      uint32_t nowMs);
+                      const TimeSnapshot& time, uint32_t nowMs);
 
     lv_color_t background() const;
     lv_color_t panel() const;
@@ -75,6 +76,7 @@ private:
     lv_obj_t* statusBar_ = nullptr;
     lv_obj_t* statusWifiIcon_ = nullptr;
     lv_obj_t* statusServerIcon_ = nullptr;
+    lv_obj_t* statusTimeLabel_ = nullptr;
     lv_obj_t* activePage_ = nullptr;
     lv_obj_t* previousPage_ = nullptr;
     uint32_t lastTickMs_ = 0;

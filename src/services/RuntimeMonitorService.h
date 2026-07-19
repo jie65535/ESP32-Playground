@@ -11,6 +11,7 @@ public:
         Server,
         Mirror,
         Benchmark,
+        Time,
         Audio,
         Display,
         Ui,

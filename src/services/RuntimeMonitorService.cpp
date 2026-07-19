@@ -49,6 +49,7 @@ void RuntimeMonitorService::recordStage(Stage stage, uint32_t elapsedUs) {
         case Stage::Server: snapshot_.lastServerUs = elapsedUs; break;
         case Stage::Mirror: snapshot_.lastMirrorUs = elapsedUs; break;
         case Stage::Benchmark: snapshot_.lastBenchmarkUs = elapsedUs; break;
+        case Stage::Time: snapshot_.lastTimeUs = elapsedUs; break;
         case Stage::Audio: snapshot_.lastAudioUs = elapsedUs; break;
         case Stage::Display: snapshot_.lastDisplayUs = elapsedUs; break;
         case Stage::Ui: snapshot_.lastUiUs = elapsedUs; break;
@@ -90,6 +91,8 @@ void RuntimeMonitorService::printStatus(Print& output) const {
     output.print(snapshot_.lastServerUs);
     output.print(F(" mirror="));
     output.print(snapshot_.lastMirrorUs);
+    output.print(F(" time="));
+    output.print(snapshot_.lastTimeUs);
     output.print(F(" display="));
     output.print(snapshot_.lastDisplayUs);
     output.print(F(" ui="));

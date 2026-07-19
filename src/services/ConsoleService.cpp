@@ -71,6 +71,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::Home;
     } else if (lower == "page system") {
         command.type = AppCommandType::PageSystem;
+    } else if (lower == "page time") {
+        command.type = AppCommandType::PageTime;
     } else if (lower == "page display") {
         command.type = AppCommandType::PageDisplay;
     } else if (lower == "page settings" || lower == "page display settings") {
@@ -91,6 +93,13 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::Status;
     } else if (lower == "help" || lower == "?") {
         command.type = AppCommandType::Help;
+    } else if (lower == "time status") {
+        command.type = AppCommandType::TimeStatus;
+    } else if (lower.startsWith("time set ")) {
+        command.type = AppCommandType::TimeSet;
+        command.value = line.substring(9);
+    } else if (lower == "i2c scan") {
+        command.type = AppCommandType::I2cScan;
     } else if (lower == "wifi scan") {
         command.type = AppCommandType::WifiScan;
     } else if (lower == "wifi status") {
@@ -202,9 +211,11 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
 
 void ConsoleService::printHelp(Print& output) {
     output.println(F("Commands: up | down | left | right | ok | back | home"));
-    output.println(F("         page system | page display | page settings | page sound"));
-    output.println(F("         page rgb | page console | page network"));
+    output.println(F("         page system | page time | page display | page settings"));
+    output.println(F("         page sound | page rgb | page console | page network"));
     output.println(F("          color_test | screenshot | status | help"));
+    output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
+    output.println(F("I2C:      i2c scan"));
     output.println(F("Wi-Fi:    wifi scan | wifi select <index> | wifi ssid <name>"));
     output.println(F("          wifi password <password> | wifi open"));
     output.println(F("          wifi status | wifi reconnect | wifi clear"));

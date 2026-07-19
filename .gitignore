@@ -10,6 +10,9 @@ __pycache__/
 docs/vendor/*
 !docs/vendor/README.md
 
+# Local external datasheets; keep vendor PDFs out of Git history.
+docs/datasheets/*
+
 # Original BDF files are kept locally for regeneration; generated subsets are tracked.
 tools/vendor-fonts/*
 

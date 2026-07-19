@@ -8,16 +8,19 @@
 #include "apps/LauncherApp.h"
 #include "apps/NetworkSettingsApp.h"
 #include "apps/SystemInfoApp.h"
+#include "apps/TimeApp.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
 #include "services/BenchmarkService.h"
 #include "services/AudioService.h"
 #include "services/DisplayService.h"
+#include "services/I2cBusService.h"
 #include "services/RgbService.h"
 #include "services/ServerService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
+#include "services/TimeService.h"
 #include "services/WifiService.h"
 #include "ui/UiRuntime.h"
 
@@ -30,7 +33,9 @@ public:
 private:
     DisplayService display_;
     UiRuntime ui_;
+    I2cBusService i2c_;
     AudioService audio_;
+    TimeService time_;
     RgbService rgb_;
     WifiService wifi_;
     ServerService server_;
@@ -42,6 +47,7 @@ private:
     AppManager appManager_;
     InputRouter inputRouter_;
     SystemInfoApp systemInfoApp_;
+    TimeApp timeApp_;
     DisplayTestApp displayTestApp_;
     DisplaySettingsApp displaySettingsApp_;
     SoundSettingsApp soundSettingsApp_;

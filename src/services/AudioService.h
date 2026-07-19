@@ -5,9 +5,11 @@
 
 #include <atomic>
 
+class I2cBusService;
+
 class AudioService {
 public:
-    bool begin(Stream& log);
+    bool begin(Stream& log, I2cBusService& i2c);
     void tick(uint32_t nowMs);
 
     bool ready() const;
@@ -26,8 +28,6 @@ private:
     static constexpr uint8_t I2S_BCLK_PIN = 5;
     static constexpr uint8_t I2S_WS_PIN = 7;
     static constexpr uint8_t I2S_DATA_OUT_PIN = 8;
-    static constexpr uint8_t I2C_SCL_PIN = 15;
-    static constexpr uint8_t I2C_SDA_PIN = 16;
     static constexpr uint8_t ES8311_ADDRESS = 0x18;
     static constexpr uint32_t SAMPLE_RATE = 8000;
     static constexpr uint16_t TONE_FREQUENCY = 1000;
@@ -37,6 +37,7 @@ private:
     static constexpr bool DEFAULT_FEEDBACK_ENABLED = false;
 
     Stream* log_ = nullptr;
+    I2cBusService* i2c_ = nullptr;
     Preferences preferences_;
     TaskHandle_t taskHandle_ = nullptr;
     std::atomic<uint32_t> toneUntilMs_{0};

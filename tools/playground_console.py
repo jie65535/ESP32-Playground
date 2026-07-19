@@ -40,12 +40,15 @@ VALID_COMMANDS = (
     "color_test",
     "help",
     "page system",
+    "page time",
     "page display",
     "page settings",
     "page sound",
     "page rgb",
     "page console",
     "page network",
+    "time status",
+    "i2c scan",
     "wifi scan",
     "wifi status",
     "wifi reconnect",
@@ -84,6 +87,7 @@ SHORTCUTS = {
     "5": "page sound",
     "6": "page console",
     "7": "page rgb",
+    "8": "page time",
     "c": "color_test",
     "r": "status",
     "h": "help",
@@ -266,6 +270,7 @@ def normalize_commands(commands: Iterable[str]) -> list[str]:
             "server set ",
             "bench upload ",
             "bench download ",
+            "time set ",
         )
         prefix = next((item for item in prefixes if lower_value.startswith(item)), None)
         if prefix is None or not value[len(prefix):]:
@@ -288,6 +293,7 @@ def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
     print("  1/0 system   2 display   3 network   4 settings   5 sound   6 console")
+    print("  7 RGB light  8 time")
     print("  Backspace back   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")
     print("  Desktop: arrows move, Enter opens; apps keep their own controls")
