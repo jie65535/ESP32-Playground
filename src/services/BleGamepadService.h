@@ -48,10 +48,6 @@ private:
     uint32_t disconnectCount_ = 0;
     uint32_t scanStartCount_ = 0;
     bool disconnectPending_ = false;
-    bool rumblePending_ = false;
-    uint16_t rumbleDurationMs_ = 0;
-    uint8_t rumbleWeakMagnitude_ = 0;
-    uint8_t rumbleStrongMagnitude_ = 0;
 
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
     ControllerPtr controllers_[BP32_MAX_GAMEPADS] = {};
@@ -71,5 +67,4 @@ private:
     void updateSnapshotMeta(uint32_t nowMs);
     void saveSettings();
     void pushEvent(GamepadEventType type, uint8_t slot, uint16_t code);
-    void processPendingRumble();
 };
