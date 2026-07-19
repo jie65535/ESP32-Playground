@@ -53,6 +53,7 @@ bool isRemoteAllowed(AppCommandType type) {
     switch (type) {
         case AppCommandType::Previous:
         case AppCommandType::Next:
+        case AppCommandType::QuickDrop:
         case AppCommandType::Left:
         case AppCommandType::Right:
         case AppCommandType::Activate:
@@ -217,6 +218,8 @@ void SystemKernel::loop() {
                     gamepadCommand.type = AppCommandType::Activate;
                 } else if (gamepadEvent.code == GamepadButtonB) {
                     gamepadCommand.type = AppCommandType::Back;
+                } else if (gamepadEvent.code == GamepadButtonX) {
+                    gamepadCommand.type = AppCommandType::QuickDrop;
                 }
                 break;
             case GamepadEventType::DpadDown:

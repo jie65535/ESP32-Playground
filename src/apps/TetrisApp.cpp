@@ -66,7 +66,14 @@ void TetrisApp::onCommand(const AppCommand& command, AppContext& context) {
             break;
         case AppCommandType::Next:
             if (phase_ == Phase::Running) {
-                dropOne(millis(), context, true);
+                const uint32_t nowMs = millis();
+                dropOne(nowMs, context, true);
+                nextSoftDropMs_ = nowMs + SOFT_DROP_INTERVAL_MS;
+            }
+            break;
+        case AppCommandType::QuickDrop:
+            if (phase_ == Phase::Running) {
+                hardDrop(context);
             }
             break;
         case AppCommandType::Left:
@@ -102,7 +109,16 @@ void TetrisApp::onTick(uint32_t nowMs, AppContext& context) {
     if (surface_ == nullptr) {
         return;
     }
-    sampleAnalog(context.gamepad.snapshot(), nowMs, context);
+    const GamepadSnapshot gamepad = context.gamepad.snapshot();
+    sampleAnalog(gamepad, nowMs);
+    const bool softDropHeld = gamepad.connected &&
+        ((gamepad.dpad & GamepadDpadDown) != 0 ||
+         gamepad.axisY >= ANALOG_THRESHOLD);
+    if (phase_ == Phase::Running && softDropHeld &&
+        static_cast<int32_t>(nowMs - nextSoftDropMs_) >= 0) {
+        dropOne(nowMs, context, true);
+        nextSoftDropMs_ = nowMs + SOFT_DROP_INTERVAL_MS;
+    }
     if (phase_ == Phase::Running &&
         static_cast<int32_t>(nowMs - nextGravityMs_) >= 0) {
         dropOne(nowMs, context, false);
@@ -200,6 +216,35 @@ void TetrisApp::draw(lv_event_t* event) {
         }
     }
     if (phase_ == Phase::Running || phase_ == Phase::Paused) {
+        Piece ghost = current_;
+        while (true) {
+            Piece candidate = ghost;
+            ++candidate.y;
+            if (collides(candidate)) {
+                break;
+            }
+            ghost = candidate;
+        }
+        for (uint8_t row = 0; row < 4; ++row) {
+            for (uint8_t column = 0; column < 4; ++column) {
+                if (!hasCell(ghost.type, ghost.rotation, row, column)) {
+                    continue;
+                }
+                const int16_t x = ghost.x + column;
+                const int16_t y = ghost.y + row;
+                if (x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT) {
+                    continue;
+                }
+                lv_area_t cell = {
+                    static_cast<lv_coord_t>(board.x1 + x * CELL_SIZE + 1),
+                    static_cast<lv_coord_t>(board.y1 + y * CELL_SIZE + 1),
+                    static_cast<lv_coord_t>(board.x1 + (x + 1) * CELL_SIZE - 2),
+                    static_cast<lv_coord_t>(board.y1 + (y + 1) * CELL_SIZE - 2),
+                };
+                drawRect(layer, cell, pieceColors_[ghost.type + 1], 2,
+                         LV_OPA_40);
+            }
+        }
         for (uint8_t row = 0; row < 4; ++row) {
             for (uint8_t column = 0; column < 4; ++column) {
                 if (!hasCell(current_.type, current_.rotation, row, column)) {
@@ -221,15 +266,38 @@ void TetrisApp::draw(lv_event_t* event) {
         }
     }
 
+    lv_area_t leftPanel = {
+        static_cast<lv_coord_t>(surfaceArea.x1 + 8),
+        static_cast<lv_coord_t>(surfaceArea.y1 + 35),
+        static_cast<lv_coord_t>(surfaceArea.x1 + BOARD_X - 9),
+        static_cast<lv_coord_t>(surfaceArea.y2 - 5),
+    };
+    drawRect(layer, leftPanel, panelColor_, 6);
+    char text[40];
+    lv_area_t label = leftPanel;
+    label.x1 += 9;
+    label.x2 -= 9;
+    label.y1 += 10;
+    label.y2 = label.y1 + 16;
+    drawText(layer, "TOP 5", label, mutedColor_, hudFont_, LV_TEXT_ALIGN_LEFT);
+    for (uint8_t index = 0; index < LEADERBOARD_COUNT; ++index) {
+        label.y1 += 22;
+        label.y2 = label.y1 + 16;
+        lv_snprintf(text, sizeof(text), "%u. %04u",
+                    static_cast<unsigned>(index + 1U),
+                    static_cast<unsigned>(leaderboard_[index]));
+        drawText(layer, text, label, index == 0 ? textColor_ : mutedColor_,
+                 hudFont_, LV_TEXT_ALIGN_LEFT);
+    }
+
     lv_area_t panel = {
-        static_cast<lv_coord_t>(surfaceArea.x1 + 119),
+        static_cast<lv_coord_t>(surfaceArea.x1 + 214),
         static_cast<lv_coord_t>(surfaceArea.y1 + 35),
         static_cast<lv_coord_t>(surfaceArea.x2 - 8),
         static_cast<lv_coord_t>(surfaceArea.y2 - 5),
     };
     drawRect(layer, panel, panelColor_, 6);
-    char text[40];
-    lv_area_t label = panel;
+    label = panel;
     label.x1 += 9;
     label.x2 -= 9;
     label.y1 += 10;
@@ -263,28 +331,6 @@ void TetrisApp::draw(lv_event_t* event) {
     label.y2 += 17;
     lv_snprintf(text, sizeof(text), "BEST   %04u", static_cast<unsigned>(bestScore_));
     drawText(layer, text, label, accentColor_, hudFont_, LV_TEXT_ALIGN_LEFT);
-    label.y1 += 18;
-    label.y2 += 18;
-    drawText(layer, "TOP 5", label, mutedColor_, hudFont_, LV_TEXT_ALIGN_LEFT);
-    for (uint8_t row = 0; row < 3; ++row) {
-        label.y1 += 14;
-        label.y2 = label.y1 + 13;
-        const uint8_t first = row * 2U;
-        const uint8_t second = first + 1U;
-        if (second < LEADERBOARD_COUNT) {
-            lv_snprintf(text, sizeof(text), "%u.%04u   %u.%04u",
-                        static_cast<unsigned>(first + 1U),
-                        static_cast<unsigned>(leaderboard_[first]),
-                        static_cast<unsigned>(second + 1U),
-                        static_cast<unsigned>(leaderboard_[second]));
-        } else {
-            lv_snprintf(text, sizeof(text), "%u.%04u",
-                        static_cast<unsigned>(first + 1U),
-                        static_cast<unsigned>(leaderboard_[first]));
-        }
-        drawText(layer, text, label, row == 0 ? textColor_ : mutedColor_,
-                 hudFont_, LV_TEXT_ALIGN_LEFT);
-    }
 
     if (phase_ != Phase::Running) {
         lv_area_t overlay = surfaceArea;
@@ -354,6 +400,8 @@ void TetrisApp::resetGame() {
     lines_ = 0;
     level_ = 1;
     gravityIntervalMs_ = INITIAL_GRAVITY_MS;
+    nextSoftDropMs_ = 0;
+    nextHorizontalRepeatMs_ = 0;
     current_ = {};
     refillBag();
     nextType_ = bag_[bagIndex_++];
@@ -417,6 +465,20 @@ void TetrisApp::lockPiece(AppContext& context) {
             context.gamepad.requestRumble(260, 200, 255);
         }
     }
+}
+
+void TetrisApp::hardDrop(AppContext& context) {
+    uint8_t dropped = 0;
+    while (tryMove(0, 1)) {
+        if (dropped < 255U) {
+            ++dropped;
+        }
+    }
+    score_ = std::min<uint32_t>(65535U,
+                                score_ + static_cast<uint16_t>(dropped) * 2U);
+    bestScore_ = std::max(bestScore_, score_);
+    lockPiece(context);
+    invalidate();
 }
 
 void TetrisApp::dropOne(uint32_t nowMs, AppContext& context, bool softDrop) {
@@ -523,11 +585,11 @@ bool TetrisApp::hasCell(uint8_t type, uint8_t rotation, uint8_t row,
            (SHAPES[type][rotation % 4U][row] & (1U << column)) != 0;
 }
 
-void TetrisApp::sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs,
-                             AppContext& context) {
+void TetrisApp::sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs) {
     if (!gamepad.connected || phase_ != Phase::Running) {
         analogXSign_ = 0;
         analogYSign_ = 0;
+        nextHorizontalRepeatMs_ = 0;
         return;
     }
     const int8_t xSign = std::abs(static_cast<int32_t>(gamepad.axisX)) >= ANALOG_THRESHOLD
@@ -542,12 +604,16 @@ void TetrisApp::sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs,
             changed = tryMove(1, 0) || changed;
         }
         analogXSign_ = xSign;
+        nextHorizontalRepeatMs_ = xSign == 0
+            ? 0 : nowMs + HORIZONTAL_INITIAL_REPEAT_MS;
+    } else if (xSign != 0 &&
+               static_cast<int32_t>(nowMs - nextHorizontalRepeatMs_) >= 0) {
+        changed = (xSign < 0 ? tryMove(-1, 0) : tryMove(1, 0)) || changed;
+        nextHorizontalRepeatMs_ = nowMs + HORIZONTAL_REPEAT_INTERVAL_MS;
     }
     if (ySign != analogYSign_) {
         if (ySign < 0) {
             changed = tryRotate() || changed;
-        } else if (ySign > 0) {
-            dropOne(nowMs, context, true);
         }
         analogYSign_ = ySign;
     }

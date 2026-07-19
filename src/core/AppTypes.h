@@ -23,6 +23,7 @@ enum class AppCommandType : uint8_t {
     Unknown,
     Previous,
     Next,
+    QuickDrop,
     Left,
     Right,
     Activate,

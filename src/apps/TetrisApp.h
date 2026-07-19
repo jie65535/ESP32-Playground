@@ -27,10 +27,13 @@ private:
     static constexpr uint8_t BOARD_HEIGHT = 20;
     static constexpr uint8_t LEADERBOARD_COUNT = 5;
     static constexpr int16_t CELL_SIZE = 9;
-    static constexpr int16_t BOARD_X = 15;
+    static constexpr int16_t BOARD_X = 115;
     static constexpr int16_t BOARD_Y = 6;
     static constexpr uint32_t INITIAL_GRAVITY_MS = 650;
     static constexpr uint32_t MIN_GRAVITY_MS = 90;
+    static constexpr uint32_t SOFT_DROP_INTERVAL_MS = 45;
+    static constexpr uint32_t HORIZONTAL_INITIAL_REPEAT_MS = 180;
+    static constexpr uint32_t HORIZONTAL_REPEAT_INTERVAL_MS = 85;
     static constexpr int16_t ANALOG_THRESHOLD = 128;
 
     Phase phase_ = Phase::Title;
@@ -41,6 +44,8 @@ private:
     uint8_t bagIndex_ = 7;
     uint32_t randomState_ = 0x7E57C0DEU;
     uint32_t nextGravityMs_ = 0;
+    uint32_t nextSoftDropMs_ = 0;
+    uint32_t nextHorizontalRepeatMs_ = 0;
     uint32_t gravityIntervalMs_ = INITIAL_GRAVITY_MS;
     uint16_t score_ = 0;
     uint16_t lines_ = 0;
@@ -76,6 +81,7 @@ private:
     void spawnPiece();
     void refillBag();
     void lockPiece(AppContext& context);
+    void hardDrop(AppContext& context);
     void dropOne(uint32_t nowMs, AppContext& context, bool softDrop);
     void clearLines(AppContext& context);
     bool tryMove(int8_t dx, int8_t dy);
@@ -83,8 +89,7 @@ private:
     bool collides(const Piece& piece) const;
     bool hasCell(uint8_t type, uint8_t rotation, uint8_t row,
                  uint8_t column) const;
-    void sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs,
-                      AppContext& context);
+    void sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs);
     void saveHighScore(AppContext& context);
     void loadLeaderboard(AppContext& context);
     uint32_t nextRandom();
