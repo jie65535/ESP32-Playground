@@ -25,10 +25,12 @@ public:
         initialized_ = false;
         previous_ = GamepadActivitySample{};
         for (uint8_t index = 0; index < 4; ++index) {
+            axisCenters_[index] = 0;
             axisStates_[index] = 0;
             axisEngaged_[index] = false;
         }
         for (uint8_t index = 0; index < 2; ++index) {
+            triggerCenters_[index] = 0;
             triggerStates_[index] = false;
             triggerEngaged_[index] = false;
         }
@@ -39,10 +41,12 @@ public:
             initialized_ = true;
             previous_ = sample;
             for (uint8_t index = 0; index < 4; ++index) {
-                axisStates_[index] = axisState(sample.axes[index], 0);
+                axisCenters_[index] = sample.axes[index];
+                axisStates_[index] = 0;
             }
             for (uint8_t index = 0; index < 2; ++index) {
-                triggerStates_[index] = triggerState(sample.triggers[index], false);
+                triggerCenters_[index] = sample.triggers[index];
+                triggerStates_[index] = false;
             }
             return sample.buttons != 0 || sample.dpad != 0 ||
                    sample.miscButtons != 0;
@@ -55,10 +59,13 @@ public:
                       sample.miscButtons != 0;
 
         for (uint8_t index = 0; index < 4; ++index) {
-            const int8_t nextState = axisState(sample.axes[index], axisStates_[index]);
-            const bool moved = absoluteDifference(sample.axes[index],
+            const int32_t delta = static_cast<int32_t>(sample.axes[index]) -
+                                  static_cast<int32_t>(axisCenters_[index]);
+            const int8_t nextState = axisState(delta, axisStates_[index]);
+            const bool moved = nextState != 0 &&
+                               absoluteDifference(sample.axes[index],
                                                   previous_.axes[index]) >=
-                               AXIS_MOTION_THRESHOLD;
+                                   AXIS_MOTION_THRESHOLD;
             const bool changed = nextState != axisStates_[index];
             if (nextState == 0) {
                 axisEngaged_[index] = false;
@@ -70,11 +77,13 @@ public:
         }
 
         for (uint8_t index = 0; index < 2; ++index) {
-            const bool nextState = triggerState(sample.triggers[index],
-                                                triggerStates_[index]);
-            const bool moved = absoluteDifference(sample.triggers[index],
+            const int32_t delta = static_cast<int32_t>(sample.triggers[index]) -
+                                  static_cast<int32_t>(triggerCenters_[index]);
+            const bool nextState = triggerState(delta, triggerStates_[index]);
+            const bool moved = nextState &&
+                               absoluteDifference(sample.triggers[index],
                                                   previous_.triggers[index]) >=
-                               TRIGGER_MOTION_THRESHOLD;
+                                   TRIGGER_MOTION_THRESHOLD;
             const bool changed = nextState != triggerStates_[index];
             if (!nextState) {
                 triggerEngaged_[index] = false;
@@ -92,12 +101,14 @@ public:
 private:
     bool initialized_ = false;
     GamepadActivitySample previous_;
+    int16_t axisCenters_[4] = {};
     int8_t axisStates_[4] = {};
     bool axisEngaged_[4] = {};
+    uint16_t triggerCenters_[2] = {};
     bool triggerStates_[2] = {};
     bool triggerEngaged_[2] = {};
 
-    static int8_t axisState(int16_t value, int8_t previousState) {
+    static int8_t axisState(int32_t value, int8_t previousState) {
         if (previousState < 0 && value <= -AXIS_EXIT_THRESHOLD) {
             return -1;
         }
@@ -113,7 +124,7 @@ private:
         return 0;
     }
 
-    static bool triggerState(uint16_t value, bool previousState) {
+    static bool triggerState(int32_t value, bool previousState) {
         return previousState ? value >= TRIGGER_EXIT_THRESHOLD
                              : value >= TRIGGER_ENTER_THRESHOLD;
     }

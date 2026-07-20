@@ -22,12 +22,11 @@ int main() {
     sample.triggers[0] = 20;
     assert(!tracker.update(sample));
 
-    sample.axes[0] = 160;
+    sample.axes[0] = 300;
     assert(tracker.update(sample));
     assert(tracker.update(sample));
     sample.axes[0] = 0;
     assert(tracker.update(sample));
-    sample.axes[0] = 0;
     assert(!tracker.update(sample));
 
     sample.triggers[0] = 180;
@@ -43,6 +42,16 @@ int main() {
     assert(!tracker.update(sample));
     sample.axes[0] = 145;
     assert(!tracker.update(sample));
+
+    sample.axes[0] = 300;
+    assert(tracker.update(sample));
+    sample.axes[0] = 145;
+    assert(tracker.update(sample));
+    assert(!tracker.update(sample));
+    sample.axes[0] = 180;
+    assert(!tracker.update(sample));
+    sample.axes[0] = 280;
+    assert(tracker.update(sample));
 
     GamepadReconnectScheduler scheduler;
     scheduler.scheduleAfterUnexpectedDisconnect(1000);
