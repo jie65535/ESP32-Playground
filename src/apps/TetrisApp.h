@@ -34,7 +34,9 @@ private:
     static constexpr uint32_t SOFT_DROP_INTERVAL_MS = 45;
     static constexpr uint32_t HORIZONTAL_INITIAL_REPEAT_MS = 180;
     static constexpr uint32_t HORIZONTAL_REPEAT_INTERVAL_MS = 85;
-    static constexpr uint32_t CLEAR_EFFECT_DURATION_MS = 240;
+    static constexpr uint32_t CLEAR_EFFECT_DURATION_MS = 320;
+    static constexpr uint32_t CLEAR_EFFECT_STAGGER_MS = 14;
+    static constexpr uint8_t CLEAR_EFFECT_FRAGMENT_COUNT = 3;
     static constexpr int16_t ANALOG_THRESHOLD = 128;
 
     Phase phase_ = Phase::Title;
@@ -81,6 +83,8 @@ private:
     void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
                   lv_color_t color, const lv_font_t* font,
                   lv_text_align_t align = LV_TEXT_ALIGN_CENTER) const;
+    void drawClearEffect(lv_layer_t* layer, const lv_area_t& board,
+                         uint32_t elapsedMs) const;
 
     void resetGame();
     void startGame(uint32_t nowMs);

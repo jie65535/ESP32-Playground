@@ -14,6 +14,12 @@ constexpr int16_t SURFACE_WIDTH = 320;
 constexpr int16_t SURFACE_HEIGHT = 218;
 constexpr int16_t HUD_HEIGHT = 25;
 
+constexpr int8_t FRAGMENT_X[3] = {1, 4, 1};
+constexpr int8_t FRAGMENT_Y[3] = {1, 1, 4};
+constexpr int8_t FRAGMENT_WIDTH[3] = {3, 4, 5};
+constexpr int8_t FRAGMENT_HEIGHT[3] = {3, 3, 4};
+constexpr int8_t FRAGMENT_VELOCITY_Y[3] = {-4, -1, 2};
+
 // Each rotation is four row masks; bit zero is the leftmost cell.
 constexpr uint8_t SHAPES[7][4][4] = {
     {{0x0F, 0x00, 0x00, 0x00}, {0x02, 0x02, 0x02, 0x02},
@@ -57,6 +63,9 @@ void TetrisApp::onExit(AppContext& context) {
 }
 
 void TetrisApp::onCommand(const AppCommand& command, AppContext& context) {
+    if (clearEffectUntilMs_ != 0) {
+        return;
+    }
     switch (command.type) {
         case AppCommandType::Previous:
             if (phase_ == Phase::Running) {
@@ -276,34 +285,7 @@ void TetrisApp::draw(lv_event_t* event) {
         }
     }
     if (clearEffectUntilMs_ != 0) {
-        const uint32_t elapsed = millis() - clearEffectStartMs_;
-        const uint32_t progress = std::min<uint32_t>(1000U,
-            (elapsed * 1000U) / CLEAR_EFFECT_DURATION_MS);
-        const uint32_t maxRadius = BOARD_WIDTH / 2U + 1U;
-        const uint32_t radius = (maxRadius * progress) / 1000U;
-        for (uint8_t index = 0; index < clearEffectCount_; ++index) {
-            const uint8_t row = clearEffectRows_[index];
-            for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
-                const uint8_t distance = static_cast<uint8_t>(
-                    std::abs(static_cast<int>(column) -
-                             static_cast<int>(clearEffectAnchorX_)));
-                if (distance > radius + 1U) {
-                    continue;
-                }
-                lv_area_t cell = {
-                    static_cast<lv_coord_t>(board.x1 + column * CELL_SIZE + 1),
-                    static_cast<lv_coord_t>(board.y1 + row * CELL_SIZE + 1),
-                    static_cast<lv_coord_t>(board.x1 + (column + 1) * CELL_SIZE - 2),
-                    static_cast<lv_coord_t>(board.y1 + (row + 1) * CELL_SIZE - 2),
-                };
-                if (distance <= radius) {
-                    drawRect(layer, cell, backgroundColor_, 2, LV_OPA_COVER);
-                } else {
-                    drawRect(layer, cell, lv_color_hex(0xFFFFFF), 2,
-                             LV_OPA_90);
-                }
-            }
-        }
+        drawClearEffect(layer, board, millis() - clearEffectStartMs_);
     }
 
     lv_area_t leftPanel = {
@@ -423,6 +405,96 @@ void TetrisApp::drawText(lv_layer_t* layer, const char* text, lv_area_t area,
     descriptor.text_local = true;
     descriptor.align = align;
     lv_draw_label(layer, &descriptor, &area);
+}
+
+void TetrisApp::drawClearEffect(lv_layer_t* layer, const lv_area_t& board,
+                                uint32_t elapsedMs) const {
+    for (uint8_t rowIndex = 0; rowIndex < clearEffectCount_; ++rowIndex) {
+        const uint8_t row = clearEffectRows_[rowIndex];
+        for (uint8_t column = 0; column < BOARD_WIDTH; ++column) {
+            const uint8_t distance = static_cast<uint8_t>(
+                std::abs(static_cast<int>(column) -
+                         static_cast<int>(clearEffectAnchorX_)));
+            const uint32_t delayMs =
+                distance * CLEAR_EFFECT_STAGGER_MS + rowIndex * 6U;
+            if (elapsedMs <= delayMs) {
+                continue;
+            }
+
+            const uint32_t localDurationMs = CLEAR_EFFECT_DURATION_MS - delayMs;
+            const uint32_t progress = std::min<uint32_t>(
+                1000U, ((elapsedMs - delayMs) * 1000U) / localDurationMs);
+            const uint32_t eased =
+                (progress * (2000U - progress)) / 1000U;
+            const uint32_t gravity =
+                (7U * progress * progress) / 1000000U;
+            const int32_t easedSigned = static_cast<int32_t>(eased);
+            const uint8_t value = board_[row][column];
+            const lv_color_t color = value < 8U
+                                         ? pieceColors_[value]
+                                         : textColor_;
+            const int16_t cellX = board.x1 + column * CELL_SIZE;
+            const int16_t cellY = board.y1 + row * CELL_SIZE;
+            lv_area_t cell = {
+                static_cast<lv_coord_t>(cellX + 1),
+                static_cast<lv_coord_t>(cellY + 1),
+                static_cast<lv_coord_t>(cellX + CELL_SIZE - 2),
+                static_cast<lv_coord_t>(cellY + CELL_SIZE - 2),
+            };
+            drawRect(layer, cell, gridColor_, 1);
+            if (progress < 150U) {
+                const lv_opa_t flashOpacity = static_cast<lv_opa_t>(
+                    ((150U - progress) * LV_OPA_50) / 150U);
+                drawRect(layer, cell, lv_color_hex(0xFFFFFF), 1,
+                         flashOpacity);
+            }
+
+            const lv_opa_t opacity = static_cast<lv_opa_t>(
+                ((1000U - progress) * LV_OPA_COVER) / 1000U);
+            if (opacity < LV_OPA_10) {
+                continue;
+            }
+            for (uint8_t fragment = 0;
+                 fragment < CLEAR_EFFECT_FRAGMENT_COUNT; ++fragment) {
+                const uint8_t seed = static_cast<uint8_t>(
+                    row * 29U + column * 17U + fragment * 43U);
+                const int8_t side = column < clearEffectAnchorX_
+                                        ? -1
+                                        : column > clearEffectAnchorX_
+                                              ? 1
+                                              : ((fragment & 1U) == 0U ? -1 : 1);
+                const int8_t jitterX = static_cast<int8_t>(seed % 3U) - 1;
+                const int8_t jitterY =
+                    static_cast<int8_t>((seed >> 2U) % 3U) - 1;
+                const int16_t horizontalSpeed = static_cast<int16_t>(
+                    2 + distance / 2 + fragment % 2);
+                const int8_t velocityX = static_cast<int8_t>(
+                    side * horizontalSpeed + jitterX);
+                const int8_t velocityY =
+                    static_cast<int8_t>(FRAGMENT_VELOCITY_Y[fragment] +
+                                        jitterY);
+                const int16_t offsetX = static_cast<int16_t>(
+                    (static_cast<int32_t>(velocityX) * easedSigned) / 1000);
+                const int16_t offsetY = static_cast<int16_t>(
+                    (static_cast<int32_t>(velocityY) * easedSigned) / 1000 +
+                    static_cast<int32_t>(gravity));
+                const int16_t shrink = progress >= 760U ? 1 : 0;
+                lv_area_t particle = {
+                    static_cast<lv_coord_t>(
+                        cellX + FRAGMENT_X[fragment] + offsetX + shrink),
+                    static_cast<lv_coord_t>(
+                        cellY + FRAGMENT_Y[fragment] + offsetY + shrink),
+                    static_cast<lv_coord_t>(
+                        cellX + FRAGMENT_X[fragment] + offsetX +
+                        FRAGMENT_WIDTH[fragment] - 1 - shrink),
+                    static_cast<lv_coord_t>(
+                        cellY + FRAGMENT_Y[fragment] + offsetY +
+                        FRAGMENT_HEIGHT[fragment] - 1 - shrink),
+                };
+                drawRect(layer, particle, color, 1, opacity);
+            }
+        }
+    }
 }
 
 void TetrisApp::resetGame() {
