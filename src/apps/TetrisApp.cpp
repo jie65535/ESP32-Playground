@@ -2,7 +2,7 @@
 
 #include "services/AudioService.h"
 #include "services/BleGamepadService.h"
-#include "services/TetrisScoreService.h"
+#include "services/GameScoreService.h"
 #include "ui/UiRuntime.h"
 
 #include <algorithm>

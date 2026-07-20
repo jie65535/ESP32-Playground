@@ -10,6 +10,10 @@
 
 Git 只保存版本锁定、构建清单和项目自己的适配层。这样不会把数百 MB 的上游源码复制进仓库，也不会把带有本地修改的 nested Git 仓库伪装成干净 submodule。
 
+PGOS Shell 卡片图标来自 `lucide-static 0.468.0`。仓库只保存由
+`tools/generate_ui_icons.py` 生成的 15 个 24×24 A8 遮罩，不保存完整字体；
+生成脚本固定上游版本，许可证见 `licenses/Lucide-ISC.txt`。
+
 ## 已落地的锁定方式
 
 `main/idf_component.yml` 声明官方 ILI9341 驱动 `espressif/esp_lcd_ili9341 == 2.0.2`；根目录 `dependencies.lock` 锁定该组件及其 `cmake_utilities` 传递依赖。第一次构建时，组件管理器把源码恢复到被忽略的 `managed_components/`。

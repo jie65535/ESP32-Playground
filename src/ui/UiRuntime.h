@@ -2,6 +2,7 @@
 
 #include "core/AppTypes.h"
 #include "ui/BitmapFont.h"
+#include "ui/UiIcons.h"
 
 #include <lvgl.h>
 
@@ -11,7 +12,7 @@ struct TimeSnapshot;
 struct UiCard {
     lv_obj_t* root = nullptr;
     lv_obj_t* icon = nullptr;
-    lv_obj_t* iconLabel = nullptr;
+    lv_obj_t* iconGraphic = nullptr;
     lv_obj_t* title = nullptr;
     lv_obj_t* subtitle = nullptr;
     lv_coord_t normalX = 20;
@@ -28,6 +29,11 @@ enum class UiPageTransition : uint8_t {
 
 class UiRuntime {
 public:
+    static constexpr int16_t CARD_HEIGHT = 44;
+    static constexpr int16_t CARD_START_Y = 50;
+    static constexpr int16_t CARD_START_WITH_SUBTITLE_Y = 64;
+    static constexpr int16_t CARD_STEP_Y = 52;
+
     explicit UiRuntime(DisplayService& display);
 
     bool begin();
@@ -38,7 +44,7 @@ public:
 
     lv_obj_t* createPageRoot(const char* eyebrow, const char* title,
                              const char* subtitle = nullptr);
-    UiCard createCard(lv_obj_t* parent, int16_t y, const char* symbol,
+    UiCard createCard(lv_obj_t* parent, int16_t y, UiIcon icon,
                       const char* title, const char* subtitle);
     void setCardFocused(UiCard& card, bool focused, bool animated = true);
     void centerFocused(lv_obj_t* scrollable, lv_obj_t* focused,
@@ -46,6 +52,10 @@ public:
 
     lv_obj_t* createLabel(lv_obj_t* parent, const char* text, int16_t x,
                           int16_t y, uint16_t fontSize, lv_color_t color);
+    lv_obj_t* createBodyLabel(lv_obj_t* parent, const char* text, int16_t x,
+                              int16_t y, lv_color_t color,
+                              bool strong = false);
+    void applyBodyFont(lv_obj_t* label, bool strong = false);
     lv_obj_t* createValueRow(lv_obj_t* parent, const char* label,
                              const char* value, int16_t y,
                              lv_obj_t** valueLabel = nullptr);

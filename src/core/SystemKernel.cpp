@@ -11,6 +11,47 @@ constexpr uint32_t SERIAL_BAUD = 115200;
 constexpr uint32_t RENDER_INTERVAL_MS = 1000;
 constexpr uint32_t SERIAL_STATUS_INTERVAL_MS = 10000;
 
+const MenuItemDefinition HOME_ITEMS[] = {
+    {UiIcon::Gamepad, "游戏", nullptr, AppId::GamesMenu},
+    {UiIcon::Settings, "设置", nullptr, AppId::SettingsMenu},
+    {UiIcon::Tools, "系统工具", nullptr, AppId::ToolsMenu},
+};
+
+const MenuItemDefinition GAME_ITEMS[] = {
+    {UiIcon::Snake, "贪吃蛇", nullptr, AppId::Snake},
+    {UiIcon::Tetris, "俄罗斯方块", nullptr, AppId::Tetris},
+    {UiIcon::Breakout, "打砖块", nullptr, AppId::Breakout},
+};
+
+const MenuItemDefinition SETTINGS_ITEMS[] = {
+    {UiIcon::Display, "显示", nullptr, AppId::DisplaySettings},
+    {UiIcon::Sound, "声音", nullptr, AppId::SoundSettings},
+    {UiIcon::Light, "RGB 灯光", nullptr, AppId::RgbSettings},
+    {UiIcon::Gamepad, "手柄", nullptr, AppId::ControllerSettings},
+    {UiIcon::Wifi, "无线网络", nullptr, AppId::NetworkSettings},
+    {UiIcon::Remote, "远程控制", nullptr, AppId::ConsoleSettings},
+};
+
+const MenuItemDefinition TOOL_ITEMS[] = {
+    {UiIcon::System, "系统监视", nullptr, AppId::SystemInfo},
+    {UiIcon::Clock, "时钟", nullptr, AppId::Time},
+    {UiIcon::Palette, "颜色实验", nullptr, AppId::DisplayTest},
+};
+
+const MenuDefinition GAMES_MENU = {
+    AppId::GamesMenu, "Games", "Games", nullptr,
+    GAME_ITEMS, static_cast<uint8_t>(sizeof(GAME_ITEMS) / sizeof(GAME_ITEMS[0]))};
+const MenuDefinition SETTINGS_MENU = {
+    AppId::SettingsMenu, "Settings", "Settings", nullptr,
+    SETTINGS_ITEMS,
+    static_cast<uint8_t>(sizeof(SETTINGS_ITEMS) / sizeof(SETTINGS_ITEMS[0]))};
+const MenuDefinition TOOLS_MENU = {
+    AppId::ToolsMenu, "Tools", "System Tools", nullptr,
+    TOOL_ITEMS, static_cast<uint8_t>(sizeof(TOOL_ITEMS) / sizeof(TOOL_ITEMS[0]))};
+const MenuDefinition HOME_MENU = {
+    AppId::Launcher, "Desktop", "PGOS", "PlaygroundOS",
+    HOME_ITEMS, static_cast<uint8_t>(sizeof(HOME_ITEMS) / sizeof(HOME_ITEMS[0]))};
+
 bool isWifiCommand(AppCommandType type) {
     switch (type) {
         case AppCommandType::WifiScan:
@@ -129,9 +170,16 @@ bool countsAsDisplayActivity(AppCommandType type) {
 
 SystemKernel::SystemKernel()
     : ui_(display_),
+      snakeScore_("pgos_snake", 2, "snake"),
+      tetrisScore_("pgos_tetris", 1, "tetris"),
+      breakoutScore_("pgos_breakout", 1, "breakout"),
       context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
                snakeScore_, tetrisScore_, breakoutScore_, Serial, ui_, runtime_},
-      appManager_(context_) {}
+      appManager_(context_),
+      gamesMenuApp_(GAMES_MENU),
+      settingsMenuApp_(SETTINGS_MENU),
+      toolsMenuApp_(TOOLS_MENU),
+      launcherApp_(HOME_MENU) {}
 
 void SystemKernel::setup() {
     Serial.begin(SERIAL_BAUD);
@@ -176,6 +224,9 @@ void SystemKernel::setup() {
         appManager_.registerApp(snakeApp_);
         appManager_.registerApp(tetrisApp_);
         appManager_.registerApp(breakoutApp_);
+        appManager_.registerApp(gamesMenuApp_);
+        appManager_.registerApp(settingsMenuApp_);
+        appManager_.registerApp(toolsMenuApp_);
         appManager_.registerApp(launcherApp_);
         appManager_.begin(AppId::Launcher);
         ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
@@ -373,8 +424,10 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
     bool handled = true;
     switch (command.type) {
         case AppCommandType::Back:
+            appManager_.back();
+            break;
         case AppCommandType::Home:
-            appManager_.activate(AppId::Launcher, UiPageTransition::Backward);
+            appManager_.home();
             break;
         case AppCommandType::PageSystem:
             appManager_.activate(AppId::SystemInfo);

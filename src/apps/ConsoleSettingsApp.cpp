@@ -11,19 +11,19 @@ String settingValue(const char* value) {
 
 const char* serverStateText(ServerState state) {
     switch (state) {
-        case ServerState::Disabled: return "Off";
-        case ServerState::NoTarget: return "Setup";
-        case ServerState::WaitingWifi: return "Waiting";
-        case ServerState::Connecting: return "Linking";
-        case ServerState::Connected: return "Online";
-        case ServerState::Backoff: return "Retry";
-        default: return "Unknown";
+        case ServerState::Disabled: return "关闭";
+        case ServerState::NoTarget: return "待配置";
+        case ServerState::WaitingWifi: return "等待网络";
+        case ServerState::Connecting: return "连接中";
+        case ServerState::Connected: return "已连接";
+        case ServerState::Backoff: return "稍后重试";
+        default: return "未知";
     }
 }
 
 String targetText(const ServerSnapshot& snapshot) {
     if (snapshot.host.isEmpty()) {
-        return "Not configured";
+        return "尚未配置";
     }
     String value = snapshot.host + ":" + snapshot.port;
     if (value.length() > 22U) {
@@ -104,19 +104,19 @@ void ConsoleSettingsApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* ConsoleSettingsApp::onCreateView(AppContext& context) {
     root_ = context.ui.createPageRoot(
-        "CONSOLE / LINKS", "Console",
-        "Configure the Wi-Fi control server");
+        nullptr, "Remote Control", "Studio 与无线控制连接");
 
-    rows_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_EDIT,
-                                     "Server target",
-                                     "Remote host and control port");
-    rows_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_WIFI,
-                                     "Wi-Fi console",
-                                     "Connects automatically over Wi-Fi");
+    rows_[0] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y, UiIcon::Remote,
+        "服务器地址", "远程主机与控制端口");
+    rows_[1] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y + UiRuntime::CARD_STEP_Y,
+        UiIcon::Wifi, "无线控制台", nullptr);
 
     for (uint8_t index = 0; index < ITEM_COUNT; ++index) {
         valueLabels_[index] = context.ui.createLabel(
             rows_[index].root, "< -- >", 194, 10, 12, context.ui.text());
+        context.ui.applyBodyFont(valueLabels_[index]);
         lv_obj_set_width(valueLabels_[index], 96);
         lv_label_set_long_mode(valueLabels_[index], LV_LABEL_LONG_CLIP);
         lv_obj_align(valueLabels_[index], LV_ALIGN_RIGHT_MID, -9, -1);
@@ -148,7 +148,7 @@ void ConsoleSettingsApp::onUpdateView(AppContext& context) {
     const String target = targetText(server);
     lv_label_set_text(rows_[0].subtitle, target.c_str());
     const String targetState = settingValue(
-        server.host.isEmpty() ? "None" : "Saved");
+        server.host.isEmpty() ? "未设置" : "已保存");
     lv_label_set_text(valueLabels_[0], targetState.c_str());
     const String serverState = settingValue(serverStateText(server.state));
     lv_label_set_text(valueLabels_[1], serverState.c_str());

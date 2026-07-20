@@ -18,6 +18,9 @@
 - 供电注意：Xbox 手柄输入在电池电量较低时仍可能正常，但震动电机的峰值电流更高；验证震动前应接 USB 或确保电池电压充足。
 - 持久化：`TetrisScoreService` 使用独立 `pgos_tetris` NVS namespace 保存五条最高分，不与贪吃蛇混用。
 
+> 2026-07-20：实验 017 将同构实现合并为 `GameScoreService`，上述
+> `pgos_tetris` namespace、schema=1 和榜单数据保持不变。
+
 ## 验证方式
 
 ```text

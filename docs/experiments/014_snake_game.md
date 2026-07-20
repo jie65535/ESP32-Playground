@@ -18,6 +18,9 @@
 - 持久化：`SnakeScoreService` 使用独立 `pgos_snake` NVS namespace 保存
   Top 5，带 schema=2；游戏运行中的新纪录只在结束或离开应用时写入。
 
+> 2026-07-20：实验 017 将同构实现合并为 `GameScoreService`，上述
+> `pgos_snake` namespace、schema=2 和写入时机保持不变。
+
 ## 构建验证
 
 2026-07-19：

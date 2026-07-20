@@ -14,14 +14,22 @@ public:
     void render();
     bool activate(AppId id,
                   UiPageTransition transition = UiPageTransition::Forward);
+    bool back();
+    bool home();
     AppId currentId() const;
     const char* currentName() const;
 
 private:
-    static constexpr uint8_t MAX_APPS = 13;
+    static constexpr uint8_t MAX_APPS = static_cast<uint8_t>(AppId::Count);
+    static constexpr uint8_t MAX_HISTORY = 4;
     AppContext& context_;
     IApp* apps_[MAX_APPS] = {};
+    AppId history_[MAX_HISTORY] = {};
     uint8_t appCount_ = 0;
+    uint8_t historyDepth_ = 0;
     uint8_t currentIndex_ = 0;
     bool active_ = false;
+
+    bool switchTo(AppId id, UiPageTransition transition);
+    bool push(AppId id);
 };

@@ -25,7 +25,7 @@ void AppManager::handleCommand(const AppCommand& command) {
     current.onCommand(command, context_);
     const AppId requested = current.requestedApp();
     if (requested != AppId::Count) {
-        activate(requested);
+        push(requested);
     }
 }
 
@@ -42,6 +42,24 @@ void AppManager::render() {
 }
 
 bool AppManager::activate(AppId id, UiPageTransition transition) {
+    historyDepth_ = 0;
+    return switchTo(id, transition);
+}
+
+bool AppManager::back() {
+    if (historyDepth_ == 0) {
+        return activate(AppId::Launcher, UiPageTransition::Backward);
+    }
+    const AppId previous = history_[--historyDepth_];
+    return switchTo(previous, UiPageTransition::Backward);
+}
+
+bool AppManager::home() {
+    historyDepth_ = 0;
+    return switchTo(AppId::Launcher, UiPageTransition::Backward);
+}
+
+bool AppManager::switchTo(AppId id, UiPageTransition transition) {
     for (uint8_t index = 0; index < appCount_; ++index) {
         if (apps_[index]->id() != id) {
             continue;
@@ -60,6 +78,24 @@ bool AppManager::activate(AppId id, UiPageTransition transition) {
         apps_[currentIndex_]->onUpdateView(context_);
         return true;
     }
+    return false;
+}
+
+bool AppManager::push(AppId id) {
+    if (!active_ || id == currentId()) {
+        return switchTo(id, UiPageTransition::Forward);
+    }
+    if (historyDepth_ >= MAX_HISTORY) {
+        for (uint8_t index = 1; index < MAX_HISTORY; ++index) {
+            history_[index - 1U] = history_[index];
+        }
+        historyDepth_ = MAX_HISTORY - 1U;
+    }
+    history_[historyDepth_++] = currentId();
+    if (switchTo(id, UiPageTransition::Forward)) {
+        return true;
+    }
+    --historyDepth_;
     return false;
 }
 

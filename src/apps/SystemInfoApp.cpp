@@ -48,19 +48,24 @@ void SystemInfoApp::onTick(uint32_t nowMs, AppContext&) {
 }
 
 lv_obj_t* SystemInfoApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("DEVICE / SYSTEM", "System Monitor");
-    cards_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_SETTINGS,
+    root_ = context.ui.createPageRoot(nullptr, "System Monitor");
+    cards_[0] = context.ui.createCard(root_, UiRuntime::CARD_START_Y, UiIcon::System,
                                       "ESP32-S3", "R8N16 / 240 MHz");
-    cards_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_LOOP,
-                                      "Main loop", "--");
-    cards_[2] = context.ui.createCard(root_, 158, LV_SYMBOL_IMAGE,
-                                      "LCD flush", "--");
-    cards_[3] = context.ui.createCard(root_, 208, LV_SYMBOL_LIST,
-                                      "Internal RAM", "--");
-    cards_[4] = context.ui.createCard(root_, 258, LV_SYMBOL_DRIVE,
+    cards_[1] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + UiRuntime::CARD_STEP_Y, UiIcon::System,
+                                      "主循环", "--");
+    cards_[2] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 2 * UiRuntime::CARD_STEP_Y, UiIcon::Display,
+                                      "LCD 刷新", "--");
+    cards_[3] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 3 * UiRuntime::CARD_STEP_Y, UiIcon::System,
+                                      "内部内存", "--");
+    cards_[4] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 4 * UiRuntime::CARD_STEP_Y, UiIcon::System,
                                       "PSRAM", "--");
-    cards_[5] = context.ui.createCard(root_, 308, LV_SYMBOL_SAVE,
-                                      "Flash and OTA", "--");
+    cards_[5] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 5 * UiRuntime::CARD_STEP_Y, UiIcon::Tools,
+                                      "Flash 与 OTA", "--");
     return root_;
 }
 
@@ -78,8 +83,8 @@ void SystemInfoApp::onUpdateView(AppContext& context) {
     }
 
     const RuntimeSnapshot runtime = context.runtime.snapshot();
-    const String identity = String("uptime ") + nowMs_ / 1000U +
-                            "s / tasks " + runtime.taskCount;
+    const String identity = String("运行 ") + nowMs_ / 1000U +
+                            "s / 任务 " + runtime.taskCount;
     const String loop = String("duty ") + runtime.mainLoopBusyPercent +
                         "% / ui " + String(runtime.lastUiUs / 1000.0F, 1) +
                         " ms / net " +
@@ -92,10 +97,10 @@ void SystemInfoApp::onUpdateView(AppContext& context) {
                          String(runtime.lastFlushWaitUs / 1000.0F, 1) +
                          " ms / " + runtime.lastFlushAreas + " areas";
     const String heap = String(percent(runtime.freeHeap, runtime.heapSize)) +
-                        "% free / min " +
+                        "% 可用 / 低水位 " +
                         DisplayService::formatBytes(runtime.minimumFreeHeap);
     const String psram = DisplayService::formatBytes(runtime.freePsram) +
-                         " free / " +
+                         " 可用 / " +
                          DisplayService::formatBytes(runtime.psramSize);
     const String flash = String("app ") +
                          DisplayService::formatBytes(runtime.sketchSize) +

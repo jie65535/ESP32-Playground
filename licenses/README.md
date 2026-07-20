@@ -1,4 +1,4 @@
-# 第三方字体资源
+# 第三方字体与图标资源
 
 `src/ui/BitmapFontData.h` 是从以下两套 12px 简体中文比例 BDF 字体生成的精简点阵字库，仅包含 Playground 实验界面实际需要的字符：
 
@@ -16,3 +16,7 @@ python tools/generate_bitmap_font.py `
 ```
 
 生成器直接保留 BDF 的 advance、ascent 和 descent，不再按每个字符的独立包围盒垂直居中，因此中英文混排共享 baseline，复杂汉字也不会被 12px 方框裁切。
+
+PGOS Shell 的卡片图标来自 `lucide-static 0.468.0`，使用 ISC License。
+`tools/generate_ui_icons.py` 从固定版本字体生成 15 个 24×24 A8 图标遮罩；
+固件不包含完整 Lucide 字体。许可证全文见 `Lucide-ISC.txt`。

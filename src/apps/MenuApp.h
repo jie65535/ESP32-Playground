@@ -3,8 +3,26 @@
 #include "core/App.h"
 #include "ui/UiRuntime.h"
 
-class LauncherApp final : public IApp {
+struct MenuItemDefinition {
+    UiIcon icon;
+    const char* title;
+    const char* subtitle;
+    AppId target;
+};
+
+struct MenuDefinition {
+    AppId id;
+    const char* name;
+    const char* title;
+    const char* subtitle;
+    const MenuItemDefinition* items;
+    uint8_t itemCount;
+};
+
+class MenuApp final : public IApp {
 public:
+    explicit MenuApp(const MenuDefinition& definition);
+
     AppId id() const override;
     const char* name() const override;
     void onEnter(AppContext& context) override;
@@ -16,10 +34,12 @@ public:
     AppId requestedApp() const override;
 
 private:
-    static constexpr uint8_t ITEM_COUNT = 12;
+    static constexpr uint8_t MAX_ITEMS = 6;
+
+    const MenuDefinition& definition_;
     uint8_t selected_ = 0;
     int8_t renderedSelection_ = -1;
     AppId requested_ = AppId::Count;
     lv_obj_t* root_ = nullptr;
-    UiCard cards_[ITEM_COUNT];
+    UiCard cards_[MAX_ITEMS];
 };

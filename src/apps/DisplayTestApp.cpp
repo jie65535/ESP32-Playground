@@ -9,7 +9,7 @@ constexpr uint32_t SWATCH_COLORS[] = {
     0x35C6D8, 0xBE63D9, 0xF3C84B,
 };
 
-const char* SWATCH_NAMES[] = {"RED", "GREEN", "BLUE", "CYAN", "MAGENTA", "YELLOW"};
+const char* SWATCH_NAMES[] = {"红", "绿", "蓝", "青", "品红", "黄"};
 
 }  // namespace
 
@@ -41,9 +41,10 @@ void DisplayTestApp::onCommand(const AppCommand& command, AppContext&) {
 void DisplayTestApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("DISPLAY / ILI9341", "Color Lab");
-    modeLabel_ = context.ui.createLabel(root_, "BALANCED RGB565", 206, 14, 11,
+    root_ = context.ui.createPageRoot(nullptr, "Color Lab");
+    modeLabel_ = context.ui.createLabel(root_, "标准 RGB565", 206, 14, 11,
                                         context.ui.muted());
+    context.ui.applyBodyFont(modeLabel_);
 
     for (uint8_t index = 0; index < 6; ++index) {
         const int16_t column = index % 3U;
@@ -52,25 +53,23 @@ lv_obj_t* DisplayTestApp::onCreateView(AppContext& context) {
         lv_obj_remove_style_all(swatch);
         lv_obj_set_size(swatch, 88, 42);
         lv_obj_set_pos(swatch, 16 + column * 100, 60 + row * 50);
-        lv_obj_set_style_radius(swatch, 9, 0);
+        lv_obj_set_style_radius(swatch, 8, 0);
         lv_obj_set_style_bg_color(swatch, lv_color_hex(SWATCH_COLORS[index]), 0);
         lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(swatch, 1, 0);
         lv_obj_set_style_border_color(swatch, context.ui.panelRaised(), 0);
         lv_obj_clear_flag(swatch, LV_OBJ_FLAG_SCROLLABLE);
-        context.ui.createLabel(swatch, SWATCH_NAMES[index], 9, 13, 12,
-                               lv_color_hex(0x080B10));
+        context.ui.createBodyLabel(swatch, SWATCH_NAMES[index], 9, 13,
+                                   lv_color_hex(0x080B10), true);
         swatches_[index] = swatch;
     }
 
-    context.ui.createLabel(root_, "BGR + inversion on", 18, 165, 12,
-                           context.ui.muted());
+    context.ui.createBodyLabel(root_, "BGR 色序 / 反色开启", 18, 165,
+                               context.ui.muted());
     context.ui.createLabel(root_, "320 x 240  /  40 MHz SPI", 168, 165, 12,
                            context.ui.text());
-    lv_obj_t* chineseLabel = context.ui.createLabel(
-        root_, "屏幕测试 中文", 18, 190, 12, context.ui.text());
-    lv_obj_set_style_text_font(
-        chineseLabel, context.ui.bitmapFont(BitmapFontSize::Small12), 0);
+    context.ui.createBodyLabel(root_, "屏幕测试 / 中文像素字体", 18, 190,
+                               context.ui.text());
     return root_;
 }
 
@@ -79,7 +78,7 @@ void DisplayTestApp::onUpdateView(AppContext& context) {
         return;
     }
     renderedColorTest_ = colorTest_;
-    lv_label_set_text(modeLabel_, colorTest_ ? "CALIBRATION" : "BALANCED RGB565");
+    lv_label_set_text(modeLabel_, colorTest_ ? "校准模式" : "标准 RGB565");
     lv_obj_set_style_text_color(modeLabel_,
                                 colorTest_ ? context.ui.accent() : context.ui.muted(),
                                 0);

@@ -11,6 +11,19 @@ String rssiText(const WifiSnapshot& snapshot) {
                : String("--");
 }
 
+const char* wifiStateText(WifiState state) {
+    switch (state) {
+        case WifiState::Disabled: return "已关闭";
+        case WifiState::NoCredentials: return "等待配置";
+        case WifiState::Ready: return "准备连接";
+        case WifiState::Scanning: return "正在扫描";
+        case WifiState::Connecting: return "正在连接";
+        case WifiState::Connected: return "已连接";
+        case WifiState::Backoff: return "稍后重试";
+        default: return "未知";
+    }
+}
+
 String shorten(const String& value, size_t maxLength) {
     if (value.length() <= maxLength) {
         return value;
@@ -152,8 +165,7 @@ void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
 }
 
 lv_obj_t* NetworkSettingsApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("NETWORK / RADIO", "Connectivity",
-                                      "Wi-Fi station and local radio");
+    root_ = context.ui.createPageRoot(nullptr, "Network");
     lastViewSignature_ = "";
     return root_;
 }
@@ -234,53 +246,51 @@ void NetworkSettingsApp::buildHeader(AppContext& context,
     context.ui.createLabel(root_, eyebrow, 16, 10, 12, context.ui.accent());
     context.ui.createLabel(root_, title, 16, 27, 24, context.ui.text());
     if (subtitle != nullptr) {
-        context.ui.createLabel(root_, subtitle, 17, 57, 12, context.ui.muted());
+        context.ui.createBodyLabel(root_, subtitle, 17, 57,
+                                   context.ui.muted());
     }
 }
 
 void NetworkSettingsApp::buildInactive(AppContext& context,
                                        const WifiSnapshot& snapshot) {
-    buildHeader(context, "NETWORK / RADIO", "Connectivity",
-                "Wi-Fi station and local radio");
+    buildHeader(context, "NETWORK / RADIO", "Network", nullptr);
 
     const String title = snapshot.ssid.isEmpty()
-                             ? String("Wi-Fi Station")
+                             ? String("Wi-Fi")
                              : shorten(snapshot.ssid, 24);
-    String subtitle = context.wifi.stateName();
+    String subtitle = wifiStateText(snapshot.state);
     if (snapshot.state == WifiState::Connected) {
         subtitle += "  /  2.4 GHz";
     }
     UiCard connection = context.ui.createCard(
-        root_, 76, LV_SYMBOL_WIFI, title.c_str(), subtitle.c_str());
+        root_, 64, UiIcon::Wifi, title.c_str(), subtitle.c_str());
     connection.normalX = 12;
     connection.normalWidth = 296;
     context.ui.setCardFocused(connection,
                               snapshot.state == WifiState::Connected, false);
 
     lv_obj_t* value = nullptr;
-    context.ui.createValueRow(root_, "IP ADDRESS", snapshot.ip.c_str(), 126,
+    context.ui.createValueRow(root_, "IP 地址", snapshot.ip.c_str(), 116,
                               &value);
     const String rssi = rssiText(snapshot);
-    context.ui.createValueRow(root_, "SIGNAL", rssi.c_str(), 148, &value);
+    context.ui.createValueRow(root_, "信号强度", rssi.c_str(), 138, &value);
     const String retry = String(snapshot.reconnectCount);
-    context.ui.createValueRow(root_, "RETRIES", retry.c_str(), 170, &value);
+    context.ui.createValueRow(root_, "重连次数", retry.c_str(), 160, &value);
 
 }
 
 void NetworkSettingsApp::buildScanning(AppContext& context) {
-    buildHeader(context, "NETWORK / SETUP", "Scanning",
-                "Looking for nearby 2.4 GHz networks");
+    buildHeader(context, "NETWORK / SETUP", "Scanning", nullptr);
     context.ui.createLabel(root_, LV_SYMBOL_REFRESH, 145, 89, 28,
                            context.ui.accent());
-    context.ui.createLabel(root_, "Non-blocking radio scan", 74, 130, 16,
-                           context.ui.text());
-    context.ui.createLabel(root_, "The console and services remain responsive",
-                           42, 157, 12, context.ui.muted());
+    context.ui.createBodyLabel(root_, "正在扫描无线网络", 88, 130,
+                               context.ui.text(), true);
+    context.ui.createBodyLabel(root_, "控制台与后台服务保持运行", 78, 157,
+                               context.ui.muted());
 }
 
 void NetworkSettingsApp::buildSelection(AppContext& context) {
-    buildHeader(context, "NETWORK / SETUP", "Choose a network",
-                "Nearby 2.4 GHz networks");
+    buildHeader(context, "NETWORK / SETUP", "Wi-Fi Networks", nullptr);
     const int16_t count = context.wifi.scanCount();
     lv_obj_t* selectedItem = nullptr;
     for (uint8_t row = 0; row < VISIBLE_ROWS; ++row) {
@@ -321,20 +331,20 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
 }
 
 void NetworkSettingsApp::buildPassword(AppContext& context) {
-    buildHeader(context, "NETWORK / SETUP", "Network selected",
-                "Credential entry continues on the trusted USB console");
+    buildHeader(context, "NETWORK / SETUP", "Wi-Fi Setup",
+                "请在可信的 USB 控制台继续输入凭据");
     const String ssid = shorten(context.wifi.selectedSsid(), 28);
-    UiCard selected = context.ui.createCard(root_, 84, LV_SYMBOL_WIFI,
-                                            ssid.c_str(), "credential required");
+    UiCard selected = context.ui.createCard(root_, 84, UiIcon::Wifi,
+                                            ssid.c_str(), "需要输入网络凭据");
     selected.normalX = 12;
     selected.normalWidth = 296;
     context.ui.setCardFocused(selected, true);
     context.ui.createLabel(root_, LV_SYMBOL_EYE_CLOSE, 24, 145, 20,
                            context.ui.accent());
-    context.ui.createLabel(root_, "Type the password in playground_console",
-                           58, 145, 12, context.ui.text());
-    context.ui.createLabel(root_, "It will be stored in device NVS, never Git",
-                           58, 170, 12, context.ui.muted());
+    context.ui.createBodyLabel(root_, "请在 playground_console 输入密码",
+                               58, 145, context.ui.text());
+    context.ui.createBodyLabel(root_, "密码只保存到设备 NVS，不进入 Git",
+                               58, 170, context.ui.muted());
 }
 
 String NetworkSettingsApp::viewSignature(AppContext& context) const {

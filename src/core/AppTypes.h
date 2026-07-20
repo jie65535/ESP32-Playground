@@ -15,6 +15,9 @@ enum class AppId : uint8_t {
     Snake,
     Tetris,
     Breakout,
+    GamesMenu,
+    SettingsMenu,
+    ToolsMenu,
     Launcher,
     Count,
 };

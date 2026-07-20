@@ -129,23 +129,23 @@ lv_obj_t* UiRuntime::createPageRoot(const char* eyebrow, const char* title,
     (void)eyebrow;
     createLabel(root, title, 16, 12, 24, text());
     if (subtitle != nullptr) {
-        createLabel(root, subtitle, 17, 43, 12, muted());
+        createBodyLabel(root, subtitle, 17, 43, muted());
     }
     return root;
 }
 
 UiCard UiRuntime::createCard(lv_obj_t* parent, int16_t y,
-                             const char* symbol, const char* title,
+                             UiIcon icon, const char* title,
                              const char* subtitle) {
     UiCard card;
     card.root = lv_obj_create(parent);
     lv_obj_remove_style_all(card.root);
-    lv_obj_set_size(card.root, card.normalWidth, 40);
+    lv_obj_set_size(card.root, card.normalWidth, CARD_HEIGHT);
     lv_obj_set_pos(card.root, card.normalX, y);
-    lv_obj_set_style_radius(card.root, 10, 0);
+    lv_obj_set_style_radius(card.root, 8, 0);
     lv_obj_set_style_bg_color(card.root, panel(), 0);
     lv_obj_set_style_bg_opa(card.root, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(card.root, 1, 0);
+    lv_obj_set_style_border_width(card.root, 2, 0);
     lv_obj_set_style_border_color(card.root, panelRaised(), 0);
     lv_obj_set_style_pad_all(card.root, 0, 0);
     lv_obj_clear_flag(card.root, LV_OBJ_FLAG_SCROLLABLE);
@@ -153,19 +153,26 @@ UiCard UiRuntime::createCard(lv_obj_t* parent, int16_t y,
     card.icon = lv_obj_create(card.root);
     lv_obj_remove_style_all(card.icon);
     lv_obj_set_size(card.icon, 30, 30);
-    lv_obj_set_pos(card.icon, 6, 5);
+    lv_obj_align(card.icon, LV_ALIGN_LEFT_MID, 6, 0);
     lv_obj_set_style_radius(card.icon, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(card.icon, panelRaised(), 0);
     lv_obj_set_style_bg_opa(card.icon, LV_OPA_COVER, 0);
 
-    card.iconLabel = lv_label_create(card.icon);
-    lv_obj_set_style_text_font(card.iconLabel, font(20), 0);
-    lv_obj_set_style_text_color(card.iconLabel, muted(), 0);
-    lv_label_set_text(card.iconLabel, symbol);
-    lv_obj_center(card.iconLabel);
+    card.iconGraphic = lv_image_create(card.icon);
+    lv_image_set_src(card.iconGraphic, PgosUiIcons::image(icon));
+    lv_obj_set_style_image_recolor(card.iconGraphic, muted(), 0);
+    lv_obj_center(card.iconGraphic);
 
-    card.title = createLabel(card.root, title, 48, 5, 16, text());
-    card.subtitle = createLabel(card.root, subtitle, 49, 24, 11, muted());
+    const bool hasSubtitle = subtitle != nullptr && subtitle[0] != '\0';
+    card.title = createLabel(card.root, title, 48, hasSubtitle ? 2 : 0,
+                             16, text());
+    applyBodyFont(card.title, true);
+    if (hasSubtitle) {
+        card.subtitle = createLabel(card.root, subtitle, 49, 21, 11, muted());
+        applyBodyFont(card.subtitle);
+    } else {
+        lv_obj_align(card.title, LV_ALIGN_LEFT_MID, 48, 0);
+    }
     return card;
 }
 
@@ -176,11 +183,15 @@ void UiRuntime::setCardFocused(UiCard& card, bool focused, bool animated) {
 
     lv_obj_set_style_bg_color(card.root, focused ? panelRaised() : panel(), 0);
     lv_obj_set_style_border_color(card.root, focused ? accent() : panelRaised(), 0);
-    lv_obj_set_style_border_width(card.root, focused ? 2 : 1, 0);
+    lv_obj_set_style_border_width(card.root, 2, 0);
     lv_obj_set_style_bg_color(card.icon, focused ? accent() : panelRaised(), 0);
-    lv_obj_set_style_text_color(card.iconLabel, focused ? background() : muted(), 0);
+    lv_obj_set_style_image_recolor(
+        card.iconGraphic, focused ? background() : muted(), 0);
     lv_obj_set_style_text_color(card.title, text(), 0);
-    lv_obj_set_style_text_color(card.subtitle, focused ? text() : muted(), 0);
+    if (card.subtitle != nullptr) {
+        lv_obj_set_style_text_color(
+            card.subtitle, focused ? text() : muted(), 0);
+    }
     if (animated) {
         animateCard(card, focused);
     } else {
@@ -240,10 +251,26 @@ lv_obj_t* UiRuntime::createLabel(lv_obj_t* parent, const char* textValue,
     return label;
 }
 
+lv_obj_t* UiRuntime::createBodyLabel(lv_obj_t* parent, const char* textValue,
+                                     int16_t x, int16_t y, lv_color_t color,
+                                     bool strong) {
+    lv_obj_t* label = createLabel(parent, textValue, x, y, 12, color);
+    applyBodyFont(label, strong);
+    return label;
+}
+
+void UiRuntime::applyBodyFont(lv_obj_t* label, bool strong) {
+    if (label != nullptr) {
+        lv_obj_set_style_text_font(
+            label, bitmapFont(strong ? BitmapFontSize::Bold12
+                                     : BitmapFontSize::Small12), 0);
+    }
+}
+
 lv_obj_t* UiRuntime::createValueRow(lv_obj_t* parent, const char* labelText,
                                     const char* valueText, int16_t y,
                                     lv_obj_t** valueLabel) {
-    createLabel(parent, labelText, 18, y, 12, muted());
+    createBodyLabel(parent, labelText, 18, y, muted());
     lv_obj_t* value = createLabel(parent, valueText, 132, y, 14, text());
     if (valueLabel != nullptr) {
         *valueLabel = value;

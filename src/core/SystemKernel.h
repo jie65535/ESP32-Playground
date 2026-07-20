@@ -6,7 +6,7 @@
 #include "apps/RgbSettingsApp.h"
 #include "apps/ControllerSettingsApp.h"
 #include "apps/ConsoleSettingsApp.h"
-#include "apps/LauncherApp.h"
+#include "apps/MenuApp.h"
 #include "apps/NetworkSettingsApp.h"
 #include "apps/SystemInfoApp.h"
 #include "apps/TimeApp.h"
@@ -23,9 +23,7 @@
 #include "services/I2cBusService.h"
 #include "services/RgbService.h"
 #include "services/ServerService.h"
-#include "services/SnakeScoreService.h"
-#include "services/TetrisScoreService.h"
-#include "services/BreakoutScoreService.h"
+#include "services/GameScoreService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
 #include "services/TimeService.h"
@@ -48,9 +46,9 @@ private:
     WifiService wifi_;
     ServerService server_;
     BleGamepadService gamepad_;
-    SnakeScoreService snakeScore_;
-    TetrisScoreService tetrisScore_;
-    BreakoutScoreService breakoutScore_;
+    GameScoreService snakeScore_;
+    GameScoreService tetrisScore_;
+    GameScoreService breakoutScore_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -70,7 +68,10 @@ private:
     SnakeApp snakeApp_;
     TetrisApp tetrisApp_;
     BreakoutApp breakoutApp_;
-    LauncherApp launcherApp_;
+    MenuApp gamesMenuApp_;
+    MenuApp settingsMenuApp_;
+    MenuApp toolsMenuApp_;
+    MenuApp launcherApp_;
     uint32_t lastRenderMs_ = 0;
     uint32_t lastStatusMs_ = 0;
     bool redrawRequested_ = true;

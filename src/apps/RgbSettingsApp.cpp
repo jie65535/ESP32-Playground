@@ -11,6 +11,29 @@ String choiceText(const char* value) {
     return String("< ") + value + " >";
 }
 
+const char* effectText(RgbEffect effect) {
+    switch (effect) {
+        case RgbEffect::Solid: return "常亮";
+        case RgbEffect::Breathe: return "呼吸";
+        case RgbEffect::Rainbow: return "彩虹";
+        case RgbEffect::Pulse: return "心跳";
+        case RgbEffect::Sparkle: return "闪烁";
+        default: return "未知";
+    }
+}
+
+const char* paletteText(uint8_t index) {
+    constexpr const char* NAMES[] = {
+        "青", "紫", "玫红", "琥珀", "绿", "蓝", "白",
+    };
+    return NAMES[index % RgbService::PALETTE_COUNT];
+}
+
+const char* speedText(uint8_t index) {
+    constexpr const char* NAMES[] = {"慢", "标准", "快"};
+    return NAMES[index % RgbService::SPEED_COUNT];
+}
+
 }  // namespace
 
 AppId RgbSettingsApp::id() const {
@@ -58,22 +81,27 @@ void RgbSettingsApp::onCommand(const AppCommand& command,
 void RgbSettingsApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* RgbSettingsApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("LIGHT / GPIO42", "RGB Light");
+    root_ = context.ui.createPageRoot(nullptr, "RGB Light");
 
-    rows_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_POWER,
-                                     "Power", "Onboard WS2812 output");
-    rows_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_LOOP,
-                                     "Effect", "Non-blocking light scene");
-    rows_[2] = context.ui.createCard(root_, 158, LV_SYMBOL_TINT,
-                                     "Palette", "Base color for effects");
-    rows_[3] = context.ui.createCard(root_, 208, LV_SYMBOL_EYE_OPEN,
-                                     "Brightness", "Peak LED output level");
-    rows_[4] = context.ui.createCard(root_, 258, LV_SYMBOL_REFRESH,
-                                     "Speed", "Animation tempo");
+    rows_[0] = context.ui.createCard(root_, UiRuntime::CARD_START_Y, UiIcon::Light,
+                                     "电源", nullptr);
+    rows_[1] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + UiRuntime::CARD_STEP_Y, UiIcon::Light,
+                                     "灯效", nullptr);
+    rows_[2] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 2 * UiRuntime::CARD_STEP_Y, UiIcon::Palette,
+                                     "颜色", nullptr);
+    rows_[3] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 3 * UiRuntime::CARD_STEP_Y, UiIcon::Light,
+                                     "亮度", nullptr);
+    rows_[4] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 4 * UiRuntime::CARD_STEP_Y, UiIcon::Light,
+                                     "速度", nullptr);
 
     for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
         valueLabels_[index] = context.ui.createLabel(
             rows_[index].root, "--", 184, 10, 12, context.ui.text());
+        context.ui.applyBodyFont(valueLabels_[index]);
         lv_obj_set_width(valueLabels_[index], 88);
         lv_label_set_long_mode(valueLabels_[index], LV_LABEL_LONG_CLIP);
         lv_obj_set_style_text_align(valueLabels_[index], LV_TEXT_ALIGN_RIGHT, 0);
@@ -110,18 +138,18 @@ void RgbSettingsApp::onUpdateView(AppContext& context) {
 
     const RgbSnapshot rgb = context.rgb.snapshot();
     if (!renderedValid_ || renderedEnabled_ != rgb.enabled) {
-        const String value = choiceText(rgb.enabled ? "On" : "Off");
+        const String value = choiceText(rgb.enabled ? "开" : "关");
         lv_label_set_text(valueLabels_[0], value.c_str());
         renderedEnabled_ = rgb.enabled;
     }
     const uint8_t effect = static_cast<uint8_t>(rgb.effect);
     if (!renderedValid_ || renderedEffect_ != effect) {
-        const String value = choiceText(RgbService::effectName(rgb.effect));
+        const String value = choiceText(effectText(rgb.effect));
         lv_label_set_text(valueLabels_[1], value.c_str());
         renderedEffect_ = effect;
     }
     if (!renderedValid_ || renderedColor_ != rgb.colorIndex) {
-        const String value = choiceText(RgbService::paletteName(rgb.colorIndex));
+        const String value = choiceText(paletteText(rgb.colorIndex));
         lv_label_set_text(valueLabels_[2], value.c_str());
         uint8_t red = 0;
         uint8_t green = 0;
@@ -141,7 +169,7 @@ void RgbSettingsApp::onUpdateView(AppContext& context) {
         renderedBrightness_ = rgb.brightnessPercent;
     }
     if (!renderedValid_ || renderedSpeed_ != rgb.speedIndex) {
-        const String value = choiceText(RgbService::speedName(rgb.speedIndex));
+        const String value = choiceText(speedText(rgb.speedIndex));
         lv_label_set_text(valueLabels_[4], value.c_str());
         renderedSpeed_ = rgb.speedIndex;
     }

@@ -15,6 +15,9 @@
 - 反馈：击中/击碎砖块、挡板反弹、丢球和过关使用现有 `AudioService`；丢球与过关在手柄连接时请求短震动。
 - 效果：每次击碎砖块从定长 30 元素粒子池发射 5 个碎片，不创建 LVGL 子对象，也不在游戏循环中动态分配内存。
 - 持久化：`BreakoutScoreService` 使用独立 `pgos_breakout` NVS namespace 保存 Top 5；每局只入榜一次，避免 Game Over 和离开页面重复写入同一成绩。
+
+> 2026-07-20：实验 017 将同构实现合并为 `GameScoreService`，上述
+> `pgos_breakout` namespace、schema=1 和每局一次入榜规则保持不变。
 - 入口：Launcher 的 Breakout 卡片、USB/TCP `page breakout` 或 `game breakout`，以及 `tools/playground_console.py` 的 `B` 快捷键。
 
 ## 主机验证

@@ -16,6 +16,11 @@
 
 PlaygroundOS 第一阶段基座已建立：`SystemKernel`、`AppManager`、`DisplayService`、`ConsoleService` 和 `WifiService` 已在 `src/` 下分层，System、Color Lab、Display Settings 和 Network 作为前台 App 运行。
 
+2026-07-20 完成第一轮 Shell 架构回收：桌面收敛为 Games / Settings /
+System Tools 三个父菜单，`AppManager` 保存父页面历史，Back 逐级返回而 Home
+清空历史回桌面；菜单复用同一个数据驱动 `MenuApp`。Shell 正文和卡片已汉化，
+大字号标题与游戏 HUD 保留英文，并引入独立 Lucide 图标资源。
+
 - 连接家庭 2.4 GHz 路由器。
 - 显示 SSID、IP、RSSI 和重连次数。
 - USB 命令支持 `wifi status`、`wifi scan`、`wifi reconnect`。
@@ -39,7 +44,8 @@ PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16
 
 - Snake、Tetris 和 Breakout 均作为独立前台 App 使用 LVGL 单一自绘面，不直接访问显示硬件，也不创建游戏元素子对象。
 - Xbox 手柄连续状态由游戏按帧采样，A/B/Home 和 D-pad 事件仍经过统一输入路由；USB/TCP 保留低频语义命令用于调试。
-- 三款游戏分别使用独立 NVS namespace 保存 Top 5，动态过程不写 Flash。
+- 三款游戏通过同一个可配置 `GameScoreService` 保存 Top 5，继续沿用各自独立
+  NVS namespace 和 schema；动态过程不写 Flash。
 - Breakout 首次引入 8ms 固定步进连续碰撞和定长碎片池，主机测试与固件构建已通过，真机操控、碰撞边界、DMA 刷新、音效和震动仍待验证。
 
 ## 随后：PGOS Studio 媒体与工具能力

@@ -60,30 +60,44 @@ void ControllerSettingsApp::onCommand(const AppCommand& command,
 void ControllerSettingsApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* ControllerSettingsApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("CONTROLLER / BLUETOOTH", "Controller",
-                                      "BLE gamepad and power policy");
+    root_ = context.ui.createPageRoot(nullptr, "Controller",
+                                      "蓝牙手柄与断开策略");
 
-    statusCard_ = context.ui.createCard(root_, 58, LV_SYMBOL_BLUETOOTH,
-                                        "Reconnect standby",
-                                        "Automatic bounded scan");
-    statusValue_ = context.ui.createLabel(statusCard_.root, "Scan off", 196,
+    statusCard_ = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y,
+                                        UiIcon::Bluetooth,
+                                        "等待连接", "自动限时重连扫描");
+    statusValue_ = context.ui.createLabel(statusCard_.root, "未扫描", 196,
                                           10, 12, context.ui.muted());
+    context.ui.applyBodyFont(statusValue_);
     lv_obj_set_width(statusValue_, 76);
     lv_label_set_long_mode(statusValue_, LV_LABEL_LONG_CLIP);
     lv_obj_align(statusValue_, LV_ALIGN_RIGHT_MID, -9, 0);
 
-    rows_[0] = context.ui.createCard(root_, 108, LV_SYMBOL_REFRESH,
-                                     "Pair controller", "Bounded 60 second scan");
-    rows_[1] = context.ui.createCard(root_, 158, LV_SYMBOL_POWER,
-                                     "Idle disconnect", "No meaningful input timeout");
-    rows_[2] = context.ui.createCard(root_, 208, LV_SYMBOL_VOLUME_MAX,
-                                     "Rumble test", "Verify controller feedback");
-    rows_[3] = context.ui.createCard(root_, 258, LV_SYMBOL_CLOSE,
-                                     "Disconnect now", "Saved bond is kept");
+    rows_[0] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y + UiRuntime::CARD_STEP_Y,
+        UiIcon::Gamepad,
+                                     "配对手柄", "开启 60 秒限时扫描");
+    rows_[1] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y +
+                   2 * UiRuntime::CARD_STEP_Y,
+        UiIcon::Settings,
+                                     "空闲断开", nullptr);
+    rows_[2] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y +
+                   3 * UiRuntime::CARD_STEP_Y,
+        UiIcon::Gamepad,
+                                     "震动测试", nullptr);
+    rows_[3] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_WITH_SUBTITLE_Y +
+                   4 * UiRuntime::CARD_STEP_Y,
+        UiIcon::Bluetooth,
+                                     "立即断开", "保留已保存的配对关系");
 
     for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
         valueLabels_[index] = context.ui.createLabel(
             rows_[index].root, "", 196, 10, 12, context.ui.text());
+        context.ui.applyBodyFont(valueLabels_[index]);
         lv_obj_set_width(valueLabels_[index], 76);
         lv_label_set_long_mode(valueLabels_[index], LV_LABEL_LONG_CLIP);
         lv_obj_align(valueLabels_[index], LV_ALIGN_RIGHT_MID, -9, 0);
@@ -119,14 +133,14 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
         renderedPacketCount_ != gamepad.packetCount) {
         if (gamepad.connected) {
             lv_label_set_text(statusCard_.title,
-                              gamepad.model[0] == '\0' ? "Gamepad connected"
+                              gamepad.model[0] == '\0' ? "手柄已连接"
                                                        : gamepad.model);
             char detail[48];
             snprintf(detail, sizeof(detail), "VID %04X / PID %04X",
                      gamepad.vendorId, gamepad.productId);
             lv_label_set_text(statusCard_.subtitle, detail);
             if (gamepad.battery == 0) {
-                lv_label_set_text(statusValue_, "Battery ?");
+                lv_label_set_text(statusValue_, "电量 ?");
             } else {
                 const uint32_t batteryPercent =
                     (static_cast<uint32_t>(gamepad.battery) * 100U + 127U) / 255U;
@@ -136,43 +150,43 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
                 lv_label_set_text(statusValue_, batteryText);
             }
         } else if (gamepad.scanMode == GamepadScanMode::Pairing) {
-            lv_label_set_text(statusCard_.title, "Pairing scan");
+            lv_label_set_text(statusCard_.title, "正在配对");
             lv_label_set_text(statusCard_.subtitle,
-                              "New and bonded controllers accepted");
+                              "接受新手柄和已配对手柄");
             char scanText[16];
-            snprintf(scanText, sizeof(scanText), "%lus left",
+            snprintf(scanText, sizeof(scanText), "%lu 秒",
                      static_cast<unsigned long>(scanSeconds));
             lv_label_set_text(statusValue_, scanText);
         } else if (gamepad.scanMode == GamepadScanMode::Reconnect) {
-            lv_label_set_text(statusCard_.title, "Reconnect scan");
+            lv_label_set_text(statusCard_.title, "正在重连");
             lv_label_set_text(statusCard_.subtitle,
-                              "Looking for a controller");
+                              "正在查找已配对手柄");
             char scanText[16];
-            snprintf(scanText, sizeof(scanText), "%lus left",
+            snprintf(scanText, sizeof(scanText), "%lu 秒",
                      static_cast<unsigned long>(scanSeconds));
             lv_label_set_text(statusValue_, scanText);
         } else if (gamepad.reconnectScheduled) {
-            lv_label_set_text(statusCard_.title, "Reconnect standby");
+            lv_label_set_text(statusCard_.title, "等待重连");
             lv_label_set_text(statusCard_.subtitle,
-                              "Automatic bounded scan");
+                              "稍后自动开启限时扫描");
             char waitText[16];
-            snprintf(waitText, sizeof(waitText), "%lus to scan",
+            snprintf(waitText, sizeof(waitText), "%lu 秒后",
                      static_cast<unsigned long>(reconnectSeconds));
             lv_label_set_text(statusValue_, waitText);
         } else {
-            lv_label_set_text(statusCard_.title, "Waiting");
+            lv_label_set_text(statusCard_.title, "等待连接");
             lv_label_set_text(statusCard_.subtitle,
-                              "Start a pairing scan");
-            lv_label_set_text(statusValue_, "Scan off");
+                              "可手动启动配对扫描");
+            lv_label_set_text(statusValue_, "未扫描");
         }
         lv_label_set_text(
             valueLabels_[0],
-            gamepad.scanMode == GamepadScanMode::Pairing ? "< Stop >"
-                                                         : "< Pair >");
-        lv_label_set_text(valueLabels_[2], gamepad.connected ? "< Test >"
-                                                             : "Unavailable");
-        lv_label_set_text(valueLabels_[3], gamepad.connected ? "< Disconnect >"
-                                                             : "Unavailable");
+            gamepad.scanMode == GamepadScanMode::Pairing ? "< 停止 >"
+                                                         : "< 配对 >");
+        lv_label_set_text(valueLabels_[2], gamepad.connected ? "< 测试 >"
+                                                             : "不可用");
+        lv_label_set_text(valueLabels_[3], gamepad.connected ? "< 断开 >"
+                                                             : "不可用");
         renderedConnected_ = gamepad.connected;
         renderedScanning_ = gamepad.scanning;
         renderedScanMode_ = gamepad.scanMode;
@@ -249,7 +263,7 @@ uint8_t ControllerSettingsApp::idleTimeoutIndex(uint32_t timeoutMs) const {
 
 String ControllerSettingsApp::idleTimeoutText(uint32_t timeoutMs) const {
     if (timeoutMs == 0) {
-        return "Never";
+        return "永不";
     }
-    return String(timeoutMs / 60000UL) + " min";
+    return String(timeoutMs / 60000UL) + " 分钟";
 }

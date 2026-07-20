@@ -63,20 +63,23 @@ void SoundSettingsApp::onCommand(const AppCommand& command,
 void SoundSettingsApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* SoundSettingsApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("SOUND / AUDIO", "Sound");
+    root_ = context.ui.createPageRoot(nullptr, "Sound");
 
-    rows_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_VOLUME_MAX,
-                                     "Volume", "small-speaker loudness curve");
-    rows_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_BELL,
-                                     "Feedback sound", "Short navigation tone");
-    rows_[2] = context.ui.createCard(root_, 158, LV_SYMBOL_PLAY,
-                                     "Test tone", "Play a short speaker check");
+    rows_[0] = context.ui.createCard(root_, UiRuntime::CARD_START_Y, UiIcon::Sound,
+                                     "音量", nullptr);
+    rows_[1] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + UiRuntime::CARD_STEP_Y, UiIcon::Sound,
+                                     "操作提示音", nullptr);
+    rows_[2] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + 2 * UiRuntime::CARD_STEP_Y, UiIcon::Sound,
+                                     "扬声器测试", nullptr);
 
     for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
         valueLabels_[index] = context.ui.createLabel(
-            rows_[index].root, index == 0 ? "< 60% >" : index == 1 ? "< Off >"
-                                                                     : "Play",
+            rows_[index].root, index == 0 ? "< 60% >" : index == 1 ? "< 关 >"
+                                                                     : "播放",
             194, 12, 12, context.ui.text());
+        context.ui.applyBodyFont(valueLabels_[index]);
         lv_obj_set_width(valueLabels_[index], 78);
         lv_label_set_long_mode(valueLabels_[index], LV_LABEL_LONG_CLIP);
         lv_obj_align(valueLabels_[index], LV_ALIGN_RIGHT_MID, -9, 0);
@@ -102,18 +105,18 @@ void SoundSettingsApp::onUpdateView(AppContext& context) {
     const bool feedback = audio.feedbackEnabled();
     const bool ready = audio.ready();
     if (renderedVolume_ != volume || renderedReady_ != ready) {
-        const String value = ready ? volumeText(audio) : "Unavailable";
+        const String value = ready ? volumeText(audio) : "不可用";
         lv_label_set_text(valueLabels_[0], value.c_str());
         renderedVolume_ = volume;
     }
     if (renderedFeedback_ != feedback || renderedReady_ != ready) {
-        const String value = ready ? choiceText(feedback ? "On" : "Off")
-                                   : "Unavailable";
+        const String value = ready ? choiceText(feedback ? "开" : "关")
+                                   : "不可用";
         lv_label_set_text(valueLabels_[1], value.c_str());
         renderedFeedback_ = feedback;
     }
     if (renderedReady_ != ready) {
-        const String value = ready ? "Play" : "Unavailable";
+        const String value = ready ? "播放" : "不可用";
         lv_label_set_text(valueLabels_[2], value.c_str());
         renderedReady_ = ready;
     }

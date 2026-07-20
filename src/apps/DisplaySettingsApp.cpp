@@ -66,17 +66,19 @@ void DisplaySettingsApp::onCommand(const AppCommand& command,
 void DisplaySettingsApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* DisplaySettingsApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("DISPLAY / SYSTEM", "Display");
+    root_ = context.ui.createPageRoot(nullptr, "Display");
 
-    rows_[0] = context.ui.createCard(root_, 58, LV_SYMBOL_EYE_OPEN,
-                                     "Brightness", "Backlight intensity");
-    rows_[1] = context.ui.createCard(root_, 108, LV_SYMBOL_POWER,
-                                     "Screen timeout", "Idle backlight timer");
+    rows_[0] = context.ui.createCard(root_, UiRuntime::CARD_START_Y, UiIcon::Display,
+                                     "亮度", nullptr);
+    rows_[1] = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y + UiRuntime::CARD_STEP_Y, UiIcon::Display,
+                                     "自动息屏", nullptr);
 
     for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
         valueLabels_[index] = context.ui.createLabel(
-            rows_[index].root, index == 0 ? "< 100% >" : "< Never >",
+            rows_[index].root, index == 0 ? "< 100% >" : "< 永不 >",
             200, 10, 12, context.ui.text());
+        context.ui.applyBodyFont(valueLabels_[index]);
         lv_obj_set_width(valueLabels_[index], 72);
         lv_label_set_long_mode(valueLabels_[index], LV_LABEL_LONG_CLIP);
         lv_obj_align(valueLabels_[index], LV_ALIGN_RIGHT_MID, -9, -5);
@@ -180,13 +182,13 @@ uint8_t DisplaySettingsApp::timeoutIndex(uint32_t seconds) const {
 
 String DisplaySettingsApp::timeoutText(uint32_t seconds) const {
     if (seconds == 0) {
-        return "Never";
+        return "永不";
     }
     if (seconds < 60) {
-        return String(seconds) + " sec";
+        return String(seconds) + " 秒";
     }
     if (seconds % 60 == 0) {
-        return String(seconds / 60U) + " min";
+        return String(seconds / 60U) + " 分钟";
     }
-    return String(seconds) + " sec";
+    return String(seconds) + " 秒";
 }

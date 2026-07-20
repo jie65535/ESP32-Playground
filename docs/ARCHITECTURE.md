@@ -14,8 +14,8 @@ Playground 可以演进为一台带屏幕、键盘、Wi-Fi、BLE 和音频能力
 main.cpp
    │
 SystemKernel / AppManager
-   ├── Launcher（桌面）
-   ├── Settings（设置）
+   ├── Launcher（游戏 / 设置 / 系统工具）
+   ├── MenuApp（数据驱动的父菜单）
    ├── Apps（信息、网络、游戏、实验）
    └── Services
        ├── Display / Input
@@ -47,16 +47,36 @@ public:
 
 应用由编译期 `AppRegistry` 注册，不做运行时下载和动态链接。新增应用只需要创建一个目录、实现接口并加入注册表。
 
-建议首批应用：
+当前 Shell 应用：
 
-- `LauncherApp`：桌面/应用列表和状态栏。
-- `SettingsApp`：Wi-Fi、BLE、服务器、设备名和系统选项。
+- `MenuApp`：由静态 `MenuDefinition` 驱动桌面、游戏、设置和系统工具菜单，
+  不为每个菜单复制一套 App 生命周期和选择逻辑。
+- 设置类 App：显示、声音、RGB、手柄、Wi-Fi 和远程控制。
 - `SystemInfoApp`：当前板卡、内存和运行时间页面。
 - `DisplayTestApp`：颜色、字体和截图实验。
 - `NetworkConsoleApp`：服务器发现、连接状态和吞吐测试。
 - `MazeApp`、`PacmanApp`：独立小游戏，不直接操作系统服务。
 
 无触摸屏更适合按键机式列表、分页或轮播桌面，不必复制手机图标网格。
+
+### 2026-07-20 架构审查结论
+
+本轮先收敛已经出现真实重复或直接影响操作的部分：
+
+1. 平铺 Launcher 已超过一屏，改为三类父菜单；菜单描述由数据表维护。
+2. `AppManager` 增加最多四层的父页面历史。应用请求进入子页面时 Push，
+   Back Pop，Home 清空历史；调试用 `page ...` 仍是无历史直达。
+3. Snake、Tetris、Breakout 三份同构 Top 5 服务合并成一个
+   `GameScoreService`，构造参数保留原 NVS namespace/schema，避免清榜。
+4. 卡片图标改为 `UiIcon` + `PgosUiIcons` 资源边界。当前使用固定版本的
+   Lucide 24×24 A8 遮罩，状态栏的通用连接符号仍可继续使用 LVGL 内置字形。
+5. Shell 正文明确使用 Fusion Pixel 16px 行盒；24/28px 标题和依赖既有
+   大字号度量的游戏 HUD 暂保留英文。卡片统一为 44px 高、8px 间距，
+   副标题仅用于标题和当前值无法表达的状态、限制或特殊逻辑。
+
+本轮没有把 Display/Audio/RGB 等硬件服务合并；它们拥有不同硬件、状态机和
+持久化语义，强行共用基类只会隐藏所有权。`AppContext` 仍偏宽、设置页值控件仍
+有少量相似布局，这两项等出现第二个真实消费者或测试替身后再收敛。
 
 ## 系统服务
 
@@ -85,12 +105,12 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备�
 ```text
 采集输入/服务事件 → AppManager 路由 → 当前 App 更新视图 → lv_timer_handler → 局部 flush
 
-导航语义遵循手机式分层：Launcher 接收方向键移动应用选择，`Confirm` 进入应用；进入前台应用后，方向键只交给当前应用处理，不再跨应用切换；`Backspace/Back` 返回 Launcher，`Home` 仍表示直接回到桌面。调试控制台仍可使用 `page system` 等显式命令直达页面。
+导航语义遵循手机式分层：当前菜单接收方向键移动选择，`Confirm` Push 进入子菜单或应用；进入前台应用后，方向键只交给当前应用处理，不再跨应用切换；`Backspace/Back` Pop 返回父菜单，`Home` 清空历史并直接回到桌面。调试控制台仍可使用 `page system` 等显式命令无历史直达页面。
 ```
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
 
-页面转场区分进入和返回：进入前台应用使用 `Forward`（新页面从右侧进入），返回 Launcher 使用 `Backward`（重建的父页面先放在下层，当前应用向右退出并露出父页面）。所有页面根节点都是纵向滚动视口，焦点切换时由 `UiRuntime::centerFocused` 计算夹紧后的目标位置，用 ease-out 动画把项目拉向视口中心；顶部/底部不足半屏时保持边界，不制造空白。遥测刷新不能调用页面转场，也不能重播焦点动画。
+页面转场区分进入和返回：进入子页面使用 `Forward`（新页面从右侧进入），返回父页面使用 `Backward`（重建的父页面先放在下层，当前页面向右退出并露出父页面）。所有页面根节点都是纵向滚动视口，焦点切换时由 `UiRuntime::centerFocused` 计算夹紧后的目标位置，用 ease-out 动画把项目拉向视口中心；顶部/底部不足半屏时保持边界，不制造空白。遥测刷新不能调用页面转场，也不能重播焦点动画。
 
 ### Peak 项目的可迁移经验
 
@@ -203,7 +223,7 @@ src/
 
 1. 建立 `SystemKernel`、事件模型和服务接口，把现有显示、控制台、截图、Wi-Fi 从 `main.cpp` 迁出。
 2. 把当前三个页面迁移为 `SystemInfoApp`、`DisplayTestApp` 和 `SettingsApp/WiFi`。
-3. 增加按键式 `LauncherApp`，一次只激活一个前台应用。
+3. 增加按键式 `MenuApp`，由同一实现承载桌面和父菜单，一次只激活一个前台应用。
 4. 完成 Wi-Fi 开关、扫描列表、密码输入、服务器发现和手工地址设置。
 5. 加入网络控制台与独立吞吐测试。
 6. 再增加 BLE、小游戏、音频等应用；只有出现真实阻塞需求时才增加 FreeRTOS 专用任务。

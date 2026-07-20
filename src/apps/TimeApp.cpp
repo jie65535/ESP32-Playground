@@ -8,30 +8,38 @@ namespace {
 String statusDescription(const TimeSnapshot& snapshot) {
     if (snapshot.effectiveSource == TimeSource::Ntp) {
         if (snapshot.state == TimeState::Ready) {
-            return "NTP active / PCF8563 is ready";
+            return "NTP 已同步，RTC 正常";
         }
         if (snapshot.state == TimeState::NotFound) {
-            return "NTP active / PCF8563 not found";
+            return "NTP 已同步，未检测到 RTC";
         }
-        return "NTP active / RTC needs attention";
+        return "NTP 已同步，RTC 需检查";
     }
     switch (snapshot.state) {
         case TimeState::Ready:
-            return "Battery-backed local clock is valid";
+            return "电池时钟正常";
         case TimeState::VoltageLow:
-            return "VL set; clock integrity is not guaranteed";
+            return "RTC 电压低，时间可能不准";
         case TimeState::Stopped:
-            return "RTC clock stopped; set local time";
+            return "RTC 已停止，请重新设置";
         case TimeState::InvalidData:
-            return "Calendar fields invalid; set local time";
+            return "日历数据无效，请重新设置";
         case TimeState::ReadError:
-            return "I2C read failed; retrying automatically";
+            return "I2C 读取失败，正在重试";
         case TimeState::NotFound:
-            return "Module not found; retrying every 5 seconds";
+            return "未检测到模块，正在重试";
         case TimeState::BusUnavailable:
         default:
-            return "Shared I2C bus is unavailable";
+            return "I2C 总线不可用";
     }
+}
+
+const char* weekdayText(uint8_t weekday) {
+    constexpr const char* NAMES[] = {
+        "星期日", "星期一", "星期二", "星期三",
+        "星期四", "星期五", "星期六",
+    };
+    return NAMES[weekday % 7U];
 }
 
 }  // namespace
@@ -70,8 +78,7 @@ void TimeApp::onCommand(const AppCommand& command, AppContext&) {
 void TimeApp::onTick(uint32_t, AppContext&) {}
 
 lv_obj_t* TimeApp::onCreateView(AppContext& context) {
-    root_ = context.ui.createPageRoot("TIME / PCF8563", "Clock",
-                                      "Local wall time / no timezone stored");
+    root_ = context.ui.createPageRoot(nullptr, "Clock");
 
     timeLabel_ = context.ui.createLabel(root_, "--:--:--", 16, 68, 28,
                                         context.ui.accent());
@@ -83,15 +90,16 @@ lv_obj_t* TimeApp::onCreateView(AppContext& context) {
     lv_obj_set_width(dateLabel_, 288);
     lv_obj_set_style_text_align(dateLabel_, LV_TEXT_ALIGN_CENTER, 0);
 
-    weekdayLabel_ = context.ui.createLabel(root_, "Waiting for RTC", 16, 130,
+    weekdayLabel_ = context.ui.createLabel(root_, "等待有效时间", 16, 130,
                                            14, context.ui.muted());
+    context.ui.applyBodyFont(weekdayLabel_, true);
     lv_obj_set_width(weekdayLabel_, 288);
     lv_obj_set_style_text_align(weekdayLabel_, LV_TEXT_ALIGN_CENTER, 0);
 
-    statusCard_ = context.ui.createCard(root_, 160, LV_SYMBOL_LOOP,
-                                        "PCF8563 / 0x51", "Detecting module");
+    statusCard_ = context.ui.createCard(root_, 160, UiIcon::Clock,
+                                        "PCF8563 / 0x51", "正在检测模块");
     setCard_ = context.ui.createCard(
-        root_, 210, LV_SYMBOL_EDIT, "Set local time",
+        root_, 212, UiIcon::Clock, "设置本地时间",
         "USB: time set YYYY-MM-DD HH:MM:SS");
     return root_;
 }
@@ -128,9 +136,8 @@ void TimeApp::onUpdateView(AppContext& context) {
     lv_label_set_text(dateLabel_, dateText);
     lv_label_set_text(weekdayLabel_,
                       snapshot.effectiveTimeValid
-                          ? TimeService::weekdayName(
-                                snapshot.effectiveDateTime.weekday)
-                          : "Waiting for valid calendar data");
+                          ? weekdayText(snapshot.effectiveDateTime.weekday)
+                          : "等待有效日历数据");
 
     const bool timeReady = snapshot.effectiveTimeValid;
     const bool rtcReady = snapshot.state == TimeState::Ready;
@@ -138,23 +145,18 @@ void TimeApp::onUpdateView(AppContext& context) {
                                 timeReady ? context.ui.accent()
                                           : context.ui.muted(),
                                 0);
-    lv_label_set_text(statusCard_.iconLabel,
-                      rtcReady ? LV_SYMBOL_OK
-                            : snapshot.state == TimeState::NotFound
-                                  ? LV_SYMBOL_CLOSE
-                                  : LV_SYMBOL_WARNING);
-    lv_obj_set_style_text_color(
-        statusCard_.iconLabel,
+    lv_obj_set_style_image_recolor(
+        statusCard_.iconGraphic,
         selected_ == 0
             ? context.ui.background()
             : rtcReady ? context.ui.accent() : context.ui.text(),
-                                0);
+        0);
     const String status = statusDescription(snapshot);
     lv_label_set_text(statusCard_.subtitle, status.c_str());
     const String syncStatus = snapshot.ntpSynced
-                                  ? "NTP synced / USB override available"
+                                  ? "NTP 已同步，可用 USB 覆盖"
                                   : snapshot.ntpConfigured
-                                        ? "NTP pending / USB time set available"
-                                        : "Wi-Fi NTP auto / USB time set available";
+                                        ? "等待 NTP，可用 USB 设置"
+                                        : "联网后自动 NTP 校时";
     lv_label_set_text(setCard_.subtitle, syncStatus.c_str());
 }
