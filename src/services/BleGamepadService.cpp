@@ -9,12 +9,6 @@ BleGamepadService* BleGamepadService::instance_ = nullptr;
 
 namespace {
 
-// Bluepad32 normalizes common gamepads to roughly -512..512 for sticks and
-// 0..1023 for triggers.  Ignore center jitter but treat a held analog control
-// as activity so it cannot be disconnected during active gameplay.
-constexpr int16_t AXIS_ACTIVITY_THRESHOLD = 64;
-constexpr uint16_t TRIGGER_ACTIVITY_THRESHOLD = 32;
-
 bool validAutoDisconnect(uint32_t timeoutMs) {
     return timeoutMs == 0 ||
            (timeoutMs >= 5UL * 60UL * 1000UL &&
@@ -68,19 +62,19 @@ void BleGamepadService::tick(uint32_t nowMs) {
     }
 
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
-    if (scanning_ && static_cast<int32_t>(nowMs - scanDeadlineMs_) >= 0) {
-        stopPairingScan();
-    }
     if (BP32.update()) {
         updateController(nowMs);
     }
-    // Once a controller is connected, discovery is no longer needed.  The
-    // Bluepad32's BLE discovery window otherwise runs continuously at full
-    // duty; a
-    // bonded controller can reconnect while discovery is disabled, so this
-    // avoids leaving the radio in a continuous 100%-duty scan.
-    if (snapshot_.connected && scanning_) {
-        stopPairingScan();
+    if (snapshot_.connected) {
+        reconnectScheduler_.cancel();
+        if (scanning_) {
+            stopScan(nowMs, false);
+        }
+    } else if (scanning_ &&
+               static_cast<int32_t>(nowMs - scanDeadlineMs_) >= 0) {
+        stopScan(nowMs, true);
+    } else if (!scanning_ && reconnectScheduler_.due(nowMs)) {
+        startScan(GamepadScanMode::Reconnect, RECONNECT_SCAN_WINDOW_MS, nowMs);
     }
     if (snapshot_.connected && !disconnectPending_ && autoDisconnectMs_ > 0 &&
         lastActivityMs_ != 0 &&
@@ -89,7 +83,7 @@ void BleGamepadService::tick(uint32_t nowMs) {
         if (log_ != nullptr) {
             log_->println(F("[gamepad] idle timeout; disconnecting controller"));
         }
-        disconnectController();
+        disconnectController(DisconnectReason::Idle);
     }
 #else
     (void)nowMs;
@@ -134,22 +128,8 @@ bool BleGamepadService::requestRumble(uint16_t durationMs,
 
 bool BleGamepadService::startPairingScan() {
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
-    if (!started_ || snapshot_.connected) {
-        return false;
-    }
     const uint32_t nowMs = millis();
-    scanDeadlineMs_ = nowMs + PAIRING_SCAN_WINDOW_MS;
-    if (!scanning_) {
-        BP32.enableNewBluetoothConnections(true);
-        scanning_ = true;
-        scanStartCount_++;
-        if (log_ != nullptr) {
-            log_->printf("[gamepad] pairing scan started duration=%lums\n",
-                         static_cast<unsigned long>(PAIRING_SCAN_WINDOW_MS));
-        }
-    }
-    updateSnapshotMeta(nowMs);
-    return true;
+    return startScan(GamepadScanMode::Pairing, PAIRING_SCAN_WINDOW_MS, nowMs);
 #else
     return false;
 #endif
@@ -157,20 +137,16 @@ bool BleGamepadService::startPairingScan() {
 
 void BleGamepadService::stopPairingScan() {
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
-    if (!scanning_) {
-        return;
-    }
-    BP32.enableNewBluetoothConnections(false);
-    scanning_ = false;
-    scanDeadlineMs_ = 0;
-    if (log_ != nullptr) {
-        log_->println(F("[gamepad] pairing scan stopped"));
-    }
-    updateSnapshotMeta(millis());
+    const uint32_t nowMs = millis();
+    stopScan(nowMs, !snapshot_.connected);
 #endif
 }
 
 bool BleGamepadService::disconnectController() {
+    return disconnectController(DisconnectReason::Manual);
+}
+
+bool BleGamepadService::disconnectController(DisconnectReason reason) {
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
     if (disconnectPending_) {
         return true;
@@ -179,8 +155,16 @@ bool BleGamepadService::disconnectController() {
         if (controller == nullptr || !controller->isConnected()) {
             continue;
         }
-        stopPairingScan();
+        const uint32_t nowMs = millis();
+        stopScan(nowMs, false);
+        reconnectScheduler_.cancel();
         disconnectPending_ = true;
+        disconnectReason_ = reason;
+        if (log_ != nullptr) {
+            log_->println(reason == DisconnectReason::Idle
+                              ? F("[gamepad] disconnect requested reason=idle")
+                              : F("[gamepad] disconnect requested reason=manual"));
+        }
         controller->disconnect();
         return true;
     }
@@ -204,13 +188,24 @@ uint32_t BleGamepadService::autoDisconnectMs() const {
 void BleGamepadService::printStatus(Print& output) const {
     output.print(F("[gamepad] state="));
     output.print(snapshot_.connected ? F("connected")
-                                     : snapshot_.scanning ? F("scanning")
-                                                          : F("waiting"));
+                                     : snapshot_.scanning
+                                           ? snapshot_.scanMode ==
+                                                     GamepadScanMode::Pairing
+                                                 ? F("pairing")
+                                                 : F("reconnecting")
+                                           : F("standby"));
     output.print(F(" scan="));
-    output.print(snapshot_.scanning ? F("on") : F("off"));
+    output.print(snapshot_.scanMode == GamepadScanMode::Pairing
+                     ? F("pairing")
+                     : snapshot_.scanMode == GamepadScanMode::Reconnect
+                           ? F("reconnect")
+                           : F("off"));
     if (snapshot_.scanning) {
         output.print(F(" remaining_ms="));
         output.print(snapshot_.scanRemainingMs);
+    } else if (snapshot_.reconnectScheduled) {
+        output.print(F(" next_scan_ms="));
+        output.print(snapshot_.reconnectRemainingMs);
     }
     if (snapshot_.connected) {
         output.print(F(" slot="));
@@ -229,8 +224,22 @@ void BleGamepadService::printStatus(Print& output) const {
         output.print(snapshot_.model);
         output.print(F(" packets="));
         output.print(snapshot_.packetCount);
-        output.print(F(" idle_ms="));
+        output.print(F(" timeout_ms="));
         output.print(snapshot_.autoDisconnectMs);
+        output.print(F(" input_age_ms="));
+        output.print(millis() - lastActivityMs_);
+        output.print(F(" axes="));
+        output.print(snapshot_.axisX);
+        output.print(',');
+        output.print(snapshot_.axisY);
+        output.print(',');
+        output.print(snapshot_.axisRX);
+        output.print(',');
+        output.print(snapshot_.axisRY);
+        output.print(F(" triggers="));
+        output.print(snapshot_.brake);
+        output.print(',');
+        output.print(snapshot_.throttle);
     }
     output.print(F(" scans="));
     output.print(snapshot_.scanStartCount);
@@ -243,10 +252,15 @@ void BleGamepadService::printStatus(Print& output) const {
 void BleGamepadService::updateSnapshotMeta(uint32_t nowMs) {
     snapshot_.enabled = started_;
     snapshot_.scanning = scanning_;
+    snapshot_.scanMode = scanMode_;
+    snapshot_.reconnectScheduled =
+        !snapshot_.connected && !scanning_ && reconnectScheduler_.scheduled();
     snapshot_.scanRemainingMs =
         scanning_ && static_cast<int32_t>(scanDeadlineMs_ - nowMs) > 0
             ? scanDeadlineMs_ - nowMs
             : 0;
+    snapshot_.reconnectRemainingMs =
+        snapshot_.reconnectScheduled ? reconnectScheduler_.remainingMs(nowMs) : 0;
     snapshot_.lastInputMs = lastActivityMs_;
     snapshot_.connectedSinceMs = connectedSinceMs_;
     snapshot_.autoDisconnectMs = autoDisconnectMs_;
@@ -271,6 +285,58 @@ void BleGamepadService::pushEvent(GamepadEventType type, uint8_t slot,
     eventQueue_[eventTail_].code = code;
     eventTail_ = static_cast<uint8_t>((eventTail_ + 1U) % EVENT_QUEUE_SIZE);
     eventCount_++;
+}
+
+bool BleGamepadService::startScan(GamepadScanMode mode, uint32_t durationMs,
+                                  uint32_t nowMs) {
+#if defined(PGOS_BLE_GAMEPAD_BACKEND)
+    if (!started_ || snapshot_.connected || mode == GamepadScanMode::None) {
+        return false;
+    }
+    reconnectScheduler_.cancel();
+    scanDeadlineMs_ = nowMs + durationMs;
+    const bool wasScanning = scanning_;
+    scanMode_ = mode;
+    if (!wasScanning) {
+        BP32.enableNewBluetoothConnections(true);
+        scanning_ = true;
+        scanStartCount_++;
+    }
+    if (log_ != nullptr) {
+        log_->printf("[gamepad] %s scan %s duration=%lums\n",
+                     mode == GamepadScanMode::Pairing ? "pairing" : "reconnect",
+                     wasScanning ? "extended" : "started",
+                     static_cast<unsigned long>(durationMs));
+    }
+    updateSnapshotMeta(nowMs);
+    return true;
+#else
+    (void)mode;
+    (void)durationMs;
+    (void)nowMs;
+    return false;
+#endif
+}
+
+void BleGamepadService::stopScan(uint32_t nowMs, bool scheduleReconnect) {
+#if defined(PGOS_BLE_GAMEPAD_BACKEND)
+    if (scanning_) {
+        BP32.enableNewBluetoothConnections(false);
+        scanning_ = false;
+        scanMode_ = GamepadScanMode::None;
+        scanDeadlineMs_ = 0;
+        if (log_ != nullptr) {
+            log_->println(F("[gamepad] scan stopped"));
+        }
+    }
+    if (scheduleReconnect && !snapshot_.connected) {
+        reconnectScheduler_.scheduleAfterScan(nowMs);
+    }
+    updateSnapshotMeta(nowMs);
+#else
+    (void)nowMs;
+    (void)scheduleReconnect;
+#endif
 }
 
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
@@ -305,7 +371,10 @@ void BleGamepadService::handleConnected(ControllerPtr controller) {
         previousButtons_ = 0;
         previousDpad_ = 0;
         previousMiscButtons_ = 0;
+        activityTracker_.reset();
+        reconnectScheduler_.cancel();
         disconnectPending_ = false;
+        disconnectReason_ = DisconnectReason::None;
         connectedSinceMs_ = millis();
         lastActivityMs_ = connectedSinceMs_;
         pushEvent(GamepadEventType::Connected, slot, 0);
@@ -328,11 +397,22 @@ void BleGamepadService::handleDisconnected(ControllerPtr controller) {
         }
         controllers_[slot] = nullptr;
         pushEvent(GamepadEventType::Disconnected, slot, 0);
+        const DisconnectReason reason = disconnectReason_;
         disconnectPending_ = false;
+        disconnectReason_ = DisconnectReason::None;
         disconnectCount_++;
         clearSnapshot();
+        const uint32_t nowMs = millis();
+        if (reason == DisconnectReason::None) {
+            reconnectScheduler_.scheduleAfterUnexpectedDisconnect(nowMs);
+        } else {
+            reconnectScheduler_.scheduleAfterIntentionalDisconnect(nowMs);
+        }
         if (log_ != nullptr) {
-            log_->printf("[gamepad] disconnected slot=%u\n", slot);
+            log_->printf("[gamepad] disconnected slot=%u reconnect_in=%lums\n",
+                         slot,
+                         static_cast<unsigned long>(
+                             reconnectScheduler_.remainingMs(nowMs)));
         }
         return;
     }
@@ -344,6 +424,7 @@ void BleGamepadService::clearSnapshot() {
     previousButtons_ = 0;
     previousDpad_ = 0;
     previousMiscButtons_ = 0;
+    activityTracker_.reset();
     lastActivityMs_ = 0;
     connectedSinceMs_ = 0;
 }
@@ -366,20 +447,17 @@ void BleGamepadService::updateController(uint32_t nowMs) {
         const int16_t axisRY = clampAxis(controller->axisRY());
         const uint16_t brake = clampTrigger(controller->brake());
         const uint16_t throttle = clampTrigger(controller->throttle());
-        const bool analogActivity =
-            std::abs(static_cast<int32_t>(axisX)) >=
-                AXIS_ACTIVITY_THRESHOLD ||
-            std::abs(static_cast<int32_t>(axisY)) >=
-                AXIS_ACTIVITY_THRESHOLD ||
-            std::abs(static_cast<int32_t>(axisRX)) >=
-                AXIS_ACTIVITY_THRESHOLD ||
-            std::abs(static_cast<int32_t>(axisRY)) >=
-                AXIS_ACTIVITY_THRESHOLD ||
-            brake >= TRIGGER_ACTIVITY_THRESHOLD ||
-            throttle >= TRIGGER_ACTIVITY_THRESHOLD;
-        if (buttons != previousButtons_ || dpad != previousDpad_ ||
-            miscButtons != previousMiscButtons_ || buttons != 0 || dpad != 0 ||
-            miscButtons != 0 || analogActivity) {
+        pgos::GamepadActivitySample activitySample;
+        activitySample.buttons = buttons;
+        activitySample.dpad = dpad;
+        activitySample.miscButtons = miscButtons;
+        activitySample.axes[0] = axisX;
+        activitySample.axes[1] = axisY;
+        activitySample.axes[2] = axisRX;
+        activitySample.axes[3] = axisRY;
+        activitySample.triggers[0] = brake;
+        activitySample.triggers[1] = throttle;
+        if (activityTracker_.update(activitySample)) {
             lastActivityMs_ = nowMs;
         }
         const uint16_t buttonChanges = buttons ^ previousButtons_;

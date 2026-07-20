@@ -19,7 +19,9 @@ void ControllerSettingsApp::onEnter(AppContext&) {
     renderedSelected_ = -1;
     renderedConnected_ = false;
     renderedScanning_ = false;
+    renderedScanMode_ = GamepadScanMode::None;
     renderedScanSeconds_ = UINT32_MAX;
+    renderedReconnectSeconds_ = UINT32_MAX;
     renderedTimeoutMs_ = UINT32_MAX;
     renderedPacketCount_ = UINT32_MAX;
 }
@@ -62,7 +64,8 @@ lv_obj_t* ControllerSettingsApp::onCreateView(AppContext& context) {
                                       "BLE gamepad and power policy");
 
     statusCard_ = context.ui.createCard(root_, 58, LV_SYMBOL_BLUETOOTH,
-                                        "Waiting", "Bonded pads may reconnect");
+                                        "Reconnect standby",
+                                        "Automatic bounded scan");
     statusValue_ = context.ui.createLabel(statusCard_.root, "Scan off", 196,
                                           10, 12, context.ui.muted());
     lv_obj_set_width(statusValue_, 76);
@@ -96,6 +99,9 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
     const GamepadSnapshot& gamepad = context.gamepad.snapshot();
     const uint32_t scanSeconds =
         gamepad.scanning ? (gamepad.scanRemainingMs + 999U) / 1000U : 0;
+    const uint32_t reconnectSeconds = gamepad.reconnectScheduled
+        ? (gamepad.reconnectRemainingMs + 999U) / 1000U
+        : 0;
 
     if (renderedSelected_ != static_cast<int8_t>(selected_)) {
         for (uint8_t index = 0; index < SETTING_COUNT; ++index) {
@@ -107,7 +113,9 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
 
     if (renderedConnected_ != gamepad.connected ||
         renderedScanning_ != gamepad.scanning ||
+        renderedScanMode_ != gamepad.scanMode ||
         renderedScanSeconds_ != scanSeconds ||
+        renderedReconnectSeconds_ != reconnectSeconds ||
         renderedPacketCount_ != gamepad.packetCount) {
         if (gamepad.connected) {
             lv_label_set_text(statusCard_.title,
@@ -127,7 +135,7 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
                          static_cast<unsigned long>(batteryPercent));
                 lv_label_set_text(statusValue_, batteryText);
             }
-        } else if (gamepad.scanning) {
+        } else if (gamepad.scanMode == GamepadScanMode::Pairing) {
             lv_label_set_text(statusCard_.title, "Pairing scan");
             lv_label_set_text(statusCard_.subtitle,
                               "New and bonded controllers accepted");
@@ -135,21 +143,41 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
             snprintf(scanText, sizeof(scanText), "%lus left",
                      static_cast<unsigned long>(scanSeconds));
             lv_label_set_text(statusValue_, scanText);
+        } else if (gamepad.scanMode == GamepadScanMode::Reconnect) {
+            lv_label_set_text(statusCard_.title, "Reconnect scan");
+            lv_label_set_text(statusCard_.subtitle,
+                              "Looking for a controller");
+            char scanText[16];
+            snprintf(scanText, sizeof(scanText), "%lus left",
+                     static_cast<unsigned long>(scanSeconds));
+            lv_label_set_text(statusValue_, scanText);
+        } else if (gamepad.reconnectScheduled) {
+            lv_label_set_text(statusCard_.title, "Reconnect standby");
+            lv_label_set_text(statusCard_.subtitle,
+                              "Automatic bounded scan");
+            char waitText[16];
+            snprintf(waitText, sizeof(waitText), "%lus to scan",
+                     static_cast<unsigned long>(reconnectSeconds));
+            lv_label_set_text(statusValue_, waitText);
         } else {
             lv_label_set_text(statusCard_.title, "Waiting");
             lv_label_set_text(statusCard_.subtitle,
-                              "Bonded controllers may reconnect");
+                              "Start a pairing scan");
             lv_label_set_text(statusValue_, "Scan off");
         }
-        lv_label_set_text(valueLabels_[0], gamepad.scanning ? "< Stop >"
-                                                            : "< Scan >");
+        lv_label_set_text(
+            valueLabels_[0],
+            gamepad.scanMode == GamepadScanMode::Pairing ? "< Stop >"
+                                                         : "< Pair >");
         lv_label_set_text(valueLabels_[2], gamepad.connected ? "< Test >"
                                                              : "Unavailable");
         lv_label_set_text(valueLabels_[3], gamepad.connected ? "< Disconnect >"
                                                              : "Unavailable");
         renderedConnected_ = gamepad.connected;
         renderedScanning_ = gamepad.scanning;
+        renderedScanMode_ = gamepad.scanMode;
         renderedScanSeconds_ = scanSeconds;
+        renderedReconnectSeconds_ = reconnectSeconds;
         renderedPacketCount_ = gamepad.packetCount;
     }
 
@@ -163,9 +191,10 @@ void ControllerSettingsApp::onUpdateView(AppContext& context) {
 
 void ControllerSettingsApp::adjustSelected(int8_t delta, AppContext& context) {
     if (selected_ == 0) {
-        if (delta < 0) {
+        if (delta < 0 &&
+            context.gamepad.snapshot().scanMode == GamepadScanMode::Pairing) {
             context.gamepad.stopPairingScan();
-        } else {
+        } else if (delta > 0) {
             context.gamepad.startPairingScan();
         }
     } else if (selected_ == 1) {
@@ -176,7 +205,8 @@ void ControllerSettingsApp::adjustSelected(int8_t delta, AppContext& context) {
 void ControllerSettingsApp::activateSelected(AppContext& context) {
     switch (selected_) {
         case 0:
-            if (context.gamepad.snapshot().scanning) {
+            if (context.gamepad.snapshot().scanMode ==
+                GamepadScanMode::Pairing) {
                 context.gamepad.stopPairingScan();
             } else {
                 context.gamepad.startPairingScan();

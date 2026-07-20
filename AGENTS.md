@@ -1,6 +1,6 @@
 # ESP32 Playground 新对话交接说明
 
-> 最后更新：2026-07-19
+> 最后更新：2026-07-20
 > 工作目录：`G:\MCU\ESP32Playground`
 > 当前阶段：PGOS 应用基座 / LCD DMA / PGOS Studio / 板载 RGB / PCF8563 RTC
 
@@ -56,11 +56,11 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 - `I2cBusService` 统一拥有 GPIO15/16 的共享 `Wire` 总线；`TimeService` 以 `0x51` 读取 PCF8563，Time 页面显示完整日期时间，Wi-Fi 连接后由 SNTP（UTC+8）自动校时并回写 RTC，USB 保留 `time set` 手动设置；模块缺失、VL、STOP 或非法字段时降级。
 - RgbService 使用 Arduino-ESP32 RMT 在 GPIO42 驱动板载 WS2812，提供 Solid/Breathe/Rainbow/Heartbeat/Sparkle；呼吸与心跳使用 10ms smoothstep 渐变。Power 不持久化，Effect/Palette/Brightness/Speed 保存到 `pgos_rgb`，750ms 合并写入。重启实测恢复 `Breathe / Violet / 50% / Fast`，同时保持 `state=off`。
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
-- BleGamepadService 使用 Bluepad32 4.2.0 接入 Xbox BLE HID（已实测 `XBox One` VID/PID `045E:0B13`），状态栏显示蓝牙图标，Controller 页面提供型号/电量/扫描倒计时、配对扫描、震动测试、立即断开和空闲断开设置。启动或用户请求只开放 60 秒发现窗口；连接成功或窗口结束后关闭扫描。默认 15 分钟无有效按键/摇杆/扳机活动断开，选项保存到 `pgos_gamepad`。
+- BleGamepadService 使用 Bluepad32 4.2.0 接入 Xbox BLE HID（已实测 `XBox One` VID/PID `045E:0B13`）。启动/用户请求提供 60 秒配对扫描，连接后停扫；意外掉线立即进行 10 秒重连扫描，主动或空闲断开先等待 30 秒，再以 10 秒扫描 / 20 秒暂停的窗口自动重连。空闲活动使用带迟滞的语义输入状态，避免模拟量中心偏移持续刷新计时；Controller 页面和 `gamepad status` 显示扫描阶段、重连倒计时、输入年龄及模拟量诊断值。默认 15 分钟断开设置保存到 `pgos_gamepad`。
 - USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和带请求号 ACK/STATE。
 - PGOS Studio 已提供无线四方向/确认/返回/Home、运行状态、RTT、上下行吞吐测试和 TCP 19002 屏幕镜像；当前镜像仍发送完整 RGB565 帧，下一步是 keyframe + dirty rectangles。
 - System 页面已提供主循环 duty、Heap/最低水位、PSRAM、Flash/OTA、任务数和各阶段耗时；这里的 CPU 指标是主循环 duty，不冒充双核总 CPU。
-- 当前分支 `dev`，工作区保留未提交的显示 DMA/依赖治理改动；当前 240MHz 构建 RAM 76112 / 327680 bytes，Flash 1710297 / 6553600 bytes，Python 14 项测试通过。COM3 已烧录并验证原生 `esp_lcd` 显示、RTC、Xbox 手柄连接、输入、震动、状态栏和扫描关闭；电池断电保持和长期漂移仍待焊接后复测，空闲断开完整等待周期仍待长时间观察。
+- 当前分支 `dev`，工作区保留未提交的显示 DMA/依赖治理与手柄省电策略改动；本次 240MHz 构建 RAM 77200 / 327680 bytes，Flash 1725733 / 6553600 bytes，Python 18 项测试通过。此前 COM3 已验证原生 `esp_lcd` 显示、RTC、Xbox 手柄连接、输入、震动、状态栏和扫描关闭；本次空闲活动与断线自动重连修正尚未烧录，电池断电保持、完整空闲等待和重连窗口仍待真机复测。
 - 曾尝试“原生 FSPI + 80MHz”组合，真机出现花屏且实体屏停止刷新；当前原生 `esp_lcd` 固定 SPI2/40MHz，不再把 80MHz 作为默认配置。后续若重测必须一次只改变一个变量。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。
 

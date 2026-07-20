@@ -30,7 +30,9 @@ private:
     int8_t renderedSelected_ = -1;
     bool renderedConnected_ = false;
     bool renderedScanning_ = false;
+    GamepadScanMode renderedScanMode_ = GamepadScanMode::None;
     uint32_t renderedScanSeconds_ = UINT32_MAX;
+    uint32_t renderedReconnectSeconds_ = UINT32_MAX;
     uint32_t renderedTimeoutMs_ = UINT32_MAX;
     uint32_t renderedPacketCount_ = UINT32_MAX;
 

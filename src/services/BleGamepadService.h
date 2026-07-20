@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AppTypes.h"
+#include "services/GamepadPolicy.h"
 
 #include <Arduino.h>
 #include <Preferences.h>
@@ -13,6 +14,8 @@ class BleGamepadService {
 public:
     static constexpr uint8_t EVENT_QUEUE_SIZE = 32;
     static constexpr uint32_t PAIRING_SCAN_WINDOW_MS = 60000UL;
+    static constexpr uint32_t RECONNECT_SCAN_WINDOW_MS =
+        pgos::GamepadReconnectScheduler::SCAN_WINDOW_MS;
     static constexpr uint32_t DEFAULT_AUTO_DISCONNECT_MS = 15UL * 60UL * 1000UL;
 
     bool begin(Stream& log);
@@ -41,6 +44,7 @@ private:
     bool started_ = false;
     bool preferencesReady_ = false;
     bool scanning_ = false;
+    GamepadScanMode scanMode_ = GamepadScanMode::None;
     uint32_t scanDeadlineMs_ = 0;
     uint32_t lastActivityMs_ = 0;
     uint32_t connectedSinceMs_ = 0;
@@ -48,6 +52,15 @@ private:
     uint32_t disconnectCount_ = 0;
     uint32_t scanStartCount_ = 0;
     bool disconnectPending_ = false;
+    pgos::GamepadActivityTracker activityTracker_;
+    pgos::GamepadReconnectScheduler reconnectScheduler_;
+
+    enum class DisconnectReason : uint8_t {
+        None,
+        Manual,
+        Idle,
+    };
+    DisconnectReason disconnectReason_ = DisconnectReason::None;
 
 #if defined(PGOS_BLE_GAMEPAD_BACKEND)
     ControllerPtr controllers_[BP32_MAX_GAMEPADS] = {};
@@ -64,6 +77,9 @@ private:
     void clearSnapshot();
 #endif
 
+    bool startScan(GamepadScanMode mode, uint32_t durationMs, uint32_t nowMs);
+    void stopScan(uint32_t nowMs, bool scheduleReconnect);
+    bool disconnectController(DisconnectReason reason);
     void updateSnapshotMeta(uint32_t nowMs);
     void saveSettings();
     void pushEvent(GamepadEventType type, uint8_t slot, uint16_t code);

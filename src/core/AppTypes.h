@@ -157,10 +157,18 @@ enum class GamepadEventType : uint8_t {
     MiscUp,
 };
 
+enum class GamepadScanMode : uint8_t {
+    None,
+    Pairing,
+    Reconnect,
+};
+
 struct GamepadSnapshot {
     bool enabled = false;
     bool connected = false;
     bool scanning = false;
+    GamepadScanMode scanMode = GamepadScanMode::None;
+    bool reconnectScheduled = false;
     uint8_t slot = 0xFF;
     uint16_t vendorId = 0;
     uint16_t productId = 0;
@@ -179,6 +187,7 @@ struct GamepadSnapshot {
     uint32_t lastInputMs = 0;
     uint32_t connectedSinceMs = 0;
     uint32_t scanRemainingMs = 0;
+    uint32_t reconnectRemainingMs = 0;
     uint32_t autoDisconnectMs = 0;
     uint32_t disconnectCount = 0;
     uint32_t scanStartCount = 0;
