@@ -47,6 +47,9 @@ bool AppManager::activate(AppId id, UiPageTransition transition) {
 }
 
 bool AppManager::back() {
+    if (active_ && apps_[currentIndex_]->onBack(context_)) {
+        return true;
+    }
     if (historyDepth_ == 0) {
         return activate(AppId::Launcher, UiPageTransition::Backward);
     }

@@ -25,7 +25,7 @@ System Tools 三个父菜单，`AppManager` 保存父页面历史，Back 逐级�
 - 显示 SSID、IP、RSSI 和重连次数。
 - USB 命令支持 `wifi status`、`wifi scan`、`wifi reconnect`。
 - 使用非阻塞连接状态机和退避重连。
-- 通过 USB 控制台扫描、选择 SSID 和输入密码；密码只写入设备 NVS，不进入 Git。
+- Network 页面可在设备端扫描、选择 SSID，并通过方向键软键盘输入密码；开放网络直接保存。USB 控制台继续作为隐藏输入和维护后备，密码只写入设备 NVS，不进入 Git。
 - 支持隐藏 SSID 的手工输入和开放网络。
 - NTP 状态显示留待入网稳定后单独增加。
 - 目标服务器地址保存在 NVS；`server set <host> <port>` 后自动启用控制连接，Wi-Fi 或上位机恢复时退避重连。

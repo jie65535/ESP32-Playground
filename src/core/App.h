@@ -45,5 +45,6 @@ public:
     virtual void onTick(uint32_t nowMs, AppContext& context) = 0;
     virtual lv_obj_t* onCreateView(AppContext& context) = 0;
     virtual void onUpdateView(AppContext& context) = 0;
+    virtual bool onBack(AppContext& context) { return false; }
     virtual AppId requestedApp() const { return AppId::Count; }
 };

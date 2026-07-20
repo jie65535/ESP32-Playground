@@ -31,6 +31,10 @@ String shorten(const String& value, size_t maxLength) {
     return value.substring(0, maxLength - 3U) + "...";
 }
 
+String choiceText(const char* value) {
+    return String("< ") + value + " >";
+}
+
 }  // namespace
 
 AppId NetworkSettingsApp::id() const {
@@ -41,94 +45,148 @@ const char* NetworkSettingsApp::name() const {
     return "Network";
 }
 
-void NetworkSettingsApp::onEnter(AppContext&) {
+void NetworkSettingsApp::onEnter(AppContext& context) {
+    setupStage_ = SetupStage::Inactive;
+    inactiveCursor_ = context.wifi.snapshot().ssid.isEmpty() ? 1U : 0U;
+    setupNotice_ = "";
+    passwordError_ = "";
     lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::onExit(AppContext&) {
     setupStage_ = SetupStage::Inactive;
     root_ = nullptr;
+    inputMetaLabel_ = nullptr;
+    keyboard_.reset();
+    setupNotice_ = "";
+    passwordError_ = "";
     lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::onCommand(const AppCommand& command,
                                    AppContext& context) {
     WifiService& wifi = context.wifi;
+
+    if (setupStage_ == SetupStage::EnteringPassword) {
+        if (keyboard_.handleNavigation(command.type)) {
+            return;
+        }
+        if (command.type == AppCommandType::QuickDrop) {
+            keyboard_.cycleMode();
+            return;
+        }
+        if (command.type == AppCommandType::Activate) {
+            const OnScreenKeyboardAction action = keyboard_.activate();
+            if (action == OnScreenKeyboardAction::Ready) {
+                submitPassword(context);
+            } else if (action == OnScreenKeyboardAction::Edited) {
+                passwordError_ = "";
+                updatePasswordMeta(context);
+            }
+            return;
+        }
+    }
+
     switch (command.type) {
         case AppCommandType::Previous:
-        case AppCommandType::Left:
             if (setupStage_ == SetupStage::Selecting) {
                 moveCursor(-1, context);
+            } else if (setupStage_ == SetupStage::Inactive) {
+                moveInactiveCursor(-1);
             }
             break;
         case AppCommandType::Next:
+            if (setupStage_ == SetupStage::Selecting) {
+                moveCursor(1, context);
+            } else if (setupStage_ == SetupStage::Inactive) {
+                moveInactiveCursor(1);
+            }
+            break;
+        case AppCommandType::Left:
+            if (setupStage_ == SetupStage::Selecting) {
+                moveCursor(-1, context);
+            } else if (setupStage_ == SetupStage::Inactive &&
+                       inactiveCursor_ == 0 && wifi.enabled()) {
+                wifi.setEnabled(false);
+                lastViewSignature_ = "";
+            }
+            break;
         case AppCommandType::Right:
             if (setupStage_ == SetupStage::Selecting) {
                 moveCursor(1, context);
+            } else if (setupStage_ == SetupStage::Inactive &&
+                       inactiveCursor_ == 0 && !wifi.enabled()) {
+                wifi.setEnabled(true);
+                lastViewSignature_ = "";
             }
             break;
         case AppCommandType::Activate:
             if (setupStage_ == SetupStage::Selecting) {
                 selectCurrent(context);
             } else if (setupStage_ == SetupStage::Inactive) {
-                wifi.toggleEnabled();
+                activateInactive(context);
             }
             break;
         case AppCommandType::WifiWizard:
             startWizard(context);
             break;
         case AppCommandType::WifiWizardCancel:
-            setupStage_ = SetupStage::Inactive;
+            cancelWizard(context);
             context.console.println(F("[wifi-ui] setup cancelled"));
             break;
         case AppCommandType::WifiScan:
             wifi.startScan();
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiSelect:
             wifi.selectScanIndex(command.number);
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiSsid:
             wifi.selectSsid(command.value);
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiPassword:
-            if (setupStage_ == SetupStage::AwaitingPassword) {
-                if (wifi.saveSelectedPassword(command.value)) {
-                    setupStage_ = SetupStage::Inactive;
-                    context.console.println(F("[wifi-ui] credentials saved"));
-                }
-            } else {
-                wifi.saveSelectedPassword(command.value);
+            if (wifi.saveSelectedPassword(command.value)) {
+                setupStage_ = SetupStage::Inactive;
+                passwordError_ = "";
+                context.console.println(F("[wifi-ui] credentials saved"));
             }
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiOpen:
-            if (setupStage_ == SetupStage::AwaitingPassword) {
-                if (wifi.saveSelectedOpen()) {
-                    setupStage_ = SetupStage::Inactive;
-                    context.console.println(F("[wifi-ui] open network saved"));
-                }
-            } else {
-                wifi.saveSelectedOpen();
+            if (wifi.saveSelectedOpen()) {
+                setupStage_ = SetupStage::Inactive;
+                passwordError_ = "";
+                context.console.println(F("[wifi-ui] open network saved"));
             }
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiStatus:
             wifi.printStatus(context.console);
             break;
         case AppCommandType::WifiReconnect:
             wifi.reconnect();
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiClear:
             wifi.clearCredentials();
             setupStage_ = SetupStage::Inactive;
+            inactiveCursor_ = 1;
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiOn:
             wifi.setEnabled(true);
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiOff:
             wifi.setEnabled(false);
             setupStage_ = SetupStage::Inactive;
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiToggle:
             wifi.toggleEnabled();
+            lastViewSignature_ = "";
             break;
         case AppCommandType::WifiHelp:
             context.console.println(F("Wi-Fi: wifi on|off|toggle|scan|wizard"));
@@ -139,7 +197,6 @@ void NetworkSettingsApp::onCommand(const AppCommand& command,
         default:
             break;
     }
-    lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
@@ -154,11 +211,15 @@ void NetworkSettingsApp::onTick(uint32_t, AppContext& context) {
         setupStage_ = SetupStage::Selecting;
         cursor_ = 0;
         windowStart_ = 0;
+        setupNotice_ = "";
         context.console.print(F("[wifi-ui] networks ready: "));
         context.console.print(snapshot.scanCount);
         context.console.println(F("; use arrows/ok"));
     } else {
         setupStage_ = SetupStage::Inactive;
+        setupNotice_ = snapshot.lastError.isEmpty()
+                           ? String("未发现可用网络")
+                           : String("扫描失败，请重试");
         context.console.println(F("[wifi-ui] scan produced no usable networks"));
     }
     lastViewSignature_ = "";
@@ -182,14 +243,86 @@ void NetworkSettingsApp::onUpdateView(AppContext& context) {
     rebuildView(context);
 }
 
+bool NetworkSettingsApp::onBack(AppContext& context) {
+    switch (setupStage_) {
+        case SetupStage::EnteringPassword:
+            setupStage_ = SetupStage::Selecting;
+            passwordError_ = "";
+            lastViewSignature_ = "";
+            return true;
+        case SetupStage::Selecting:
+            setupStage_ = SetupStage::Inactive;
+            setupNotice_ = "";
+            lastViewSignature_ = "";
+            return true;
+        case SetupStage::Scanning:
+            cancelWizard(context);
+            return true;
+        case SetupStage::Inactive:
+        default:
+            return false;
+    }
+}
+
 void NetworkSettingsApp::startWizard(AppContext& context) {
-    context.wifi.setEnabled(true);
+    if (!context.wifi.enabled()) {
+        context.wifi.setEnabled(true);
+    }
     setupStage_ = SetupStage::Scanning;
     cursor_ = 0;
     windowStart_ = 0;
+    setupNotice_ = "";
+    passwordError_ = "";
     lastViewSignature_ = "";
     context.console.println(F("[wifi-ui] scanning; please wait"));
-    context.wifi.startScan();
+    if (!context.wifi.startScan()) {
+        setupStage_ = SetupStage::Inactive;
+        setupNotice_ = "扫描无法启动";
+    }
+}
+
+void NetworkSettingsApp::cancelWizard(AppContext& context) {
+    if (setupStage_ == SetupStage::Scanning) {
+        context.wifi.cancelScan();
+    }
+    setupStage_ = SetupStage::Inactive;
+    setupNotice_ = "";
+    passwordError_ = "";
+    lastViewSignature_ = "";
+}
+
+void NetworkSettingsApp::moveInactiveCursor(int16_t delta) {
+    if (delta < 0) {
+        inactiveCursor_ = inactiveCursor_ == 0
+                              ? INACTIVE_ITEM_COUNT - 1U
+                              : inactiveCursor_ - 1U;
+    } else {
+        inactiveCursor_ = static_cast<uint8_t>(
+            (inactiveCursor_ + 1U) % INACTIVE_ITEM_COUNT);
+    }
+    setupNotice_ = "";
+    lastViewSignature_ = "";
+}
+
+void NetworkSettingsApp::activateInactive(AppContext& context) {
+    switch (inactiveCursor_) {
+        case 0:
+            context.wifi.toggleEnabled();
+            break;
+        case 1:
+            startWizard(context);
+            return;
+        case 2:
+            if (!context.wifi.snapshot().ssid.isEmpty()) {
+                context.wifi.reconnect();
+            } else {
+                setupNotice_ = "尚未保存网络";
+            }
+            break;
+        default:
+            break;
+    }
+    lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::moveCursor(int16_t delta, AppContext& context) {
@@ -207,22 +340,84 @@ void NetworkSettingsApp::moveCursor(int16_t delta, AppContext& context) {
     } else if (cursor_ >= windowStart_ + VISIBLE_ROWS) {
         windowStart_ = cursor_ - VISIBLE_ROWS + 1;
     }
+    setupNotice_ = "";
     lastViewSignature_ = "";
 }
 
 void NetworkSettingsApp::selectCurrent(AppContext& context) {
+    const bool open = context.wifi.scanIsOpen(cursor_);
     if (!context.wifi.selectScanIndex(cursor_)) {
+        setupNotice_ = "隐藏网络暂不支持设备端配置";
+        lastViewSignature_ = "";
         return;
     }
-    setupStage_ = SetupStage::AwaitingPassword;
+
+    if (open) {
+        if (context.wifi.saveSelectedOpen()) {
+            setupStage_ = SetupStage::Inactive;
+            setupNotice_ = "开放网络已保存";
+            context.console.println(F("[wifi-ui] open network saved"));
+        } else {
+            setupNotice_ = "网络保存失败";
+        }
+    } else {
+        setupStage_ = SetupStage::EnteringPassword;
+        passwordError_ = "";
+        context.console.print(F("[wifi-ui] on-device password entry for "));
+        context.console.println(context.wifi.selectedSsid());
+    }
     lastViewSignature_ = "";
-    context.console.print(F("[wifi-ui] password required for "));
-    context.console.print(context.wifi.selectedSsid());
-    context.console.println(F("; use hidden host input"));
+}
+
+void NetworkSettingsApp::submitPassword(AppContext& context) {
+    const size_t passwordLength = keyboard_.length();
+    if (passwordLength < 8U) {
+        passwordError_ = "密码至少需要 8 个字符";
+        updatePasswordMeta(context);
+        return;
+    }
+    if (passwordLength > 63U) {
+        passwordError_ = "密码不能超过 63 个字符";
+        updatePasswordMeta(context);
+        return;
+    }
+
+    const String password(keyboard_.text());
+    if (!context.wifi.saveSelectedPassword(password)) {
+        passwordError_ = "凭据保存失败";
+        updatePasswordMeta(context);
+        return;
+    }
+
+    keyboard_.clear();
+    setupStage_ = SetupStage::Inactive;
+    setupNotice_ = "凭据已保存，正在连接";
+    passwordError_ = "";
+    lastViewSignature_ = "";
+    context.console.println(F("[wifi-ui] credentials saved (password hidden)"));
+}
+
+void NetworkSettingsApp::updatePasswordMeta(AppContext& context) {
+    if (inputMetaLabel_ == nullptr) {
+        return;
+    }
+    if (!passwordError_.isEmpty()) {
+        lv_label_set_text(inputMetaLabel_, passwordError_.c_str());
+        lv_obj_set_style_text_color(inputMetaLabel_, context.ui.accent(), 0);
+        return;
+    }
+    const String value = String(keyboard_.length()) + " / 63";
+    lv_label_set_text(inputMetaLabel_, value.c_str());
+    lv_obj_set_style_text_color(inputMetaLabel_, context.ui.muted(), 0);
 }
 
 void NetworkSettingsApp::rebuildView(AppContext& context) {
+    keyboard_.reset();
+    inputMetaLabel_ = nullptr;
     lv_obj_clean(root_);
+    lv_obj_set_scroll_dir(root_, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(root_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_pad_bottom(root_, 72, 0);
     switch (setupStage_) {
         case SetupStage::Scanning:
             buildScanning(context);
@@ -230,7 +425,7 @@ void NetworkSettingsApp::rebuildView(AppContext& context) {
         case SetupStage::Selecting:
             buildSelection(context);
             break;
-        case SetupStage::AwaitingPassword:
+        case SetupStage::EnteringPassword:
             buildPassword(context);
             break;
         case SetupStage::Inactive:
@@ -256,27 +451,56 @@ void NetworkSettingsApp::buildInactive(AppContext& context,
     buildHeader(context, "NETWORK / RADIO", "Network", nullptr);
 
     const String title = snapshot.ssid.isEmpty()
-                             ? String("Wi-Fi")
-                             : shorten(snapshot.ssid, 24);
+                             ? String("尚未配置网络")
+                             : shorten(snapshot.ssid, 18);
     String subtitle = wifiStateText(snapshot.state);
     if (snapshot.state == WifiState::Connected) {
-        subtitle += "  /  2.4 GHz";
+        subtitle = snapshot.ip;
     }
-    UiCard connection = context.ui.createCard(
-        root_, 64, UiIcon::Wifi, title.c_str(), subtitle.c_str());
-    connection.normalX = 12;
-    connection.normalWidth = 296;
-    context.ui.setCardFocused(connection,
-                              snapshot.state == WifiState::Connected, false);
+    if (!setupNotice_.isEmpty()) {
+        subtitle += "  /  ";
+        subtitle += setupNotice_;
+    }
+    UiCard status = context.ui.createCard(
+        root_, UiRuntime::CARD_START_Y, UiIcon::Wifi,
+        title.c_str(), subtitle.c_str());
 
-    lv_obj_t* value = nullptr;
-    context.ui.createValueRow(root_, "IP 地址", snapshot.ip.c_str(), 116,
-                              &value);
-    const String rssi = rssiText(snapshot);
-    context.ui.createValueRow(root_, "信号强度", rssi.c_str(), 138, &value);
-    const String retry = String(snapshot.reconnectCount);
-    context.ui.createValueRow(root_, "重连次数", retry.c_str(), 160, &value);
+    const int16_t actionY = UiRuntime::CARD_START_Y + UiRuntime::CARD_STEP_Y;
+    UiCard rows[INACTIVE_ITEM_COUNT];
+    rows[0] = context.ui.createCard(root_, actionY, UiIcon::Wifi,
+                                    "Wi-Fi 电源", nullptr);
+    rows[1] = context.ui.createCard(root_, actionY + UiRuntime::CARD_STEP_Y,
+                                    UiIcon::Settings, "配置网络", nullptr);
+    rows[2] = context.ui.createCard(root_, actionY + 2 * UiRuntime::CARD_STEP_Y,
+                                    UiIcon::Wifi, "重新连接", nullptr);
 
+    const String values[INACTIVE_ITEM_COUNT] = {
+        choiceText(context.wifi.enabled() ? "开" : "关"),
+        choiceText("扫描"),
+        snapshot.ssid.isEmpty() ? String("不可用") : choiceText("连接"),
+    };
+    for (uint8_t index = 0; index < INACTIVE_ITEM_COUNT; ++index) {
+        lv_obj_t* value = context.ui.createLabel(
+            rows[index].root, values[index].c_str(), 198, 10, 12,
+            index == 2 && snapshot.ssid.isEmpty()
+                ? context.ui.dim()
+                : context.ui.text());
+        context.ui.applyBodyFont(value);
+        lv_obj_set_width(value, 82);
+        lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_align(value, LV_ALIGN_RIGHT_MID, -9, 0);
+        context.ui.setCardFocused(rows[index], index == inactiveCursor_, false);
+    }
+    context.ui.centerFocused(root_, rows[inactiveCursor_].root, false);
+
+    if (snapshot.state == WifiState::Connected) {
+        const String rssi = rssiText(snapshot);
+        lv_obj_t* signal = context.ui.createLabel(
+            status.root, rssi.c_str(), 192, 13, 10,
+            context.ui.muted());
+        lv_obj_set_width(signal, 76);
+        lv_obj_set_style_text_align(signal, LV_TEXT_ALIGN_RIGHT, 0);
+    }
 }
 
 void NetworkSettingsApp::buildScanning(AppContext& context) {
@@ -291,6 +515,10 @@ void NetworkSettingsApp::buildScanning(AppContext& context) {
 
 void NetworkSettingsApp::buildSelection(AppContext& context) {
     buildHeader(context, "NETWORK / SETUP", "Wi-Fi Networks", nullptr);
+    if (!setupNotice_.isEmpty()) {
+        context.ui.createBodyLabel(root_, setupNotice_.c_str(), 17, 59,
+                                   context.ui.accent());
+    }
     const int16_t count = context.wifi.scanCount();
     lv_obj_t* selectedItem = nullptr;
     for (uint8_t row = 0; row < VISIBLE_ROWS; ++row) {
@@ -319,32 +547,39 @@ void NetworkSettingsApp::buildSelection(AppContext& context) {
 
         context.ui.createLabel(item, selected ? ">" : "", 7, 2, 12,
                                context.ui.accent());
-        const String ssid = shorten(context.wifi.scanSsid(index), 25);
+        const String ssid = shorten(context.wifi.scanSsid(index), 23);
         context.ui.createLabel(item, ssid.c_str(), 22, 2, 12,
                                context.ui.text());
-        const String signal = String(context.wifi.scanRssi(index)) + " dBm";
+        String signal = String(context.wifi.scanRssi(index)) + " dBm";
+        if (context.wifi.scanIsOpen(index)) {
+            signal += " OPEN";
+        }
         lv_obj_t* signalLabel = context.ui.createLabel(
-            item, signal.c_str(), 274, 2, 12, context.ui.muted());
+            item, signal.c_str(), 274, 2, 10, context.ui.muted());
         lv_obj_align(signalLabel, LV_ALIGN_RIGHT_MID, -7, 0);
     }
     context.ui.centerFocused(root_, selectedItem);
 }
 
 void NetworkSettingsApp::buildPassword(AppContext& context) {
-    buildHeader(context, "NETWORK / SETUP", "Wi-Fi Setup",
-                "请在可信的 USB 控制台继续输入凭据");
-    const String ssid = shorten(context.wifi.selectedSsid(), 28);
-    UiCard selected = context.ui.createCard(root_, 84, UiIcon::Wifi,
-                                            ssid.c_str(), "需要输入网络凭据");
-    selected.normalX = 12;
-    selected.normalWidth = 296;
-    context.ui.setCardFocused(selected, true);
-    context.ui.createLabel(root_, LV_SYMBOL_EYE_CLOSE, 24, 145, 20,
+    lv_obj_set_scroll_dir(root_, LV_DIR_NONE);
+    lv_obj_set_style_pad_bottom(root_, 0, 0);
+    context.ui.createLabel(root_, "NETWORK / SETUP", 12, 5, 10,
                            context.ui.accent());
-    context.ui.createBodyLabel(root_, "请在 playground_console 输入密码",
-                               58, 145, context.ui.text());
-    context.ui.createBodyLabel(root_, "密码只保存到设备 NVS，不进入 Git",
-                               58, 170, context.ui.muted());
+    context.ui.createLabel(root_, "Wi-Fi Password", 12, 19, 20,
+                           context.ui.text());
+    const String ssid = String("SSID  ") +
+                        shorten(context.wifi.selectedSsid(), 30);
+    context.ui.createBodyLabel(root_, ssid.c_str(), 14, 45,
+                               context.ui.muted());
+
+    keyboard_.create(root_, context.ui, 61, 32, 111, 101,
+                     true, 63, "Password");
+    inputMetaLabel_ = context.ui.createBodyLabel(
+        root_, "0 / 63", 14, 94, context.ui.muted());
+    lv_obj_set_width(inputMetaLabel_, 292);
+    lv_obj_set_style_text_align(inputMetaLabel_, LV_TEXT_ALIGN_RIGHT, 0);
+    updatePasswordMeta(context);
 }
 
 String NetworkSettingsApp::viewSignature(AppContext& context) const {
@@ -361,8 +596,12 @@ String NetworkSettingsApp::viewSignature(AppContext& context) const {
     signature += '|';
     signature += wifi.scanCount;
     signature += '|';
+    signature += inactiveCursor_;
+    signature += '|';
     signature += cursor_;
     signature += '|';
     signature += windowStart_;
+    signature += '|';
+    signature += setupNotice_;
     return signature;
 }

@@ -14,7 +14,7 @@ ESP32 Playground（STA）
 
 第一步只做 Station 入网：连接、断线、重连、IP、RSSI 和 NTP。不要在第一版同时加入 WebSocket、MQTT、OTA 和复杂网页。
 
-当前第一版通过 USB CDC 控制台完成配网，不把目标 SSID 或密码写死在固件：
+当前固件提供两条共用 `WifiService` 状态机的配网入口。日常入口是设备端 Network 页面：扫描 2.4 GHz 网络、方向键选择 SSID、加密网络进入 ASCII 软键盘、开放网络直接保存。USB CDC 控制台保留为维护和隐藏输入后备，不把目标 SSID 或密码写死在固件：
 
 ```text
 wifi scan
@@ -24,6 +24,8 @@ wifi status
 ```
 
 也可用 `wifi ssid <name>` 选择扫描不到的隐藏网络，或用 `wifi open` 配置开放网络。成功配置后，SSID 和密码写入 ESP32 NVS，重启后自动尝试连接；`wifi clear` 会删除已保存凭据并停止自动连接。
+
+设备端软键盘使用 LVGL `textarea + keyboard/buttonmatrix`，但焦点移动继续由 PGOS 的 Up/Down/Left/Right/Confirm 语义驱动，不引入触摸依赖。密码限制沿用 WPA/WPA2 的 8～63 字节边界，输入框立即以 `*` 遮罩，密码不进入页面签名、日志或远程状态。前台 App 可优先消费 Back，因此密码页 Back 返回扫描列表，Home 仍由系统直接回桌面。
 
 ## 无线控制台方向
 

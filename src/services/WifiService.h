@@ -15,6 +15,7 @@ public:
     void toggleEnabled();
 
     bool startScan();
+    void cancelScan();
     bool selectScanIndex(int32_t index);
     bool selectSsid(const String& ssid);
     bool saveSelectedPassword(const String& password);
@@ -27,6 +28,7 @@ public:
     int16_t scanCount() const;
     String scanSsid(int16_t index) const;
     int32_t scanRssi(int16_t index) const;
+    bool scanIsOpen(int16_t index) const;
     uint32_t scanGeneration() const;
     bool lastScanSucceeded() const;
     const String& selectedSsid() const;

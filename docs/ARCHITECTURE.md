@@ -114,6 +114,8 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备�
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
 
+需要文本输入的前台页面复用 `OnScreenKeyboard`：LVGL `textarea` 保存和遮罩文本，`keyboard/buttonmatrix` 负责绘制紧凑 ASCII 键盘，PGOS 方向语义负责焦点移动和确认。AppManager 允许当前 App 在存在模态输入时优先消费 Back；未消费的 Back 才执行父页面 Pop，Home 始终保持系统级回桌面语义。
+
 页面转场区分进入和返回：进入子页面使用 `Forward`（新页面从右侧进入），返回父页面使用 `Backward`（重建的父页面先放在下层，当前页面向右退出并露出父页面）。所有页面根节点都是纵向滚动视口，焦点切换时由 `UiRuntime::centerFocused` 计算夹紧后的目标位置，用 ease-out 动画把项目拉向视口中心；顶部/底部不足半屏时保持边界，不制造空白。遥测刷新不能调用页面转场，也不能重播焦点动画。
 
 ### Peak 项目的可迁移经验

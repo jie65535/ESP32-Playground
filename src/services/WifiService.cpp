@@ -148,6 +148,18 @@ bool WifiService::startScan() {
     return true;
 }
 
+void WifiService::cancelScan() {
+    if (state_ != WifiState::Scanning) {
+        return;
+    }
+    WiFi.scanDelete();
+    scanRetryAtMs_ = 0;
+    scanRadioResetPending_ = false;
+    state_ = idleState();
+    lastError_ = "";
+    log_->println(F("[wifi] scan cancelled"));
+}
+
 bool WifiService::selectScanIndex(int32_t index) {
     if (scanCount_ < 0 || index < 0 || index >= scanCount_) {
         log_->println(F("[wifi] invalid index; run wifi scan first"));
@@ -272,6 +284,13 @@ String WifiService::scanSsid(int16_t index) const {
 
 int32_t WifiService::scanRssi(int16_t index) const {
     return WiFi.RSSI(index);
+}
+
+bool WifiService::scanIsOpen(int16_t index) const {
+    if (index < 0 || index >= scanCount_) {
+        return false;
+    }
+    return WiFi.encryptionType(static_cast<uint8_t>(index)) == WIFI_AUTH_OPEN;
 }
 
 uint32_t WifiService::scanGeneration() const {
@@ -427,6 +446,7 @@ bool WifiService::saveCredentials(const String& ssid, const String& password) {
     password_ = password;
     selectedSsid_ = "";
     scanCount_ = -1;
+    WiFi.scanDelete();
     lastError_ = "";
     backoffStep_ = 0;
     nextAttemptMs_ = millis();

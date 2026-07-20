@@ -45,8 +45,9 @@
 #define LV_USE_CANVAS 1
 #define LV_USE_BAR 1
 #define LV_USE_ARC 0
-#define LV_USE_KEYBOARD 0
-#define LV_USE_TEXTAREA 0
+#define LV_USE_BUTTONMATRIX 1
+#define LV_USE_KEYBOARD 1
+#define LV_USE_TEXTAREA 1
 #define LV_USE_SPINBOX 0
 #define LV_USE_SPINNER 0
 #define LV_USE_LIST 0
