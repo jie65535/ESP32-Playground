@@ -70,6 +70,10 @@ public:
    `GameScoreService`，构造参数保留原 NVS namespace/schema，避免清榜。
 4. 卡片图标改为 `UiIcon` + `PgosUiIcons` 资源边界。当前使用固定版本的
    Lucide 24×24 A8 遮罩，状态栏的通用连接符号仍可继续使用 LVGL 内置字形。
+5. Blackjack 不复用 Top 5：规则放入不依赖 Arduino/LVGL 的
+   `BlackjackEngine`，筹码和统计由 `BlackjackProfileService` 持久化，App
+   只负责输入、事件动画和绘制。规则事件在播放期间锁定牌桌操作，但系统级
+   Back/Home 始终由 `AppManager` 处理。
 5. Shell 正文明确使用 Fusion Pixel 16px 行盒；24/28px 标题和依赖既有
    大字号度量的游戏 HUD 暂保留英文。卡片统一为 44px 高、8px 间距，
    副标题仅用于标题和当前值无法表达的状态、限制或特殊逻辑。

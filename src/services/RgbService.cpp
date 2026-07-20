@@ -79,6 +79,19 @@ void RgbService::tick(uint32_t nowMs) {
         return;
     }
 
+    if (feedbackUntilMs_ != 0) {
+        if (static_cast<int32_t>(nowMs - feedbackUntilMs_) < 0) {
+            const uint16_t scale = static_cast<uint16_t>(
+                brightnessPercent_ * 255U / 100U);
+            writeOutput(scale8(feedbackRed_, scale),
+                        scale8(feedbackGreen_, scale),
+                        scale8(feedbackBlue_, scale));
+            return;
+        }
+        feedbackUntilMs_ = 0;
+        dirty_ = true;
+    }
+
     if (!enabled_) {
         appliedBrightnessPercent_ = brightnessPercent_;
         if (dirty_ || outputRed_ != 0 || outputGreen_ != 0 ||
@@ -185,6 +198,20 @@ void RgbService::setSpeedIndex(uint8_t index) {
     speedIndex_ = index;
     restartEffect();
     markSettingsDirty();
+}
+
+bool RgbService::flashFeedback(uint8_t red, uint8_t green, uint8_t blue,
+                               uint16_t durationMs) {
+    if (!ready_ || !enabled_ || durationMs == 0) {
+        return false;
+    }
+    feedbackRed_ = red;
+    feedbackGreen_ = green;
+    feedbackBlue_ = blue;
+    const uint16_t clampedDuration =
+        durationMs < 40 ? 40 : durationMs > 2000 ? 2000 : durationMs;
+    feedbackUntilMs_ = millis() + clampedDuration;
+    return true;
 }
 
 RgbSnapshot RgbService::snapshot() const {

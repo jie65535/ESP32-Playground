@@ -18,6 +18,7 @@ enum class UiIcon : uint8_t {
     Snake,
     Tetris,
     Breakout,
+    Blackjack,
 };
 
 namespace PgosUiIcons {

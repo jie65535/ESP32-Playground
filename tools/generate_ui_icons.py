@@ -29,6 +29,7 @@ ICONS = (
     "cherry",
     "blocks",
     "brick-wall",
+    "spade",
 )
 
 

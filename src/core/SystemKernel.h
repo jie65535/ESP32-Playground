@@ -13,6 +13,7 @@
 #include "apps/SnakeApp.h"
 #include "apps/TetrisApp.h"
 #include "apps/BreakoutApp.h"
+#include "apps/BlackjackApp.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
@@ -24,6 +25,7 @@
 #include "services/RgbService.h"
 #include "services/ServerService.h"
 #include "services/GameScoreService.h"
+#include "services/BlackjackProfileService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
 #include "services/TimeService.h"
@@ -49,6 +51,7 @@ private:
     GameScoreService snakeScore_;
     GameScoreService tetrisScore_;
     GameScoreService breakoutScore_;
+    BlackjackProfileService blackjackProfile_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -68,6 +71,7 @@ private:
     SnakeApp snakeApp_;
     TetrisApp tetrisApp_;
     BreakoutApp breakoutApp_;
+    BlackjackApp blackjackApp_;
     MenuApp gamesMenuApp_;
     MenuApp settingsMenuApp_;
     MenuApp toolsMenuApp_;

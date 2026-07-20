@@ -21,6 +21,7 @@ const MenuItemDefinition GAME_ITEMS[] = {
     {UiIcon::Snake, "贪吃蛇", nullptr, AppId::Snake},
     {UiIcon::Tetris, "俄罗斯方块", nullptr, AppId::Tetris},
     {UiIcon::Breakout, "打砖块", nullptr, AppId::Breakout},
+    {UiIcon::Blackjack, "二十一点", nullptr, AppId::Blackjack},
 };
 
 const MenuItemDefinition SETTINGS_ITEMS[] = {
@@ -112,6 +113,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageSnake:
         case AppCommandType::PageTetris:
         case AppCommandType::PageBreakout:
+        case AppCommandType::PageBlackjack:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
@@ -174,7 +176,8 @@ SystemKernel::SystemKernel()
       tetrisScore_("pgos_tetris", 1, "tetris"),
       breakoutScore_("pgos_breakout", 1, "breakout"),
       context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
-               snakeScore_, tetrisScore_, breakoutScore_, Serial, ui_, runtime_},
+               snakeScore_, tetrisScore_, breakoutScore_, blackjackProfile_,
+               Serial, ui_, runtime_},
       appManager_(context_),
       gamesMenuApp_(GAMES_MENU),
       settingsMenuApp_(SETTINGS_MENU),
@@ -206,6 +209,7 @@ void SystemKernel::setup() {
     snakeScore_.begin(Serial);
     tetrisScore_.begin(Serial);
     breakoutScore_.begin(Serial);
+    blackjackProfile_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -224,6 +228,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(snakeApp_);
         appManager_.registerApp(tetrisApp_);
         appManager_.registerApp(breakoutApp_);
+        appManager_.registerApp(blackjackApp_);
         appManager_.registerApp(gamesMenuApp_);
         appManager_.registerApp(settingsMenuApp_);
         appManager_.registerApp(toolsMenuApp_);
@@ -464,6 +469,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageBreakout:
             appManager_.activate(AppId::Breakout);
+            break;
+        case AppCommandType::PageBlackjack:
+            appManager_.activate(AppId::Blackjack);
             break;
         case AppCommandType::ColorTest:
             appManager_.activate(AppId::DisplayTest);

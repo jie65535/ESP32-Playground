@@ -13,6 +13,7 @@ class WifiService;
 class ServerService;
 class BleGamepadService;
 class GameScoreService;
+class BlackjackProfileService;
 class RuntimeMonitorService;
 class UiRuntime;
 
@@ -27,6 +28,7 @@ struct AppContext {
     GameScoreService& snakeScore;
     GameScoreService& tetrisScore;
     GameScoreService& breakoutScore;
+    BlackjackProfileService& blackjackProfile;
     Stream& console;
     UiRuntime& ui;
     RuntimeMonitorService& runtime;

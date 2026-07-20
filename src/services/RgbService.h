@@ -43,6 +43,8 @@ public:
     void setBrightnessPercent(uint8_t percent);
     uint8_t speedIndex() const;
     void setSpeedIndex(uint8_t index);
+    bool flashFeedback(uint8_t red, uint8_t green, uint8_t blue,
+                       uint16_t durationMs);
 
     RgbSnapshot snapshot() const;
     void printStatus(Print& output) const;
@@ -81,7 +83,11 @@ private:
     uint32_t effectStartedMs_ = 0;
     uint32_t lastFrameMs_ = 0;
     uint32_t settingsSaveDueMs_ = 0;
+    uint32_t feedbackUntilMs_ = 0;
     uint32_t randomState_ = 0x42A5C39DU;
+    uint8_t feedbackRed_ = 0;
+    uint8_t feedbackGreen_ = 0;
+    uint8_t feedbackBlue_ = 0;
 
     void restartEffect();
     void markSettingsDirty();

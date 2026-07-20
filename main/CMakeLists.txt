@@ -1,8 +1,8 @@
 # PlatformIO/ESP-IDF only evaluates this list during CMake configuration.
 # Adding a new source file therefore requires a reconfigure (editing this file
 # is sufficient); ordinary edits keep using the incremental object cache.
-# Keep the source glob explicit in this component so newly added PGOS apps
-# (including the first game) trigger a CMake reconfigure in PlatformIO.
+# Keep the source glob explicit in this component so newly added PGOS apps,
+# including standalone game engines, trigger a CMake reconfigure in PlatformIO.
 file(GLOB_RECURSE PGOS_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 idf_component_register(
