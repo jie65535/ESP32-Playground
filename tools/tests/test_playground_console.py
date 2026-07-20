@@ -57,6 +57,10 @@ class ConsoleMappingTests(unittest.TestCase):
             "page snake",
         )
         self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "b")),
+            "page breakout",
+        )
+        self.assertEqual(
             CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "c")),
             "color_test",
         )
@@ -75,8 +79,10 @@ class ConsoleMappingTests(unittest.TestCase):
 
     def test_command_validation(self) -> None:
         self.assertEqual(
-            CONSOLE.normalize_commands(["UP", "page display", "status"]),
-            ["up", "page display", "status"],
+            CONSOLE.normalize_commands(
+                ["UP", "page display", "page breakout", "status"]
+            ),
+            ["up", "page display", "page breakout", "status"],
         )
         with self.assertRaises(ValueError):
             CONSOLE.normalize_commands(["alarm"])

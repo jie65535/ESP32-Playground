@@ -14,6 +14,7 @@ enum class AppId : uint8_t {
     NetworkSettings,
     Snake,
     Tetris,
+    Breakout,
     Launcher,
     Count,
 };
@@ -40,6 +41,7 @@ enum class AppCommandType : uint8_t {
     PageNetwork,
     PageSnake,
     PageTetris,
+    PageBreakout,
     ColorTest,
     Screenshot,
     Status,

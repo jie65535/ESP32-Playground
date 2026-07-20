@@ -12,6 +12,7 @@
 #include "apps/TimeApp.h"
 #include "apps/SnakeApp.h"
 #include "apps/TetrisApp.h"
+#include "apps/BreakoutApp.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
@@ -24,6 +25,7 @@
 #include "services/ServerService.h"
 #include "services/SnakeScoreService.h"
 #include "services/TetrisScoreService.h"
+#include "services/BreakoutScoreService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
 #include "services/TimeService.h"
@@ -48,6 +50,7 @@ private:
     BleGamepadService gamepad_;
     SnakeScoreService snakeScore_;
     TetrisScoreService tetrisScore_;
+    BreakoutScoreService breakoutScore_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -66,6 +69,7 @@ private:
     NetworkSettingsApp networkSettingsApp_;
     SnakeApp snakeApp_;
     TetrisApp tetrisApp_;
+    BreakoutApp breakoutApp_;
     LauncherApp launcherApp_;
     uint32_t lastRenderMs_ = 0;
     uint32_t lastStatusMs_ = 0;

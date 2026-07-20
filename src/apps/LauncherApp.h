@@ -16,7 +16,7 @@ public:
     AppId requestedApp() const override;
 
 private:
-    static constexpr uint8_t ITEM_COUNT = 11;
+    static constexpr uint8_t ITEM_COUNT = 12;
     uint8_t selected_ = 0;
     int8_t renderedSelection_ = -1;
     AppId requested_ = AppId::Count;

@@ -17,6 +17,7 @@ const char* itemName(uint8_t index) {
         case 8: return "Connectivity";
         case 9: return "Snake";
         case 10: return "Tetris";
+        case 11: return "Breakout";
         default: return "Unknown";
     }
 }
@@ -34,6 +35,7 @@ const char* itemDescription(uint8_t index) {
         case 8: return "Wi-Fi, IP and network services";
         case 9: return "classic controller game";
         case 10: return "falling blocks challenge";
+        case 11: return "three-round brick breaker";
         default: return "";
     }
 }
@@ -51,6 +53,7 @@ const char* itemSymbol(uint8_t index) {
         case 8: return LV_SYMBOL_WIFI;
         case 9: return LV_SYMBOL_PLAY;
         case 10: return LV_SYMBOL_DRIVE;
+        case 11: return LV_SYMBOL_MINUS;
         default: return LV_SYMBOL_LIST;
     }
 }
@@ -68,6 +71,7 @@ AppId itemApp(uint8_t index) {
         case 8: return AppId::NetworkSettings;
         case 9: return AppId::Snake;
         case 10: return AppId::Tetris;
+        case 11: return AppId::Breakout;
         default: return AppId::Count;
     }
 }

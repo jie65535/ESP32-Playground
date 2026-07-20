@@ -14,6 +14,7 @@ class ServerService;
 class BleGamepadService;
 class SnakeScoreService;
 class TetrisScoreService;
+class BreakoutScoreService;
 class RuntimeMonitorService;
 class UiRuntime;
 
@@ -27,6 +28,7 @@ struct AppContext {
     BleGamepadService& gamepad;
     SnakeScoreService& snakeScore;
     TetrisScoreService& tetrisScore;
+    BreakoutScoreService& breakoutScore;
     Stream& console;
     UiRuntime& ui;
     RuntimeMonitorService& runtime;

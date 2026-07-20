@@ -58,9 +58,10 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 - WifiService 通过 USB 控制台扫描/选择 SSID、输入密码并保存到设备 NVS；连接采用非阻塞超时、扫描重试和退避重连，屏幕和 USB 显示状态、IP、RSSI 与重连次数。
 - BleGamepadService 使用 Bluepad32 4.2.0 接入 Xbox BLE HID（已实测 `XBox One` VID/PID `045E:0B13`）。启动/用户请求提供 60 秒配对扫描，连接后停扫；意外掉线立即进行 10 秒重连扫描，主动或空闲断开先等待 30 秒，再以 10 秒扫描 / 20 秒暂停的窗口自动重连。空闲活动以连接首帧的摇杆/扳机中心值为基线并使用迟滞状态，避免带偏移回中后锁存活动；Controller 页面和 `gamepad status` 显示扫描阶段、重连倒计时、输入年龄及模拟量诊断值。默认 15 分钟断开设置保存到 `pgos_gamepad`。
 - USB CDC 与 TCP 命令已统一进入有界 InputRouter；ServerService 支持主动 TCP HELLO/heartbeat/PING-PONG、白名单远程导航和带请求号 ACK/STATE。
+- Snake、Tetris 和 Breakout 已作为独立前台小游戏接入 Launcher；均使用单一 LVGL 自绘面和独立 Top 5 NVS。Breakout 提供三关、三条命、双耐久砖、8ms 固定步进碰撞、可控反弹角与定长碎片池；COM3 已验证标题、运行、击砖计分、暂停输入锁定和返回桌面，完整三关与 Xbox 手感仍待人工复测。
 - PGOS Studio 已提供无线四方向/确认/返回/Home、运行状态、RTT、上下行吞吐测试和 TCP 19002 屏幕镜像；当前镜像仍发送完整 RGB565 帧，下一步是 keyframe + dirty rectangles。
 - System 页面已提供主循环 duty、Heap/最低水位、PSRAM、Flash/OTA、任务数和各阶段耗时；这里的 CPU 指标是主循环 duty，不冒充双核总 CPU。
-- 当前分支 `dev`，工作区保留未提交的手柄空闲活动基线修正；本次 240MHz 构建 RAM 77208 / 327680 bytes，Flash 1726465 / 6553600 bytes，Python 18 项测试通过，并已烧录 COM3、确认新固件正常启动。此前 COM3 已验证原生 `esp_lcd` 显示、RTC、Xbox 手柄连接、输入、震动、状态栏和扫描关闭；本次烧录时现场无法连接手柄，因此带偏移回中后的完整 5 分钟空闲断开和重连窗口仍待真机复测。
+- 当前分支 `dev`，工作区保留未提交的 Breakout 应用、分数服务、入口和文档；本次 240MHz 构建 RAM 78184 / 327680 bytes，Flash 1734073 / 6553600 bytes，Python 18 项测试通过，已烧录 COM3 并取得标题、运行、暂停输入锁定和返回桌面截图。此前 COM3 已验证原生 `esp_lcd` 显示、RTC、Xbox 手柄连接、输入、震动、状态栏和扫描关闭；Breakout 完整三关与 Xbox 手感、以及带偏移回中后的完整 5 分钟空闲断开和重连窗口仍待真机复测。
 - 曾尝试“原生 FSPI + 80MHz”组合，真机出现花屏且实体屏停止刷新；当前原生 `esp_lcd` 固定 SPI2/40MHz，不再把 80MHz 作为默认配置。后续若重测必须一次只改变一个变量。
 - 真实硬件验证应记录在对应实验文档中，不要只在聊天里保留结论。
 
@@ -76,12 +77,13 @@ ESP32 Playground 是一个独立的个人实验项目，目标是探索 QD 电�
 ## 6. 下一步
 
 1. 让用户复测 `3073e00` 之后 Breathe/Heartbeat 的 10ms smoothstep 渐变是否足够丝滑，并确认七种颜色顺序、100% 白色与长期稳定性。
-2. 把镜像协议从固定 153600-byte 完整帧升级为首次 keyframe + dirty rectangles，由 Studio 在主机端合成画面。
-3. 增加 UDP/mDNS 服务发现，减少手工配置 Studio 地址，同时保留持久化服务器身份和安全边界。
-4. 复测 PCF8563 电池保持、断网计时和 Wi-Fi SNTP 自动回写，并记录 `time status` 的 `ntp=...` 状态。
-5. 把统一输入语义扩展到实体按键/编码器，并增加受控的文本输入页面。
-6. 为游戏和高频实验建立独立 RenderSurface，避免破坏系统 Shell 的 LVGL 所有权。
-7. 再逐项探索麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
+2. 烧录并复测 Breakout 的三关流程、挡板手感、角落碰撞、Top 5、碎片、音效、震动和长期稳定性。
+3. 把镜像协议从固定 153600-byte 完整帧升级为首次 keyframe + dirty rectangles，由 Studio 在主机端合成画面。
+4. 增加 UDP/mDNS 服务发现，减少手工配置 Studio 地址，同时保留持久化服务器身份和安全边界。
+5. 复测 PCF8563 电池保持、断网计时和 Wi-Fi SNTP 自动回写，并记录 `time status` 的 `ntp=...` 状态。
+6. 把统一输入语义扩展到实体按键/编码器，并增加受控的文本输入页面。
+7. 为游戏和高频实验建立独立 RenderSurface，避免破坏系统 Shell 的 LVGL 所有权。
+8. 再逐项探索麦克风、I²C/RTC、ADC、BLE、TF/扩展接口和 OTA。
 
 ## 7. 已迁移的通用资产
 

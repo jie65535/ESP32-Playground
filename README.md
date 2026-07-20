@@ -43,7 +43,7 @@ python tools/playground_console.py --port COM3 --wifi-setup
 python tools/capture_screen.py --port COM3 --output captures/home.png
 ```
 
-USB 调试控制台的显式 `page system`、`page time`、`page display`、`page settings`、`page sound`、`page rgb`、`page controller`、`page console`、`page network`、`page snake` 和 `page tetris` 可直达页面，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台。固件也接受 `gamepad status`、`gamepad scan`、`gamepad stop`、`gamepad rumble`、`gamepad disconnect`、`back`、`home`、`time status`、`time set YYYY-MM-DD HH:MM:SS` 和 Wi-Fi 配置命令；密码不会由固件或控制台回显。
+USB 调试控制台的显式 `page system`、`page time`、`page display`、`page settings`、`page sound`、`page rgb`、`page controller`、`page console`、`page network`、`page snake`、`page tetris` 和 `page breakout` 可直达页面，Backspace 返回桌面，`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台；`T` 和 `B` 分别直达俄罗斯方块和打砖块。固件也接受 `gamepad status`、`gamepad scan`、`gamepad stop`、`gamepad rumble`、`gamepad disconnect`、`back`、`home`、`time status`、`time set YYYY-MM-DD HH:MM:SS` 和 Wi-Fi 配置命令；密码不会由固件或控制台回显。
 
 ## PGOS Studio 无线上位机
 
@@ -95,6 +95,7 @@ python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 - [实验记录：Xbox Series 手柄 BLE HID 可行性](docs/experiments/013_ble_xbox_gamepad.md)
 - [实验记录：PGOS 贪吃蛇小游戏](docs/experiments/014_snake_game.md)
 - [实验记录：PGOS 俄罗斯方块小游戏](docs/experiments/015_tetris_game.md)
+- [实验记录：PGOS 打砖块小游戏](docs/experiments/016_breakout_game.md)
 - [可复用经验知识库](docs/knowledge/README.md)
 - [第三方依赖与源码策略](docs/DEPENDENCIES.md)
 - [厂商原始资料说明](docs/vendor/README.md)

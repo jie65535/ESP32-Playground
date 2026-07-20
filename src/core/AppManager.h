@@ -18,7 +18,7 @@ public:
     const char* currentName() const;
 
 private:
-    static constexpr uint8_t MAX_APPS = 12;
+    static constexpr uint8_t MAX_APPS = 13;
     AppContext& context_;
     IApp* apps_[MAX_APPS] = {};
     uint8_t appCount_ = 0;

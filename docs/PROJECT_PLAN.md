@@ -35,6 +35,13 @@ RGB 基座已加入最小实验：`RgbService` 通过 GPIO42/RMT 驱动板载 WS
 
 PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16 共享总线，`TimeService` 以 `0x51` 探测并读取电池时钟，Time 页面显示本地时间，USB 支持 `time set`；Wi-Fi 连接后由 SNTP 自动校对并回写 RTC。模块缺失、VL、STOP 或非法字段时会降级；NTP 回退、运行中恢复、冷启动 RTC 读取和 RTC 回写已真机通过，电池保持和长期漂移仍待焊接后记录。
 
+## 当前：小游戏与固定步进绘制
+
+- Snake、Tetris 和 Breakout 均作为独立前台 App 使用 LVGL 单一自绘面，不直接访问显示硬件，也不创建游戏元素子对象。
+- Xbox 手柄连续状态由游戏按帧采样，A/B/Home 和 D-pad 事件仍经过统一输入路由；USB/TCP 保留低频语义命令用于调试。
+- 三款游戏分别使用独立 NVS namespace 保存 Top 5，动态过程不写 Flash。
+- Breakout 首次引入 8ms 固定步进连续碰撞和定长碎片池，主机测试与固件构建已通过，真机操控、碰撞边界、DMA 刷新、音效和震动仍待验证。
+
 ## 随后：PGOS Studio 媒体与工具能力
 
 - UDP 19003 / mDNS 服务发现：设备发现 Studio、Studio beacon 唤醒设备重连，并以持久化 `server_id` 防止误连。
