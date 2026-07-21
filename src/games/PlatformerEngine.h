@@ -1,6 +1,7 @@
 #pragma once
 
 #include "games/PlatformerLevel.h"
+#include "games/PlatformerLevelRuntime.h"
 
 #include <cstdint>
 
@@ -11,6 +12,9 @@ enum class PlatformerPhase : uint8_t {
     Running,
     Paused,
     Dying,
+    Warping,
+    VineClimb,
+    CastleBridge,
     Flagpole,
     CastleWalk,
     TimeBonus,
@@ -48,6 +52,8 @@ enum class PlatformerEventType : uint8_t {
     LifeRestarted,
     ReachedGoal,
     CourseClear,
+    WarpStarted,
+    WarpCompleted,
 };
 
 struct PlatformerInput {
@@ -119,6 +125,7 @@ struct PlatformerEnemyState {
     float width = 16.0F;
     float height = 16.0F;
     uint16_t stateMs = 0;
+    uint16_t sourceTileId = 0;
     bool active = false;
     bool facingLeft = false;
 };
@@ -150,6 +157,56 @@ struct PlatformerProjectile {
     bool exploding = false;
 };
 
+struct PlatformerMovingPlatformState {
+    float x = 0.0F;
+    float y = 0.0F;
+    float vx = 0.0F;
+    float vy = 0.0F;
+    float minimum = 0.0F;
+    float maximum = 0.0F;
+    float pulleyTop = 0.0F;
+    uint16_t sourceTileId = PLATFORMER_EMPTY_TILE;
+    PlatformerMotionType motion = PlatformerMotionType::None;
+    PlatformerDirection direction = PlatformerDirection::None;
+    uint8_t widthTiles = 0;
+    int8_t pairIndex = -1;
+    bool pulley = false;
+    bool active = false;
+};
+
+struct PlatformerFireBarState {
+    float x = 0.0F;
+    float y = 0.0F;
+    float angleDegrees = 0.0F;
+    uint8_t length = 0;
+    PlatformerRotationDirection direction =
+        PlatformerRotationDirection::None;
+    bool active = false;
+};
+
+struct PlatformerVineState {
+    float x = 0.0F;
+    float baseY = 0.0F;
+    float grownPixels = 0.0F;
+    bool active = false;
+};
+
+enum class PlatformerEnemyHazardKind : uint8_t {
+    Hammer,
+    BowserFire,
+};
+
+struct PlatformerEnemyHazardState {
+    PlatformerEnemyHazardKind kind = PlatformerEnemyHazardKind::Hammer;
+    float x = 0.0F;
+    float y = 0.0F;
+    float vx = 0.0F;
+    float vy = 0.0F;
+    uint16_t sourceTileId = 0;
+    uint16_t ageMs = 0;
+    bool active = false;
+};
+
 struct PlatformerSnapshot {
     PlatformerPhase phase = PlatformerPhase::Title;
     PlatformerDeathReason deathReason = PlatformerDeathReason::None;
@@ -159,7 +216,10 @@ struct PlatformerSnapshot {
     float playerVx = 0.0F;
     float playerVy = 0.0F;
     float cameraX = 0.0F;
+    float cameraY = 0.0F;
+    float flagX = 0.0F;
     float flagY = 0.0F;
+    uint16_t flagTileId = PLATFORMER_EMPTY_TILE;
     bool grounded = false;
     bool playerBig = false;
     bool playerFire = false;
@@ -168,8 +228,10 @@ struct PlatformerSnapshot {
     bool playerSkidding = false;
     bool playerVisible = true;
     bool playerInvincible = false;
+    bool playerDamageBlinking = false;
     bool goalReached = false;
     bool mapTestMode = false;
+    bool campaignMode = false;
     uint32_t score = 0;
     uint16_t timeRemaining = 400;
     uint16_t phaseElapsedMs = 0;
@@ -180,6 +242,12 @@ struct PlatformerSnapshot {
     uint8_t powerupCount = 0;
     uint8_t effectCount = 0;
     uint8_t projectileCount = 0;
+    uint8_t movingPlatformCount = 0;
+    uint8_t fireBarCount = 0;
+    bool vineActive = false;
+    uint8_t enemyHazardCount = 0;
+    uint8_t world = 1;
+    uint8_t stage = 1;
 };
 
 class PlatformerEngine final {
@@ -195,18 +263,27 @@ public:
     static constexpr uint8_t MAX_POWERUPS = 6;
     static constexpr uint8_t MAX_EFFECTS = 20;
     static constexpr uint8_t MAX_PROJECTILES = 2;
+    static constexpr uint8_t MAX_MOVING_PLATFORMS = 20;
+    static constexpr uint8_t MAX_FIRE_BARS = 12;
+    static constexpr uint8_t MAX_ENEMY_HAZARDS = 12;
 
     static constexpr float PLAYER_WIDTH = 16.0F;
     static constexpr float PLAYER_HEIGHT = 16.0F;
     static constexpr float BIG_PLAYER_WIDTH = 16.0F;
     static constexpr float BIG_PLAYER_HEIGHT = 32.0F;
-    static constexpr float CROUCH_PLAYER_HEIGHT = 22.0F;
+    // The reference keeps big Mario's two-tile render box and moves a
+    // one-tile collision box into its lower half while crouching.
+    static constexpr float CROUCH_PLAYER_HEIGHT = PLAYER_HEIGHT;
+    static constexpr float TILE_COLLISION_ROUNDNESS = 2.0F;
     static constexpr float ENEMY_WIDTH = 16.0F;
     static constexpr float ENEMY_HEIGHT = 16.0F;
     PlatformerEngine();
 
     void reset();
     void start();
+    bool startCampaign(uint8_t world = 1, uint8_t stage = 1);
+    bool prepareCampaignTitle(uint8_t world = 1, uint8_t stage = 1);
+    bool advanceCampaign();
     void startMapTest();
     void advanceMapTest();
     void togglePause();
@@ -219,8 +296,13 @@ public:
     PlatformerPowerup powerup(uint8_t index) const;
     PlatformerEffect effect(uint8_t index) const;
     PlatformerProjectile projectile(uint8_t index) const;
+    PlatformerMovingPlatformState movingPlatform(uint8_t index) const;
+    PlatformerFireBarState fireBar(uint8_t index) const;
+    PlatformerVineState vine() const;
+    PlatformerEnemyHazardState enemyHazard(uint8_t index) const;
     float goalX() const;
     float castleX() const;
+    const PlatformerLevelRuntime& levelRuntime() const;
 
     bool pollEvent(PlatformerEvent& event);
 
@@ -232,6 +314,8 @@ public:
     void debugSpawnPowerup(PlatformerPowerupKind kind, float x, float y);
     void debugActivateEnemy(uint8_t index, float x, float y,
                             PlatformerEnemyMotion motion);
+    void debugSpawnCampaignEnemy(PlatformerEnemyType type, float x, float y,
+                                 uint16_t sourceTileId);
     void debugBeginGoal();
     void debugSetTimeRemaining(uint16_t value);
     bool debugTileSolid(uint16_t column, uint8_t row) const;
@@ -252,14 +336,22 @@ private:
         PlatformerEnemyType type = PlatformerEnemyType::Goomba;
         PlatformerEnemyMotion motion = PlatformerEnemyMotion::Walking;
         float activationX = 0.0F;
+        float originX = 0.0F;
+        float originY = 0.0F;
         float width = 16.0F;
         float height = 16.0F;
         uint16_t stateMs = 0;
+        uint16_t sourceTileId = 0;
         uint8_t spawnOrder = 0;
+        uint8_t health = 1;
         bool spawned = false;
     };
 
     static constexpr uint8_t EVENT_QUEUE_SIZE = 24;
+    static constexpr uint16_t MAX_CAMPAIGN_COLUMNS = 400;
+    static constexpr uint8_t MAX_CAMPAIGN_ROWS = 51;
+    static constexpr uint16_t CAMPAIGN_SPAWN_WORDS =
+        (MAX_CAMPAIGN_COLUMNS * MAX_CAMPAIGN_ROWS + 31U) / 32U;
     static constexpr float WALK_SPEED = 134.0F;
     static constexpr float RUN_SPEED = 194.0F;
     static constexpr float WALK_ACCELERATION = 205.0F;
@@ -288,6 +380,8 @@ private:
     static constexpr uint16_t COYOTE_TIME_MS = 72;
     static constexpr uint16_t JUMP_BUFFER_MS = 96;
     static constexpr uint16_t LEVEL_TICK_MS = 400;
+    static constexpr uint16_t DAMAGE_CONTROL_LOCK_MS = 750;
+    static constexpr uint16_t DAMAGE_INVINCIBLE_MS = 3250;
 
     PlatformerPhase phase_ = PlatformerPhase::Title;
     PlatformerDeathReason deathReason_ = PlatformerDeathReason::None;
@@ -296,6 +390,10 @@ private:
     PlatformerPowerup powerups_[MAX_POWERUPS] = {};
     PlatformerEffect effects_[MAX_EFFECTS] = {};
     PlatformerProjectile projectiles_[MAX_PROJECTILES] = {};
+    PlatformerMovingPlatformState movingPlatforms_[MAX_MOVING_PLATFORMS] = {};
+    PlatformerFireBarState fireBars_[MAX_FIRE_BARS] = {};
+    PlatformerVineState vine_{};
+    PlatformerEnemyHazardState enemyHazards_[MAX_ENEMY_HAZARDS] = {};
     PlatformerBox boxes_[MAX_BOXES] = {};
     uint16_t boxBumpMs_[MAX_BOXES] = {};
     uint8_t boxCount_ = 0;
@@ -303,6 +401,9 @@ private:
     uint8_t powerupCount_ = 0;
     uint8_t effectCount_ = 0;
     uint8_t projectileCount_ = 0;
+    uint8_t movingPlatformCount_ = 0;
+    uint8_t fireBarCount_ = 0;
+    uint8_t enemyHazardCount_ = 0;
     uint8_t coinsCollected_ = 0;
     uint8_t lives_ = 3;
     uint32_t score_ = 0;
@@ -316,9 +417,14 @@ private:
     uint16_t hurtInvincibleMs_ = 0;
     uint16_t starInvincibleMs_ = 0;
     uint16_t fireCooldownMs_ = 0;
+    uint16_t warpCooldownMs_ = 0;
+    uint16_t swimCooldownMs_ = 0;
     uint8_t stompChain_ = 0;
     float cameraX_ = 0.0F;
+    float cameraY_ = 0.0F;
+    float flagX_ = 0.0F;
     float flagY_ = 0.0F;
+    uint16_t flagTileId_ = PLATFORMER_EMPTY_TILE;
     float goalX_ = 0.0F;
     float castleX_ = 0.0F;
     PlatformerPlayerPower playerPower_ = PlatformerPlayerPower::Small;
@@ -328,6 +434,22 @@ private:
     bool playerSkidding_ = false;
     bool timeWarningSent_ = false;
     bool mapTestMode_ = false;
+    bool campaignMode_ = false;
+    bool cameraFrozen_ = false;
+    bool warpTeleported_ = false;
+    bool startIntro_ = false;
+    bool vineReturnActive_ = false;
+    uint8_t activeWarpIndex_ = 0;
+    uint8_t activeVineIndex_ = 0;
+    int16_t bridgeStartColumn_ = -1;
+    int16_t bridgeEndColumn_ = -1;
+    uint8_t bridgeRow_ = 0;
+    uint8_t bridgeRemovedCount_ = 0;
+    PlatformerLevelType vinePreviousLevelType_ = PlatformerLevelType::None;
+    PlatformerBackgroundColor vinePreviousBackground_ =
+        PlatformerBackgroundColor::Black;
+    PlatformerLevelRuntime levelRuntime_{};
+    uint32_t campaignEnemySpawned_[CAMPAIGN_SPAWN_WORDS] = {};
     PlatformerEvent events_[EVENT_QUEUE_SIZE] = {};
     uint8_t eventRead_ = 0;
     uint8_t eventWrite_ = 0;
@@ -335,10 +457,14 @@ private:
 
     void buildLevel();
     void resetActors();
+    void resetCampaignLevel(bool resetPower);
     void resetLife();
     void updateRunning(float dt, uint16_t dtMs, const PlatformerInput& input);
     void updateMapTest(float dt, uint16_t dtMs);
     void updateScriptedPhase(float dt, uint16_t dtMs);
+    void updateWarp(float dt);
+    void updateVineClimb(float dt);
+    void updateCastleBridge(float dt);
     void updateTimers(uint16_t dtMs);
     void updateCamera();
     void updatePlayerHorizontal(float dt, const PlatformerInput& input);
@@ -348,13 +474,38 @@ private:
     void moveVertical(float distance);
     bool rectHitsSolid(float x, float y, float width, float height,
                        bool includeHidden = false) const;
+    bool rectHitsPlayerTiles(float x, float y, float width, float height,
+                             float horizontalInset, float bottomTrim,
+                             float tileHorizontalInset) const;
+    bool rectHitsPlayerVertical(float x, float y, float width, float height,
+                                bool rising) const;
+    bool rectHitsPlayerHorizontal(float x, float y, float width,
+                                  float height) const;
     void updateBoxes(uint16_t dtMs);
     void updateEnemies(float dt, uint16_t dtMs);
+    void updateEnemyHazards(float dt, uint16_t dtMs);
+    void activateCampaignEnemies();
+    void spawnSpiny(const EnemyActor& lakitu);
+    void spawnEnemyHazard(PlatformerEnemyHazardKind kind, float x, float y,
+                          float vx, float vy);
     void placeEnemyAtSpawn(EnemyActor& enemy);
     void updatePowerups(float dt, uint16_t dtMs);
     void updateEffects(float dt, uint16_t dtMs);
     void updateProjectiles(float dt, uint16_t dtMs);
+    void resetCampaignDynamics();
+    void updateMovingPlatforms(float dt);
+    void updateFireBars(float dt);
+    void checkFireBarCollisions();
+    void updateVine(float dt, const PlatformerInput& input);
+    void spawnVine(uint16_t column, uint8_t row);
+    void checkVineReturn();
+    int8_t standingPlatform() const;
+    int8_t landingPlatform(float previousBottom, float nextBottom) const;
     void collectPowerups();
+    void collectMapCoins();
+    bool tryEnterWarp(const PlatformerInput& input);
+    void applyTeleportPoints(float previousX);
+    const PlatformerWarpData* activeWarp() const;
     void checkBoxCollision(float previousY, float verticalVelocity);
     void hitBox(uint8_t index);
     void breakBrick(uint8_t index);
@@ -364,6 +515,8 @@ private:
     void hurtPlayer();
     void beginDeath(PlatformerDeathReason reason);
     void beginGoal();
+    float flagClimbPlayerX() const;
+    void beginCastleClear();
     void spawnPowerup(PlatformerPowerupKind kind, float x, float y);
     void spawnEffect(PlatformerEffectKind kind, float x, float y,
                      float vx, float vy, uint16_t value = 0);

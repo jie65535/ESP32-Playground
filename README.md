@@ -12,7 +12,7 @@
 
 ## 当前环境
 
-Games 菜单现已加入 Platformer（超级马里奥 1-1）：USB 可使用 `page platformer` 或快捷键 `P` 直达，`ok`/A 跳跃，X 暂停，B/Home 返回；`platformer maptest` 和 `platformer mapnext` 可在无手柄时固定角色、逐段平移检查整关地图、敌人生成点和碰撞对象。参考工程的选定帧已通过离线工具转换为单份 RGB565+A8 打包资源，设备端不解析 PNG/GIF/JSON；普通帧走 LVGL 图像任务，镜像/缩放才回退到水平段绘制。
+Games 菜单中的 Platformer 已扩展为 1-1 至 8-4 共 32 关战役：USB 可使用 `page platformer` 或快捷键 `P` 直达；标题页默认选中 NVS 继续点，左右选择 WORLD/STAGE 字段、上下调整 1–8/1–4、`ok`/A 开始所选关卡。游戏中 `ok`/A 跳跃，X 暂停，B/Home 返回；关卡地图、区域、水管、藤蔓、平台、火焰棒和敌人出生点由离线工具转换成紧凑 C++ 数据，设备端不解析 PNG/XML/CSV。运行时使用固定池和一块 PSRAM RGB565 游戏画布，NVS 只保存继续关卡、通关状态和最高分；`platformer maptest [world-stage]` 可直达指定关卡，`platformer mapnext` 再逐段巡检原始地图。
 
 - PlatformIO + Arduino
 - `pioarduino/platform-espressif32 55.03.39`
@@ -101,6 +101,7 @@ python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 - [实验记录：PGOS 俄罗斯方块小游戏](docs/experiments/015_tetris_game.md)
 - [实验记录：PGOS 打砖块小游戏](docs/experiments/016_breakout_game.md)
 - [实验记录：PGOS 超级马里奥 1-1](docs/experiments/020_platformer_game.md)
+- [实验记录：PGOS 超级马里奥 32 关战役](docs/experiments/021_platformer_campaign.md)
 - [实验记录：Shell 架构收敛、图标与汉化](docs/experiments/017_shell_architecture_localization.md)
 - [实验记录：PGOS 二十一点与事件动画](docs/experiments/018_blackjack_game.md)
 - [实验记录：设备端 Wi-Fi 扫描与方向键软键盘](docs/experiments/019_on_device_wifi_setup.md)

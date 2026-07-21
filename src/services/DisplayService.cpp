@@ -8,6 +8,8 @@
 #include <esp_err.h>
 #include <esp_lcd_ili9341.h>
 
+#include <algorithm>
+
 namespace {
 
 constexpr spi_host_device_t LCD_SPI_HOST = SPI2_HOST;
@@ -19,6 +21,7 @@ constexpr int LCD_DC_PIN = 46;
 constexpr uint32_t LCD_PIXEL_CLOCK_HZ = 40U * 1000U * 1000U;
 constexpr size_t LCD_MAX_TRANSFER_BYTES =
     static_cast<size_t>(DisplayService::SCREEN_WIDTH) * 40U * sizeof(uint16_t);
+constexpr uint16_t DIRECT_PRESENT_ROWS = 40U;
 // A disconnected or stalled USB CDC host must not leave loopTask trapped in
 // the screenshot writer forever.  A normal 1 KiB chunk is much shorter than
 // this even at the nominal 115200 baud console setting.
@@ -325,6 +328,44 @@ void DisplayService::waitForDma() {
     activeFlushMetrics_.waitUs += static_cast<uint32_t>(min<uint64_t>(
         esp_timer_get_time() - waitStartedUs, UINT32_MAX));
     completeDmaTransfer();
+}
+
+bool DisplayService::dmaPending() const {
+    return dmaPending_;
+}
+
+bool DisplayService::presentRgb565(int16_t x, int16_t y, uint16_t width,
+                                   uint16_t height, uint16_t* pixels,
+                                   uint16_t stride) {
+    if (!ready_ || pixels == nullptr || width == 0U || height == 0U ||
+        stride < width || dmaPending_ || x < 0 || y < 0 ||
+        x + width > SCREEN_WIDTH || y + height > SCREEN_HEIGHT) {
+        return false;
+    }
+    if (stride != width) {
+        return false;
+    }
+    for (uint16_t row = 0; row < height; row += DIRECT_PRESENT_ROWS) {
+        const uint16_t rows = std::min<uint16_t>(
+            DIRECT_PRESENT_ROWS, static_cast<uint16_t>(height - row));
+        const bool lastArea = row + rows == height;
+        uint16_t* chunk = pixels + static_cast<size_t>(row) * stride;
+        const lv_area_t area = {
+            static_cast<lv_coord_t>(x),
+            static_cast<lv_coord_t>(y + row),
+            static_cast<lv_coord_t>(x + width - 1),
+            static_cast<lv_coord_t>(y + row + rows - 1),
+        };
+        if (!flush(area, reinterpret_cast<const uint8_t*>(chunk), lastArea)) {
+            lv_draw_sw_rgb565_swap(reinterpret_cast<uint8_t*>(chunk),
+                                   static_cast<uint32_t>(width) * rows);
+            return false;
+        }
+        waitForDma();
+        lv_draw_sw_rgb565_swap(reinterpret_cast<uint8_t*>(chunk),
+                               static_cast<uint32_t>(width) * rows);
+    }
+    return true;
 }
 
 void DisplayService::completeDmaTransfer() {

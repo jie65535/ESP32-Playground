@@ -98,6 +98,32 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
     } else if (lower == "platformer maptest" ||
                lower == "game platformer maptest") {
         command.type = AppCommandType::PlatformerMapTest;
+    } else if (lower.startsWith("platformer maptest ")) {
+        String argument = lower.substring(19);
+        argument.trim();
+        const int separator = argument.indexOf('-');
+        if (separator <= 0) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            const String worldText = argument.substring(0, separator);
+            const String stageText = argument.substring(separator + 1);
+            if (!isUnsignedInteger(worldText) ||
+                !isUnsignedInteger(stageText)) {
+                command.type = AppCommandType::Unknown;
+                command.value = line;
+                return true;
+            }
+            const int world = worldText.toInt();
+            const int stage = stageText.toInt();
+            if (world < 1 || world > 8 || stage < 1 || stage > 4) {
+                command.type = AppCommandType::Unknown;
+                command.value = line;
+            } else {
+                command.type = AppCommandType::PlatformerMapTest;
+                command.number = (world - 1) * 4 + (stage - 1);
+            }
+        }
     } else if (lower == "platformer mapnext") {
         command.type = AppCommandType::PlatformerMapTestNext;
     } else if (lower == "page blackjack" || lower == "game blackjack") {
@@ -255,7 +281,7 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("         page tetris"));
     output.println(F("         page breakout"));
     output.println(F("         page platformer"));
-    output.println(F("         platformer maptest"));
+    output.println(F("         platformer maptest [world-stage]"));
     output.println(F("         platformer mapnext"));
     output.println(F("         page blackjack"));
     output.println(F("          color_test | screenshot [request_id] | status | help"));

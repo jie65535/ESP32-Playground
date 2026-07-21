@@ -18,6 +18,17 @@ struct PlatformerSolidRect {
 enum class PlatformerEnemyType : uint8_t {
     Goomba,
     Koopa,
+    KoopaParatroopa,
+    BuzzyBeetle,
+    PiranhaPlant,
+    Blooper,
+    CheepCheep,
+    Lakitu,
+    Spiny,
+    HammerBro,
+    BulletBill,
+    LavaBubble,
+    Bowser,
 };
 
 struct PlatformerEnemySpawn {

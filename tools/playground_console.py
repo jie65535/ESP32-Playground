@@ -283,6 +283,7 @@ def normalize_commands(commands: Iterable[str]) -> list[str]:
             "bench upload ",
             "bench download ",
             "time set ",
+            "platformer maptest ",
         )
         prefix = next((item for item in prefixes if lower_value.startswith(item)), None)
         if prefix is None or not value[len(prefix):]:

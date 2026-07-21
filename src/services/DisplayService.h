@@ -39,6 +39,10 @@ public:
     bool asyncFlushEnabled() const;
     bool finishDmaIfReady();
     void waitForDma();
+    bool dmaPending() const;
+    bool presentRgb565(int16_t x, int16_t y, uint16_t width,
+                       uint16_t height, uint16_t* pixels,
+                       uint16_t stride);
 
     uint8_t brightnessPercent() const;
     void setBrightnessPercent(uint8_t percent);

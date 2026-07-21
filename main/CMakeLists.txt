@@ -1,7 +1,9 @@
 # ESP-IDF evaluates this component file once in script mode while collecting
 # requirements, so CONFIGURE_DEPENDS cannot be used here. Keep this comment in
 # the same change as newly added standalone game/UI sources to force
-# PlatformIO's CMake reconfiguration and refresh the globbed source list.
+# PlatformIO's CMake reconfiguration and refresh the globbed source list,
+# including the generated Platformer campaign pack, sparse level runtime and
+# tile renderer.
 file(GLOB_RECURSE PGOS_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 idf_component_register(
