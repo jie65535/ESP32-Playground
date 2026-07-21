@@ -3,10 +3,14 @@
 #include "services/AudioService.h"
 #include "services/BleGamepadService.h"
 #include "services/GameScoreService.h"
+#include "ui/CanvasDraw.h"
 #include "ui/UiRuntime.h"
 
 #include <algorithm>
 #include <cmath>
+
+using pgos::drawRect;
+using pgos::drawText;
 
 namespace {
 
@@ -403,33 +407,6 @@ void BreakoutApp::draw(lv_event_t* event) {
                     static_cast<unsigned>(leaderboard_[4]));
         drawText(layer, text, scores, mutedColor_, hudFont_);
     }
-}
-
-void BreakoutApp::drawRect(lv_layer_t* layer, const lv_area_t& area,
-                           lv_color_t color, int32_t radius,
-                           lv_opa_t opacity) const {
-    lv_draw_rect_dsc_t descriptor;
-    lv_draw_rect_dsc_init(&descriptor);
-    descriptor.bg_color = color;
-    descriptor.bg_opa = opacity;
-    descriptor.radius = radius;
-    lv_draw_rect(layer, &descriptor, &area);
-}
-
-void BreakoutApp::drawText(lv_layer_t* layer, const char* text, lv_area_t area,
-                           lv_color_t color, const lv_font_t* font,
-                           lv_text_align_t align) const {
-    if (text == nullptr || font == nullptr) {
-        return;
-    }
-    lv_draw_label_dsc_t descriptor;
-    lv_draw_label_dsc_init(&descriptor);
-    descriptor.color = color;
-    descriptor.font = font;
-    descriptor.text = text;
-    descriptor.text_local = true;
-    descriptor.align = align;
-    lv_draw_label(layer, &descriptor, &area);
 }
 
 void BreakoutApp::resetGame() {

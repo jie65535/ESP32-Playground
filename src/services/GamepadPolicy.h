@@ -12,6 +12,64 @@ struct GamepadActivitySample {
     uint16_t triggers[2] = {};
 };
 
+class GamepadAxisFilter {
+public:
+    static constexpr int16_t ENTER_THRESHOLD = 144;
+    static constexpr int16_t EXIT_THRESHOLD = 88;
+
+    void reset() {
+        calibrated_ = false;
+        center_ = 0;
+        state_ = 0;
+    }
+
+    void calibrate(int16_t center) {
+        calibrated_ = true;
+        center_ = center;
+        state_ = 0;
+    }
+
+    int16_t update(int16_t value) {
+        if (!calibrated_) {
+            calibrate(value);
+            return 0;
+        }
+
+        const int32_t delta = static_cast<int32_t>(value) - center_;
+        if (state_ < 0 && delta <= -EXIT_THRESHOLD) {
+            return clampDelta(delta);
+        }
+        if (state_ > 0 && delta >= EXIT_THRESHOLD) {
+            return clampDelta(delta);
+        }
+        if (delta <= -ENTER_THRESHOLD) {
+            state_ = -1;
+            return clampDelta(delta);
+        }
+        if (delta >= ENTER_THRESHOLD) {
+            state_ = 1;
+            return clampDelta(delta);
+        }
+        state_ = 0;
+        return 0;
+    }
+
+private:
+    bool calibrated_ = false;
+    int16_t center_ = 0;
+    int8_t state_ = 0;
+
+    static int16_t clampDelta(int32_t value) {
+        if (value < -512) {
+            return -512;
+        }
+        if (value > 512) {
+            return 512;
+        }
+        return static_cast<int16_t>(value);
+    }
+};
+
 class GamepadActivityTracker {
 public:
     static constexpr int16_t AXIS_ENTER_THRESHOLD = 128;

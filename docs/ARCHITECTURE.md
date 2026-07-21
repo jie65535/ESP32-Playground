@@ -56,6 +56,7 @@ public:
 - `DisplayTestApp`：颜色、字体和截图实验。
 - `NetworkConsoleApp`：服务器发现、连接状态和吞吐测试。
 - `MazeApp`、`PacmanApp`：独立小游戏，不直接操作系统服务。
+- `PlatformerApp`：使用纯 C++ `PlatformerEngine`、数据驱动关卡和单一 `RenderSurface` 实现超级马里奥 1-1；USB maptest 只作为离线验证入口，不进入普通页面导航。
 
 无触摸屏更适合按键机式列表、分页或轮播桌面，不必复制手机图标网格。
 
@@ -113,6 +114,8 @@ Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备�
 ```
 
 `UiRuntime` 是 LVGL 的唯一所有者，负责显示驱动、主题、状态栏、页面根节点、转场和通用卡片。应用只创建自己的 view 并更新控件，不直接访问 TFT、SPI 或 LVGL 刷新回调。显示服务另外维护一份 PSRAM shadow framebuffer，用于兼容既有 RGB565 截图协议。
+
+高频游戏使用单一 `RenderSurface` 作为 LVGL 所有权边界，并复用 `CanvasDraw` 的矩形和按字体行高垂直居中文字原语。Platformer 的 `PixelSprite` 只保存一份 RGB565/RGB565A8 打包数据：普通帧直接提交 LVGL 图像任务，镜像或缩放才从同一数据走水平段回退，不为渲染方式复制像素资源。
 
 需要文本输入的前台页面复用 `OnScreenKeyboard`：LVGL `textarea` 保存和遮罩文本，`keyboard/buttonmatrix` 负责绘制紧凑 ASCII 键盘，PGOS 方向语义负责焦点移动和确认。AppManager 允许当前 App 在存在模态输入时优先消费 Back；未消费的 Back 才执行父页面 Pop，Home 始终保持系统级回桌面语义。
 

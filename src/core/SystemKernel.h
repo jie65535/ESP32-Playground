@@ -13,6 +13,7 @@
 #include "apps/SnakeApp.h"
 #include "apps/TetrisApp.h"
 #include "apps/BreakoutApp.h"
+#include "apps/PlatformerApp.h"
 #include "apps/BlackjackApp.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
@@ -71,6 +72,7 @@ private:
     SnakeApp snakeApp_;
     TetrisApp tetrisApp_;
     BreakoutApp breakoutApp_;
+    PlatformerApp platformerApp_;
     BlackjackApp blackjackApp_;
     MenuApp gamesMenuApp_;
     MenuApp settingsMenuApp_;

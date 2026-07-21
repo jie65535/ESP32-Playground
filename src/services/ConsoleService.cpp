@@ -93,6 +93,13 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageTetris;
     } else if (lower == "page breakout" || lower == "game breakout") {
         command.type = AppCommandType::PageBreakout;
+    } else if (lower == "page platformer" || lower == "game platformer") {
+        command.type = AppCommandType::PagePlatformer;
+    } else if (lower == "platformer maptest" ||
+               lower == "game platformer maptest") {
+        command.type = AppCommandType::PlatformerMapTest;
+    } else if (lower == "platformer mapnext") {
+        command.type = AppCommandType::PlatformerMapTestNext;
     } else if (lower == "page blackjack" || lower == "game blackjack") {
         command.type = AppCommandType::PageBlackjack;
     } else if (lower == "color_test") {
@@ -247,6 +254,9 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("         page snake"));
     output.println(F("         page tetris"));
     output.println(F("         page breakout"));
+    output.println(F("         page platformer"));
+    output.println(F("         platformer maptest"));
+    output.println(F("         platformer mapnext"));
     output.println(F("         page blackjack"));
     output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));

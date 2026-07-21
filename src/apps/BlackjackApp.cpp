@@ -5,11 +5,15 @@
 #include "services/BleGamepadService.h"
 #include "services/RgbService.h"
 #include "services/TimeService.h"
+#include "ui/CanvasDraw.h"
 #include "ui/UiRuntime.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+
+using pgos::drawRect;
+using pgos::drawText;
 
 namespace {
 
@@ -679,41 +683,6 @@ void BlackjackApp::drawChip(lv_layer_t* layer, int16_t x, int16_t y,
     outer.y1 += 2;
     outer.y2 -= 2;
     drawRect(layer, outer, color, LV_RADIUS_CIRCLE);
-}
-
-void BlackjackApp::drawRect(lv_layer_t* layer, const lv_area_t& area,
-                            lv_color_t color, int32_t radius,
-                            lv_opa_t opacity) const {
-    lv_draw_rect_dsc_t descriptor;
-    lv_draw_rect_dsc_init(&descriptor);
-    descriptor.bg_color = color;
-    descriptor.bg_opa = opacity;
-    descriptor.radius = radius;
-    lv_draw_rect(layer, &descriptor, &area);
-}
-
-void BlackjackApp::drawText(lv_layer_t* layer, const char* text,
-                            lv_area_t area, lv_color_t color,
-                            const lv_font_t* font,
-                            lv_text_align_t align) const {
-    if (text == nullptr || font == nullptr) {
-        return;
-    }
-    const int32_t areaHeight = area.y2 - area.y1 + 1;
-    const int32_t lineHeight = lv_font_get_line_height(font);
-    if (areaHeight > lineHeight) {
-        area.y1 += static_cast<lv_coord_t>((areaHeight - lineHeight) / 2);
-        area.y2 = area.y1 + static_cast<lv_coord_t>(lineHeight - 1);
-    }
-    lv_draw_label_dsc_t descriptor;
-    lv_draw_label_dsc_init(&descriptor);
-    descriptor.color = color;
-    descriptor.font = font;
-    descriptor.text = text;
-    descriptor.text_local = true;
-    descriptor.align = align;
-    descriptor.opa = LV_OPA_COVER;
-    lv_draw_label(layer, &descriptor, &area);
 }
 
 void BlackjackApp::enterBetting(AppContext& context) {

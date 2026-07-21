@@ -106,13 +106,6 @@ private:
                   int16_t width = CARD_WIDTH) const;
     void drawChip(lv_layer_t* layer, int16_t x, int16_t y,
                   lv_color_t color) const;
-    void drawRect(lv_layer_t* layer, const lv_area_t& area,
-                  lv_color_t color, int32_t radius = 0,
-                  lv_opa_t opacity = LV_OPA_COVER) const;
-    void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
-                  lv_color_t color, const lv_font_t* font,
-                  lv_text_align_t align = LV_TEXT_ALIGN_CENTER) const;
-
     void enterBetting(AppContext& context);
     void startRound(AppContext& context, uint32_t nowMs);
     void executeAction(PlayerAction action, AppContext& context,

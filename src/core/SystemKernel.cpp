@@ -21,6 +21,7 @@ const MenuItemDefinition GAME_ITEMS[] = {
     {UiIcon::Snake, "贪吃蛇", nullptr, AppId::Snake},
     {UiIcon::Tetris, "俄罗斯方块", nullptr, AppId::Tetris},
     {UiIcon::Breakout, "打砖块", nullptr, AppId::Breakout},
+    {UiIcon::Gamepad, "Super Mario", nullptr, AppId::Platformer},
     {UiIcon::Blackjack, "二十一点", nullptr, AppId::Blackjack},
 };
 
@@ -113,6 +114,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageSnake:
         case AppCommandType::PageTetris:
         case AppCommandType::PageBreakout:
+        case AppCommandType::PagePlatformer:
         case AppCommandType::PageBlackjack:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
@@ -228,6 +230,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(snakeApp_);
         appManager_.registerApp(tetrisApp_);
         appManager_.registerApp(breakoutApp_);
+        appManager_.registerApp(platformerApp_);
         appManager_.registerApp(blackjackApp_);
         appManager_.registerApp(gamesMenuApp_);
         appManager_.registerApp(settingsMenuApp_);
@@ -469,6 +472,13 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageBreakout:
             appManager_.activate(AppId::Breakout);
+            break;
+        case AppCommandType::PagePlatformer:
+            appManager_.activate(AppId::Platformer);
+            break;
+        case AppCommandType::PlatformerMapTest:
+            appManager_.activate(AppId::Platformer);
+            appManager_.handleCommand(command);
             break;
         case AppCommandType::PageBlackjack:
             appManager_.activate(AppId::Blackjack);

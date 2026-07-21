@@ -77,12 +77,6 @@ private:
 
     static void drawEvent(lv_event_t* event);
     void draw(lv_event_t* event);
-    void drawRect(lv_layer_t* layer, const lv_area_t& area,
-                  lv_color_t color, int32_t radius = 0,
-                  lv_opa_t opacity = LV_OPA_COVER) const;
-    void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
-                  lv_color_t color, const lv_font_t* font,
-                  lv_text_align_t align = LV_TEXT_ALIGN_CENTER) const;
     void drawClearEffect(lv_layer_t* layer, const lv_area_t& board,
                          uint32_t elapsedMs) const;
 

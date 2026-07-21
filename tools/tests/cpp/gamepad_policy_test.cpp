@@ -4,6 +4,7 @@
 
 using pgos::GamepadActivitySample;
 using pgos::GamepadActivityTracker;
+using pgos::GamepadAxisFilter;
 using pgos::GamepadReconnectScheduler;
 
 GamepadActivitySample neutralSample() {
@@ -11,6 +12,16 @@ GamepadActivitySample neutralSample() {
 }
 
 int main() {
+    GamepadAxisFilter axisFilter;
+    assert(axisFilter.update(146) == 0);
+    assert(axisFilter.update(205) == 0);
+    assert(axisFilter.update(295) == 149);
+    assert(axisFilter.update(245) == 99);
+    assert(axisFilter.update(225) == 0);
+    assert(axisFilter.update(275) == 0);
+    assert(axisFilter.update(-20) == -166);
+    assert(axisFilter.update(80) == 0);
+
     GamepadActivityTracker tracker;
     GamepadActivitySample sample = neutralSample();
     assert(!tracker.update(sample));

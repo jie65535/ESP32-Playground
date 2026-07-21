@@ -12,6 +12,8 @@
 
 ## 当前环境
 
+Games 菜单现已加入 Platformer（超级马里奥 1-1）：USB 可使用 `page platformer` 或快捷键 `P` 直达，`ok`/A 跳跃，X 暂停，B/Home 返回；`platformer maptest` 和 `platformer mapnext` 可在无手柄时固定角色、逐段平移检查整关地图、敌人生成点和碰撞对象。参考工程的选定帧已通过离线工具转换为单份 RGB565+A8 打包资源，设备端不解析 PNG/GIF/JSON；普通帧走 LVGL 图像任务，镜像/缩放才回退到水平段绘制。
+
 - PlatformIO + Arduino
 - `pioarduino/platform-espressif32 55.03.39`
 - `Arduino-ESP32 3.3.9` / `ESP-IDF 5.5.4`
@@ -43,7 +45,7 @@ python tools/playground_console.py --port COM3 --wifi-setup
 python tools/capture_screen.py --port COM3 --output captures/home.png
 ```
 
-USB 调试控制台的显式 `page system`、`page time`、`page display`、`page settings`、`page sound`、`page rgb`、`page controller`、`page console`、`page network`、`page snake`、`page tetris`、`page breakout` 和 `page blackjack` 可直达页面，Backspace 返回上一级，`home` 直接返回桌面；`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台；`T`、`B` 和 `J` 分别直达俄罗斯方块、打砖块和二十一点。固件也接受 `gamepad status`、`gamepad scan`、`gamepad stop`、`gamepad rumble`、`gamepad disconnect`、`back`、`home`、`time status`、`time set YYYY-MM-DD HH:MM:SS` 和 Wi-Fi 配置命令；密码不会由固件或控制台回显。
+USB 调试控制台的显式 `page system`、`page time`、`page display`、`page settings`、`page sound`、`page rgb`、`page controller`、`page console`、`page network`、`page snake`、`page tetris`、`page breakout`、`page platformer` 和 `page blackjack` 可直达页面，Backspace 返回上一级，`home` 直接返回桌面；`C` 显示色卡，`R` 查询状态，`W` 启动 Wi-Fi 配网，`S` 会暂停日志读取线程并导出 LVGL shadow framebuffer 的原始 RGB565 画布到 PNG/Windows 剪贴板。四方向键移动当前页面焦点，回车确认，`Q` 退出控制台；`T`、`B`、`P` 和 `J` 分别直达俄罗斯方块、打砖块、超级马里奥和二十一点。固件也接受 `gamepad status`、`gamepad scan`、`gamepad stop`、`gamepad rumble`、`gamepad disconnect`、`back`、`home`、`time status`、`time set YYYY-MM-DD HH:MM:SS` 和 Wi-Fi 配置命令；密码不会由固件或控制台回显。
 
 设备端进入“设置 → 无线网络 → 配置网络”即可启动同一套非阻塞扫描。加密网络会进入 320×240 方向键软键盘；方向键移动、确认输入，Xbox `X` 可快速切换字母/符号页，Back 返回网络列表。开放网络会跳过密码页直接保存并连接。
 
@@ -98,6 +100,7 @@ python tools/pgos_server.py --listen 0.0.0.0 --port 19000
 - [实验记录：PGOS 贪吃蛇小游戏](docs/experiments/014_snake_game.md)
 - [实验记录：PGOS 俄罗斯方块小游戏](docs/experiments/015_tetris_game.md)
 - [实验记录：PGOS 打砖块小游戏](docs/experiments/016_breakout_game.md)
+- [实验记录：PGOS 超级马里奥 1-1](docs/experiments/020_platformer_game.md)
 - [实验记录：Shell 架构收敛、图标与汉化](docs/experiments/017_shell_architecture_localization.md)
 - [实验记录：PGOS 二十一点与事件动画](docs/experiments/018_blackjack_game.md)
 - [实验记录：设备端 Wi-Fi 扫描与方向键软键盘](docs/experiments/019_on_device_wifi_setup.md)

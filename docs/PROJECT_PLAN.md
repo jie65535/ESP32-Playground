@@ -43,6 +43,7 @@ PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16
 ## 当前：小游戏、固定步进与回合制事件动画
 
 - Snake、Tetris、Breakout 和 Blackjack 均作为独立前台 App 使用 LVGL 单一自绘面，不直接访问显示硬件，也不创建游戏元素子对象。
+- Platformer 已完成超级马里奥 1-1 的第一关实现：纯 C++ 横版平台游戏引擎、固定步进碰撞、摄像机卷轴、CoinBox/多金币砖/特殊砖奖励、Goomba/Koopa、终点旗杆和城堡流程；App 通过单一 `RenderSurface` 绘制，并提供 USB `platformer maptest/mapnext` 固定角色全图巡检。离线精灵只保留一份 RGB565+A8 打包资源，普通帧走 LVGL 图像任务，镜像/缩放回退到水平段；自绘游戏共用 `CanvasDraw` 的 HUD 文字垂直居中规则，后续再接脏矩形。
 - Xbox 手柄连续状态由游戏按帧采样，A/B/Home 和 D-pad 事件仍经过统一输入路由；USB/TCP 保留低频语义命令用于调试。
 - 前三款游戏通过同一个可配置 `GameScoreService` 保存 Top 5，继续沿用各自独立
   NVS namespace 和 schema；动态过程不写 Flash。
