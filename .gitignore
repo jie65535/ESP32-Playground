@@ -27,3 +27,4 @@ tools/vendor-fonts/*
 include/secrets.local.h
 captures/
 logs/
+artifacts/
