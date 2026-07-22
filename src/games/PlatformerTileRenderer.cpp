@@ -115,10 +115,23 @@ void drawLayer(const PlatformerCampaignLevel& level, PlatformerMapLayer layer,
             for (int32_t drawColumn = drawFirst; drawColumn < drawLast;
                  ++drawColumn) {
                 uint16_t drawTileId = tileId;
+                int8_t bumpOffset = 0;
+                if (runtime != nullptr) {
+                    drawTileId = runtime->displaySourceId(
+                        static_cast<uint16_t>(drawColumn),
+                        static_cast<uint8_t>(row), drawTileId);
+                    if (layer == PlatformerMapLayer::Underground ||
+                        layer == PlatformerMapLayer::Foreground) {
+                        bumpOffset = runtime->blockBumpOffset(
+                            static_cast<uint16_t>(drawColumn),
+                            static_cast<uint8_t>(row));
+                    }
+                }
                 if (runtime != nullptr && drawTileId < PLATFORMER_BLOCK_TILE_COUNT) {
                     const uint16_t reference =
                         PLATFORMER_BLOCK_REFERENCE_IDS[drawTileId];
-                    if (reference == 761U || reference == 809U) {
+                    if (reference == 761U || reference == 809U ||
+                        reference == 857U) {
                         continue;
                     }
                 }
@@ -153,8 +166,8 @@ void drawLayer(const PlatformerCampaignLevel& level, PlatformerMapLayer layer,
                 drawCachedOrPacked(
                     PLATFORMER_BLOCK_TILES, blockCache, drawTileId,
                     static_cast<int16_t>(drawColumn * TILE - cameraX),
-                    static_cast<int16_t>(row * TILE - cameraY), target, width,
-                    height, stride);
+                    static_cast<int16_t>(row * TILE - cameraY + bumpOffset),
+                    target, width, height, stride);
             }
             column = runEnd;
         }
@@ -194,10 +207,7 @@ void drawEnemies(const PlatformerCampaignLevel& level, int32_t cameraX,
                 break;
             }
             const int32_t runEnd = column + runLength;
-            if (tileId < PLATFORMER_ENEMY_TILE_COUNT && tileId != 73U &&
-                tileId != 79U && tileId != 83U && tileId != 85U &&
-                tileId != 91U && tileId != 490U && tileId != 492U &&
-                tileId != 496U) {
+            if (platformerEnemySourceCreatesEntity(tileId)) {
                 for (int32_t drawColumn = std::max(column, firstColumn);
                      drawColumn < std::min(runEnd, lastColumn); ++drawColumn) {
                     drawCachedOrPacked(
@@ -322,7 +332,7 @@ void PlatformerTileRenderer::drawAboveForeground(
 void PlatformerTileRenderer::drawTile(
     const PlatformerPackedTileSheet& sheet, uint16_t tileId, int16_t x,
     int16_t y, uint16_t* target, uint16_t width, uint16_t height,
-    uint16_t stride, bool flipX) {
+    uint16_t stride, bool flipX, bool flipY) {
     if (target == nullptr || sheet.palette == nullptr ||
         tileId >= sheet.tileCount) {
         return;
@@ -343,8 +353,12 @@ void PlatformerTileRenderer::drawTile(
                                         ? PLATFORMER_SOURCE_TILE_SIZE - 1U -
                                               sourceX
                                         : sourceX;
+            const uint8_t sampleY = flipY
+                                        ? PLATFORMER_SOURCE_TILE_SIZE - 1U -
+                                              sourceY
+                                        : sourceY;
             const uint8_t paletteIndex =
-                platformerPackedTilePixel(sheet, tileId, sampleX, sourceY);
+                platformerPackedTilePixel(sheet, tileId, sampleX, sampleY);
             if (paletteIndex != 0U && paletteIndex < sheet.paletteSize) {
                 target[static_cast<size_t>(destinationY) * stride +
                        destinationX] = sheet.palette[paletteIndex];
@@ -356,7 +370,7 @@ void PlatformerTileRenderer::drawTile(
 void PlatformerTileRenderer::drawTile(
     const PlatformerDecodedTileSheet& sheet, uint16_t tileId, int16_t x,
     int16_t y, uint16_t* target, uint16_t width, uint16_t height,
-    uint16_t stride, bool flipX) {
+    uint16_t stride, bool flipX, bool flipY) {
     if (sheet.source == nullptr || sheet.pixels == nullptr || target == nullptr ||
         sheet.source->palette == nullptr || tileId >= sheet.source->tileCount ||
         sheet.pixelCount < (static_cast<size_t>(tileId) + 1U) *
@@ -371,7 +385,12 @@ void PlatformerTileRenderer::drawTile(
         if (destinationY < 0 || destinationY >= static_cast<int16_t>(height)) {
             continue;
         }
-        const uint8_t* sourceRow = tile + sourceY * PLATFORMER_SOURCE_TILE_SIZE;
+        const uint8_t sampleY = flipY
+                                    ? PLATFORMER_SOURCE_TILE_SIZE - 1U -
+                                          sourceY
+                                    : sourceY;
+        const uint8_t* sourceRow =
+            tile + sampleY * PLATFORMER_SOURCE_TILE_SIZE;
         uint16_t* destination =
             target + static_cast<size_t>(destinationY) * stride;
         for (uint8_t sourceX = 0; sourceX < PLATFORMER_SOURCE_TILE_SIZE;

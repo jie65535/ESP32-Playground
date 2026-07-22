@@ -27,6 +27,8 @@ class PlatformerCampaignDataTests(unittest.TestCase):
                     "-Isrc",
                     "src/games/PlatformerCampaignData.cpp",
                     "src/games/PlatformerCampaignData.generated.cpp",
+                    "src/games/PlatformerTileAssets.cpp",
+                    "src/games/PlatformerTileAssets.generated.cpp",
                     "tools/tests/platformer_campaign_data_test.cpp",
                     "-o",
                     str(executable),

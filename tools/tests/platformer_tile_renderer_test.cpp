@@ -2,6 +2,7 @@
 #include "games/PlatformerTileAssets.h"
 #include "games/PlatformerTileRenderer.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -42,6 +43,11 @@ int main(int argc, char** argv) {
     assert(PLATFORMER_BLOCK_REFERENCE_IDS[593] == 101);
     assert(PLATFORMER_ENEMY_REFERENCE_IDS[38] == 38);
     assert(PLATFORMER_ENEMY_REFERENCE_IDS[143] == 38);
+    assert(platformerEnemySourceCreatesEntity(38U));
+    assert(platformerEnemySourceCreatesEntity(143U));
+    assert(!platformerEnemySourceCreatesEntity(75U));
+    assert(!platformerEnemySourceCreatesEntity(184U));
+    assert(!platformerEnemySourceCreatesEntity(492U));
 
     const PlatformerCampaignLevel* first = platformerCampaignLevel(1, 1);
     assert(first != nullptr);
@@ -101,6 +107,63 @@ int main(int argc, char** argv) {
     PlatformerTileRenderer::render(*underground, 0, 13 * 16, frame, WIDTH,
                                    HEIGHT, WIDTH, false);
     assert(frame[static_cast<size_t>(100) * WIDTH + 100] == 0U);
+
+    PlatformerLevelRuntime trampolineRuntime;
+    assert(trampolineRuntime.load(2, 1));
+    const PlatformerTrampolineRuntimeState* trampoline =
+        trampolineRuntime.trampoline(0U);
+    assert(trampoline != nullptr);
+    const int32_t trampolineCameraX = std::max<int32_t>(
+        0, static_cast<int32_t>(trampoline->column) * 16 - WIDTH / 2);
+    const int32_t trampolineCameraY = std::max<int32_t>(
+        0, static_cast<int32_t>(trampoline->row) * 16 - HEIGHT / 2);
+    PlatformerTileRenderer::renderBase(
+        trampolineRuntime, trampolineCameraX, trampolineCameraY, frame,
+        WIDTH, HEIGHT, WIDTH, &blockCache);
+    const uint32_t extendedTrampolineChecksum = checksum();
+    assert(trampolineRuntime.setTrampolineState(0U, 1U, 1U, true));
+    PlatformerTileRenderer::renderBase(
+        trampolineRuntime, trampolineCameraX, trampolineCameraY, frame,
+        WIDTH, HEIGHT, WIDTH, &blockCache);
+    assert(checksum() != extendedTrampolineChecksum);
+
+    PlatformerLevelRuntime bumpRuntime;
+    assert(bumpRuntime.load(1, 1));
+    assert(bumpRuntime.hitBlock(16, 9, false).accepted);
+    PlatformerTileRenderer::renderBase(bumpRuntime, 192, 64, frame, WIDTH,
+                                       HEIGHT, WIDTH, &blockCache);
+    const uint32_t usedBlockChecksum = checksum();
+    assert(bumpRuntime.startBlockBump(16, 9));
+    bumpRuntime.updateBlockBumps();
+    PlatformerTileRenderer::renderBase(bumpRuntime, 192, 64, frame, WIDTH,
+                                       HEIGHT, WIDTH, &blockCache);
+    assert(checksum() != usedBlockChecksum);
+    for (uint8_t step = 1U; step < 8U; ++step) {
+        bumpRuntime.updateBlockBumps();
+    }
+    PlatformerTileRenderer::renderBase(bumpRuntime, 192, 64, frame, WIDTH,
+                                       HEIGHT, WIDTH, &blockCache);
+    assert(checksum() == usedBlockChecksum);
+
+    uint16_t normalTile[16U * 16U] = {};
+    uint16_t flippedPacked[16U * 16U] = {};
+    uint16_t flippedDecoded[16U * 16U] = {};
+    PlatformerTileRenderer::drawTile(PLATFORMER_ENEMY_TILES, 38U, 0, 0,
+                                     normalTile, 16U, 16U, 16U);
+    PlatformerTileRenderer::drawTile(PLATFORMER_ENEMY_TILES, 38U, 0, 0,
+                                     flippedPacked, 16U, 16U, 16U, false,
+                                     true);
+    PlatformerTileRenderer::drawTile(enemyCache, 38U, 0, 0,
+                                     flippedDecoded, 16U, 16U, 16U, false,
+                                     true);
+    assert(std::memcmp(flippedPacked, flippedDecoded,
+                       sizeof(flippedPacked)) == 0);
+    for (uint8_t y = 0U; y < 16U; ++y) {
+        for (uint8_t x = 0U; x < 16U; ++x) {
+            assert(flippedPacked[y * 16U + x] ==
+                   normalTile[(15U - y) * 16U + x]);
+        }
+    }
 
     return 0;
 }

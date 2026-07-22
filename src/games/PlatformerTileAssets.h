@@ -28,5 +28,6 @@ extern const uint16_t
 
 uint8_t platformerPackedTilePixel(const PlatformerPackedTileSheet& sheet,
                                   uint16_t tileId, uint8_t x, uint8_t y);
+bool platformerEnemySourceCreatesEntity(uint16_t sourceTileId);
 
 }  // namespace pgos

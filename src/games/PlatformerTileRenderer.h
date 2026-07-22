@@ -50,11 +50,13 @@ public:
     static void drawTile(const PlatformerPackedTileSheet& sheet,
                          uint16_t tileId, int16_t x, int16_t y,
                          uint16_t* target, uint16_t width, uint16_t height,
-                         uint16_t stride, bool flipX = false);
+                         uint16_t stride, bool flipX = false,
+                         bool flipY = false);
     static void drawTile(const PlatformerDecodedTileSheet& sheet,
                          uint16_t tileId, int16_t x, int16_t y,
                          uint16_t* target, uint16_t width, uint16_t height,
-                         uint16_t stride, bool flipX = false);
+                         uint16_t stride, bool flipX = false,
+                         bool flipY = false);
 
     static size_t decodedPixelCount(const PlatformerPackedTileSheet& sheet);
     static bool decode(const PlatformerPackedTileSheet& sheet,

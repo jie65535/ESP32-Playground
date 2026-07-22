@@ -49,7 +49,6 @@ bool kindIsSolid(PlatformerRuntimeTileKind kind) {
         case PlatformerRuntimeTileKind::Question:
         case PlatformerRuntimeTileKind::Brick:
         case PlatformerRuntimeTileKind::Trampoline:
-        case PlatformerRuntimeTileKind::CloudPlatform:
             return true;
         case PlatformerRuntimeTileKind::Empty:
         case PlatformerRuntimeTileKind::Coin:
@@ -58,6 +57,7 @@ bool kindIsSolid(PlatformerRuntimeTileKind kind) {
         case PlatformerRuntimeTileKind::Flag:
         case PlatformerRuntimeTileKind::Axe:
         case PlatformerRuntimeTileKind::MovingPlatform:
+        case PlatformerRuntimeTileKind::CloudPlatform:
             return false;
     }
     return false;
@@ -67,14 +67,28 @@ bool kindIsSolid(PlatformerRuntimeTileKind kind) {
 
 bool PlatformerLevelRuntime::load(uint8_t world, uint8_t stage) {
     level_ = platformerCampaignLevel(world, stage);
+    scanTrampolines();
+    scanAnimatedTiles();
     resetChanges();
     return level_ != nullptr;
 }
 
 void PlatformerLevelRuntime::resetChanges() {
     modificationCount_ = 0;
+    animationFrame_ = 0U;
+    for (uint8_t index = 0; index < animatedTileCount_; ++index) {
+        animatedTiles_[index].ageFrames = 0U;
+    }
     for (auto& change : modifications_) {
         change = PlatformerTileModification{};
+    }
+    for (auto& bump : blockBumps_) {
+        bump = PlatformerBlockBumpState{};
+    }
+    for (uint8_t index = 0; index < trampolineCount_; ++index) {
+        trampolines_[index].sequenceIndex = 0U;
+        trampolines_[index].visualState = 0U;
+        trampolines_[index].activated = false;
     }
     if (level_ != nullptr) {
         activeLevelType_ = level_->levelType;
@@ -210,6 +224,14 @@ bool PlatformerLevelRuntime::isSolid(uint16_t column, uint8_t row) const {
     if (change != nullptr) {
         return change->state == PlatformerTileModificationState::Used;
     }
+    for (uint8_t index = 0; index < trampolineCount_; ++index) {
+        const PlatformerTrampolineRuntimeState& trampoline =
+            trampolines_[index];
+        if (trampoline.activated && trampoline.column == column &&
+            trampoline.row == row) {
+            return false;
+        }
+    }
     return kindIsSolid(tile(column, row).kind);
 }
 
@@ -298,6 +320,239 @@ bool PlatformerLevelRuntime::removeTile(uint16_t column, uint8_t row) {
     }
     return addModification(column, row,
                            PlatformerTileModificationState::Broken);
+}
+
+void PlatformerLevelRuntime::setAnimationFrame(uint32_t frame) {
+    animationFrame_ = frame;
+    const uint8_t cycleFrame =
+        frame == 0U
+            ? 0U
+            : static_cast<uint8_t>((frame - 1U) % 57U + 1U);
+    for (uint8_t index = 0; index < animatedTileCount_; ++index) {
+        animatedTiles_[index].ageFrames = cycleFrame;
+    }
+}
+
+uint32_t PlatformerLevelRuntime::animationFrame() const {
+    return animationFrame_;
+}
+
+void PlatformerLevelRuntime::updateAnimations(float cameraX, float cameraY,
+                                               uint16_t viewportWidth,
+                                               uint16_t viewportHeight) {
+    ++animationFrame_;
+    for (uint8_t index = 0; index < animatedTileCount_; ++index) {
+        PlatformerAnimatedTileState& tile = animatedTiles_[index];
+        const float x = static_cast<float>(tile.column * TILE_SIZE);
+        const float y = static_cast<float>(tile.row * TILE_SIZE);
+        const bool inCamera =
+            x + TILE_SIZE >= cameraX && x <= cameraX + viewportWidth &&
+            y + TILE_SIZE >= cameraY && y <= cameraY + viewportHeight;
+        if (!inCamera) {
+            continue;
+        }
+        tile.ageFrames = tile.ageFrames >= 57U
+                             ? 1U
+                             : static_cast<uint8_t>(tile.ageFrames + 1U);
+    }
+}
+
+uint8_t PlatformerLevelRuntime::animatedTileCount() const {
+    return animatedTileCount_;
+}
+
+bool PlatformerLevelRuntime::startBlockBump(uint16_t column, uint8_t row) {
+    for (const auto& bump : blockBumps_) {
+        if (bump.active && bump.column == column && bump.row == row) {
+            return false;
+        }
+    }
+    for (auto& bump : blockBumps_) {
+        if (!bump.active) {
+            bump.column = column;
+            bump.row = row;
+            bump.step = 0U;
+            bump.offset = 0;
+            bump.active = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+void PlatformerLevelRuntime::updateBlockBumps() {
+    // Reference cumulative positions after its eight 32px-tile deltas,
+    // scaled to the 16px PGOS tiles and rounded to integer pixels.
+    static constexpr int8_t OFFSETS[] = {-2, -3, -4, -5,
+                                          -4, -3, -2, 0};
+    for (auto& bump : blockBumps_) {
+        if (!bump.active) {
+            continue;
+        }
+        bump.offset = OFFSETS[bump.step];
+        ++bump.step;
+        if (bump.step >= sizeof(OFFSETS) / sizeof(OFFSETS[0])) {
+            bump.active = false;
+            bump.offset = 0;
+        }
+    }
+}
+
+int8_t PlatformerLevelRuntime::blockBumpOffset(uint16_t column,
+                                                uint8_t row) const {
+    for (const auto& bump : blockBumps_) {
+        if (bump.active && bump.column == column && bump.row == row) {
+            return bump.offset;
+        }
+    }
+    return 0;
+}
+
+const PlatformerBlockBumpState* PlatformerLevelRuntime::blockBump(
+    uint8_t index) const {
+    if (index >= MAX_BLOCK_BUMPS || !blockBumps_[index].active) {
+        return nullptr;
+    }
+    return &blockBumps_[index];
+}
+
+uint8_t PlatformerLevelRuntime::trampolineCount() const {
+    return trampolineCount_;
+}
+
+const PlatformerTrampolineRuntimeState* PlatformerLevelRuntime::trampoline(
+    uint8_t index) const {
+    return index < trampolineCount_ ? &trampolines_[index] : nullptr;
+}
+
+bool PlatformerLevelRuntime::setTrampolineState(uint8_t index,
+                                                uint8_t sequenceIndex,
+                                                uint8_t visualState,
+                                                bool activated) {
+    if (index >= trampolineCount_ || visualState > 2U) {
+        return false;
+    }
+    PlatformerTrampolineRuntimeState& trampoline = trampolines_[index];
+    trampoline.sequenceIndex = sequenceIndex;
+    trampoline.visualState = visualState;
+    trampoline.activated = activated;
+    return true;
+}
+
+uint16_t PlatformerLevelRuntime::displaySourceId(uint16_t column, uint8_t row,
+                                                 uint16_t sourceId) const {
+    if (sourceId >= PLATFORMER_BLOCK_TILE_COUNT) {
+        return sourceId;
+    }
+    const uint16_t reference = PLATFORMER_BLOCK_REFERENCE_IDS[sourceId];
+    for (uint8_t index = 0; index < trampolineCount_; ++index) {
+        const PlatformerTrampolineRuntimeState& trampoline =
+            trampolines_[index];
+        const bool top = trampoline.column == column &&
+                         trampoline.row == row && reference == 346U;
+        const bool bottom = trampoline.column == column &&
+                            static_cast<uint16_t>(trampoline.row) + 1U == row &&
+                            reference == 394U;
+        if (top || bottom) {
+            return static_cast<uint16_t>(sourceId + trampoline.visualState);
+        }
+    }
+    if (modificationAt(column, row) == nullptr &&
+        (reference == 144U || reference == 192U || reference == 240U)) {
+        uint8_t ageFrames = 0U;
+        for (uint8_t index = 0; index < animatedTileCount_; ++index) {
+            const PlatformerAnimatedTileState& tile = animatedTiles_[index];
+            if (tile.column == column && tile.row == row &&
+                tile.sourceId == sourceId) {
+                ageFrames = tile.ageFrames;
+                break;
+            }
+        }
+        const uint8_t frame = platformerReferencePausedAnimationFrame(
+            ageFrames, 8U, 4U, 25U);
+        if (sourceId + frame < PLATFORMER_BLOCK_TILE_COUNT) {
+            return static_cast<uint16_t>(sourceId + frame);
+        }
+    }
+    return sourceId;
+}
+
+void PlatformerLevelRuntime::scanAnimatedTiles() {
+    animatedTileCount_ = 0U;
+    for (auto& tile : animatedTiles_) {
+        tile = PlatformerAnimatedTileState{};
+    }
+    if (level_ == nullptr) {
+        return;
+    }
+    for (uint8_t row = 0; row < level_->height; ++row) {
+        for (uint16_t column = 0; column < level_->width; ++column) {
+            for (uint8_t layerIndex = 0;
+                 layerIndex < static_cast<uint8_t>(PlatformerMapLayer::Count);
+                 ++layerIndex) {
+                const uint16_t source = platformerCampaignTileAt(
+                    *level_, static_cast<PlatformerMapLayer>(layerIndex),
+                    column, row);
+                if (source >= PLATFORMER_BLOCK_TILE_COUNT) {
+                    continue;
+                }
+                const uint16_t reference =
+                    PLATFORMER_BLOCK_REFERENCE_IDS[source];
+                if (reference != 144U && reference != 192U &&
+                    reference != 240U) {
+                    continue;
+                }
+                bool duplicate = false;
+                for (uint8_t index = 0; index < animatedTileCount_; ++index) {
+                    const PlatformerAnimatedTileState& tile =
+                        animatedTiles_[index];
+                    if (tile.column == column && tile.row == row &&
+                        tile.sourceId == source) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate && animatedTileCount_ < MAX_ANIMATED_TILES) {
+                    PlatformerAnimatedTileState& tile =
+                        animatedTiles_[animatedTileCount_++];
+                    tile.column = column;
+                    tile.row = row;
+                    tile.sourceId = source;
+                }
+            }
+        }
+    }
+}
+
+void PlatformerLevelRuntime::scanTrampolines() {
+    trampolineCount_ = 0U;
+    for (auto& trampoline : trampolines_) {
+        trampoline = PlatformerTrampolineRuntimeState{};
+    }
+    if (level_ == nullptr) {
+        return;
+    }
+    for (uint8_t row = 0; row < level_->height; ++row) {
+        for (uint16_t column = 0; column < level_->width; ++column) {
+            for (PlatformerMapLayer layer : {PlatformerMapLayer::Foreground,
+                                             PlatformerMapLayer::Underground}) {
+                const uint16_t source = platformerCampaignTileAt(
+                    *level_, layer, column, row);
+                if (source >= PLATFORMER_BLOCK_TILE_COUNT ||
+                    PLATFORMER_BLOCK_REFERENCE_IDS[source] != 346U) {
+                    continue;
+                }
+                if (trampolineCount_ < MAX_TRAMPOLINES) {
+                    PlatformerTrampolineRuntimeState& trampoline =
+                        trampolines_[trampolineCount_++];
+                    trampoline.column = column;
+                    trampoline.row = row;
+                    trampoline.sourceId = source;
+                }
+                break;
+            }
+        }
+    }
 }
 
 int16_t PlatformerLevelRuntime::findReferenceColumn(uint16_t reference) const {

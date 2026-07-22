@@ -1,5 +1,6 @@
 #pragma once
 
+#include "games/PlatformerAnimation.h"
 #include "games/PlatformerCampaignData.h"
 
 #include <cstdint>
@@ -57,10 +58,37 @@ struct PlatformerBlockHitResult {
     bool broken = false;
 };
 
+struct PlatformerBlockBumpState {
+    uint16_t column = 0;
+    uint8_t row = 0;
+    uint8_t step = 0;
+    int8_t offset = 0;
+    bool active = false;
+};
+
+struct PlatformerTrampolineRuntimeState {
+    uint16_t column = 0;
+    uint8_t row = 0;
+    uint16_t sourceId = PLATFORMER_EMPTY_TILE;
+    uint8_t sequenceIndex = 0;
+    uint8_t visualState = 0;
+    bool activated = false;
+};
+
+struct PlatformerAnimatedTileState {
+    uint16_t column = 0;
+    uint16_t sourceId = PLATFORMER_EMPTY_TILE;
+    uint8_t row = 0;
+    uint8_t ageFrames = 0;
+};
+
 class PlatformerLevelRuntime final {
 public:
     static constexpr uint8_t TILE_SIZE = 16;
     static constexpr uint8_t MAX_MODIFICATIONS = 64;
+    static constexpr uint8_t MAX_BLOCK_BUMPS = 8;
+    static constexpr uint8_t MAX_TRAMPOLINES = 8;
+    static constexpr uint8_t MAX_ANIMATED_TILES = 128;
 
     bool load(uint8_t world, uint8_t stage);
     void resetChanges();
@@ -82,6 +110,21 @@ public:
                                       bool canBreakBrick);
     bool collectCoin(uint16_t column, uint8_t row);
     bool removeTile(uint16_t column, uint8_t row);
+    void setAnimationFrame(uint32_t frame);
+    uint32_t animationFrame() const;
+    void updateAnimations(float cameraX, float cameraY,
+                          uint16_t viewportWidth, uint16_t viewportHeight);
+    uint8_t animatedTileCount() const;
+    bool startBlockBump(uint16_t column, uint8_t row);
+    void updateBlockBumps();
+    int8_t blockBumpOffset(uint16_t column, uint8_t row) const;
+    const PlatformerBlockBumpState* blockBump(uint8_t index) const;
+    uint8_t trampolineCount() const;
+    const PlatformerTrampolineRuntimeState* trampoline(uint8_t index) const;
+    bool setTrampolineState(uint8_t index, uint8_t sequenceIndex,
+                            uint8_t visualState, bool activated);
+    uint16_t displaySourceId(uint16_t column, uint8_t row,
+                             uint16_t sourceId) const;
 
     int16_t goalColumn() const;
     int16_t axeColumn() const;
@@ -94,6 +137,12 @@ private:
     const PlatformerCampaignLevel* level_ = nullptr;
     PlatformerTileModification modifications_[MAX_MODIFICATIONS] = {};
     uint8_t modificationCount_ = 0;
+    uint32_t animationFrame_ = 0;
+    PlatformerBlockBumpState blockBumps_[MAX_BLOCK_BUMPS] = {};
+    PlatformerTrampolineRuntimeState trampolines_[MAX_TRAMPOLINES] = {};
+    uint8_t trampolineCount_ = 0;
+    PlatformerAnimatedTileState animatedTiles_[MAX_ANIMATED_TILES] = {};
+    uint8_t animatedTileCount_ = 0;
     PlatformerLevelType activeLevelType_ = PlatformerLevelType::None;
     PlatformerBackgroundColor activeBackground_ =
         PlatformerBackgroundColor::Black;
@@ -103,6 +152,8 @@ private:
     PlatformerRuntimeReward rewardAt(uint16_t column, uint8_t row) const;
     bool addModification(uint16_t column, uint8_t row,
                          PlatformerTileModificationState state);
+    void scanTrampolines();
+    void scanAnimatedTiles();
     int16_t findReferenceColumn(uint16_t reference) const;
 };
 

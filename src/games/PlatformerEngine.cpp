@@ -16,37 +16,64 @@ Value clampValue(Value value, Value minimum, Value maximum) {
     return std::max(minimum, std::min(value, maximum));
 }
 
-PlatformerEnemyType campaignEnemyType(uint16_t reference) {
+bool campaignEnemyType(uint16_t reference, PlatformerEnemyType& type) {
     switch (reference) {
         case 38:
         case 39:
         case 455:
-            return PlatformerEnemyType::Koopa;
+            type = PlatformerEnemyType::Koopa;
+            return true;
         case 40:
-            return PlatformerEnemyType::KoopaParatroopa;
+            type = PlatformerEnemyType::KoopaParatroopa;
+            return true;
         case 44:
-            return PlatformerEnemyType::PiranhaPlant;
+            type = PlatformerEnemyType::PiranhaPlant;
+            return true;
         case 48:
-            return PlatformerEnemyType::Blooper;
+            type = PlatformerEnemyType::Blooper;
+            return true;
         case 50:
-            return PlatformerEnemyType::Lakitu;
+            type = PlatformerEnemyType::Lakitu;
+            return true;
         case 56:
-            return PlatformerEnemyType::HammerBro;
+            type = PlatformerEnemyType::HammerBro;
+            return true;
         case 61:
-            return PlatformerEnemyType::Bowser;
+            type = PlatformerEnemyType::Bowser;
+            return true;
         case 81:
         case 498:
-            return PlatformerEnemyType::CheepCheep;
+            type = PlatformerEnemyType::CheepCheep;
+            return true;
         case 87:
-            return PlatformerEnemyType::BuzzyBeetle;
+            type = PlatformerEnemyType::BuzzyBeetle;
+            return true;
         case 90:
-            return PlatformerEnemyType::BulletBill;
+            type = PlatformerEnemyType::BulletBill;
+            return true;
         case 504:
-            return PlatformerEnemyType::LavaBubble;
+            type = PlatformerEnemyType::LavaBubble;
+            return true;
         case 70:
         case 71:
+            type = PlatformerEnemyType::Goomba;
+            return true;
         default:
-            return PlatformerEnemyType::Goomba;
+            return false;
+    }
+}
+
+uint16_t cannonBulletSource(uint16_t cannonSource) {
+    switch (cannonSource) {
+        case 79U:
+            return 195U;
+        case 95U:
+            return 300U;
+        case 591U:
+            return 405U;
+        case 63U:
+        default:
+            return 90U;
     }
 }
 
@@ -64,6 +91,31 @@ bool campaignEnemyUsesGravity(PlatformerEnemyType type) {
     }
 }
 
+bool isDefeatedParticle(PlatformerEnemyMotion motion) {
+    return motion == PlatformerEnemyMotion::FallingDefeated ||
+           motion == PlatformerEnemyMotion::Defeated;
+}
+
+uint8_t enemyAnimationDelay(PlatformerEnemyType type) {
+    switch (type) {
+        case PlatformerEnemyType::Goomba:
+        case PlatformerEnemyType::Koopa:
+        case PlatformerEnemyType::BuzzyBeetle:
+        case PlatformerEnemyType::CheepCheep:
+            return 10U;
+        case PlatformerEnemyType::KoopaParatroopa:
+        case PlatformerEnemyType::PiranhaPlant:
+        case PlatformerEnemyType::Spiny:
+        case PlatformerEnemyType::HammerBro:
+            return 15U;
+        case PlatformerEnemyType::Blooper:
+        case PlatformerEnemyType::Bowser:
+            return 30U;
+        default:
+            return 0U;
+    }
+}
+
 }  // namespace
 
 PlatformerEngine::PlatformerEngine() {
@@ -71,14 +123,21 @@ PlatformerEngine::PlatformerEngine() {
 }
 
 void PlatformerEngine::reset() {
+    logicFrame_ = 0U;
+    animationFrame_ = 0U;
+    randomState_ = 0x6D2B79F5UL;
+    playerAnimationMode_ = 0U;
+    playerAnimationFrame_ = 0U;
+    playerAnimationTimer_ = 0U;
     phase_ = PlatformerPhase::Title;
     deathReason_ = PlatformerDeathReason::None;
     score_ = 0;
     coinsCollected_ = 0;
     lives_ = 3;
     timeRemaining_ = 400;
-    levelClockMs_ = 0;
+    levelClockFrames_ = 0;
     phaseElapsedMs_ = 0;
+    phaseFrames_ = 0;
     cameraX_ = 0.0F;
     cameraY_ = 0.0F;
     flagY_ = static_cast<float>(PLATFORMER_LEVEL_1_1.flagTopY);
@@ -88,25 +147,36 @@ void PlatformerEngine::reset() {
     playerCrouching_ = false;
     playerFacingLeft_ = false;
     playerSkidding_ = false;
-    timeWarningSent_ = false;
+    playerRunning_ = false;
+    trampolineCollided_ = false;
+    swimStrokeFrames_ = 0U;
     mapTestMode_ = false;
     campaignMode_ = false;
     cameraFrozen_ = false;
-    warpTeleported_ = false;
+    warpState_ = 0U;
     startIntro_ = false;
     vineReturnActive_ = false;
+    vineSequenceState_ = 0U;
+    vineReturnFrames_ = 0U;
+    flagLanded_ = false;
+    flagShifted_ = false;
+    timeBonusReady_ = false;
+    timeBonusCompletionFrames_ = 0U;
     vine_ = PlatformerVineState{};
     activeWarpIndex_ = 0;
-    jumpHoldMs_ = 0;
-    coyoteMs_ = 0;
-    jumpBufferMs_ = 0;
-    powerTransitionMs_ = 0;
-    hurtInvincibleMs_ = 0;
-    starInvincibleMs_ = 0;
-    fireCooldownMs_ = 0;
-    warpCooldownMs_ = 0;
-    swimCooldownMs_ = 0;
+    powerTransitionFrames_ = 0;
+    powerTransitionElapsedFrames_ = 0;
+    hurtInvincibleFrames_ = 0;
+    starInvincibleFrames_ = 0;
+    starBlinkFrames_ = 0;
+    fireballPoseFrames_ = 0U;
+    powerTransition_ = PlatformerPowerTransition::None;
+    starProtectedThisFrame_ = false;
+    hurtProtectedThisFrame_ = false;
     stompChain_ = 0;
+    playerAccelerationX_ = 0.0F;
+    playerAccelerationY_ = 0.0F;
+    cameraAdvanceX_ = 0.0F;
     eventRead_ = 0;
     eventWrite_ = 0;
     eventCount_ = 0;
@@ -138,8 +208,24 @@ bool PlatformerEngine::prepareCampaignTitle(uint8_t world, uint8_t stage) {
     }
     phase_ = PlatformerPhase::Title;
     phaseElapsedMs_ = 0;
+    phaseFrames_ = 0;
     player_.active = false;
     startIntro_ = false;
+    cameraFrozen_ = true;
+    return true;
+}
+
+bool PlatformerEngine::startPreparedCampaign() {
+    if (!campaignMode_ || phase_ != PlatformerPhase::Title ||
+        levelRuntime_.level() == nullptr) {
+        return false;
+    }
+    phase_ = PlatformerPhase::LevelTransition;
+    phaseElapsedMs_ = 0U;
+    phaseFrames_ = 0U;
+    player_.active = false;
+    startIntro_ = levelRuntime_.level()->levelType ==
+                  PlatformerLevelType::StartUnderground;
     cameraFrozen_ = true;
     return true;
 }
@@ -153,11 +239,7 @@ bool PlatformerEngine::advanceCampaign() {
     if (current.nextWorld == 0U || current.nextStage == 0U) {
         return false;
     }
-    if (!levelRuntime_.load(current.nextWorld, current.nextStage)) {
-        return false;
-    }
-    resetCampaignLevel(false);
-    return true;
+    return beginLevelTransition(current.nextWorld, current.nextStage);
 }
 
 void PlatformerEngine::startMapTest() {
@@ -198,12 +280,31 @@ void PlatformerEngine::advanceMapTest() {
 void PlatformerEngine::togglePause() {
     if (phase_ == PlatformerPhase::Running) {
         phase_ = PlatformerPhase::Paused;
+        queueEvent(PlatformerEventType::Paused);
     } else if (phase_ == PlatformerPhase::Paused) {
         phase_ = PlatformerPhase::Running;
     }
 }
 
 void PlatformerEngine::step(float deltaSeconds, const PlatformerInput& input) {
+    if (phase_ == PlatformerPhase::Title ||
+        phase_ == PlatformerPhase::GameOver ||
+        phase_ == PlatformerPhase::Won) {
+        return;
+    }
+    if (phase_ == PlatformerPhase::Paused) {
+        updatePausedCommands();
+        return;
+    }
+    const bool cannonCallbacksEnabled =
+        campaignMode_ && phase_ != PlatformerPhase::LevelTransition;
+    const bool animationsEnabled =
+        phase_ != PlatformerPhase::LevelTransition;
+    const PlatformerPhase phaseAtFrameStart = phase_;
+    ++logicFrame_;
+    if (phase_ != PlatformerPhase::LevelTransition) {
+        ++animationFrame_;
+    }
     const float dt = clampValue(deltaSeconds, 0.001F, 0.05F);
     const uint16_t dtMs = static_cast<uint16_t>(
         clampValue(static_cast<int32_t>(std::lround(dt * 1000.0F)),
@@ -227,13 +328,33 @@ void PlatformerEngine::step(float deltaSeconds, const PlatformerInput& input) {
         case PlatformerPhase::Flagpole:
         case PlatformerPhase::CastleWalk:
         case PlatformerPhase::TimeBonus:
-            updateScriptedPhase(dt, dtMs);
+        case PlatformerPhase::LevelTransition:
+            updateScriptedPhase(dt, dtMs, input);
             break;
         case PlatformerPhase::Title:
         case PlatformerPhase::Paused:
         case PlatformerPhase::GameOver:
         case PlatformerPhase::Won:
             break;
+    }
+    updatePlayerAnimation();
+    if (campaignMode_ && animationsEnabled) {
+        levelRuntime_.updateAnimations(
+            cameraX_, cameraY_, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+    }
+    completePendingBrickBreak();
+    if (cannonCallbacksEnabled &&
+        phase_ != PlatformerPhase::LevelTransition &&
+        phase_ != PlatformerPhase::GameOver) {
+        updateCloudPlatformCallbacks();
+        updateEnemyActivationCallbacks();
+        updateCannonTimers();
+    }
+    if (phaseAtFrameStart == PlatformerPhase::Running &&
+        (phase_ == PlatformerPhase::Running ||
+         phase_ == PlatformerPhase::Warping ||
+         phase_ == PlatformerPhase::VineClimb)) {
+        updateLevelTimer();
     }
 }
 
@@ -256,17 +377,37 @@ PlatformerSnapshot PlatformerEngine::snapshot() const {
     snapshot.flagY = flagY_;
     snapshot.flagTileId = flagTileId_;
     snapshot.grounded = player_.grounded;
-    snapshot.playerBig = playerPower_ != PlatformerPlayerPower::Small;
+    snapshot.playerBig = playerPower_ != PlatformerPlayerPower::Small ||
+                         powerTransition_ != PlatformerPowerTransition::None;
     snapshot.playerFire = playerPower_ == PlatformerPlayerPower::Fire;
     snapshot.playerCrouching = playerCrouching_;
     snapshot.playerFacingLeft = playerFacingLeft_;
     snapshot.playerSkidding = playerSkidding_;
-    snapshot.playerVisible = player_.active &&
-                             (powerTransitionMs_ == 0 ||
-                              ((powerTransitionMs_ / 65U) & 1U) == 0U);
-    snapshot.playerInvincible = starInvincibleMs_ > 0;
-    snapshot.playerDamageBlinking =
-        hurtInvincibleMs_ > 0 && powerTransitionMs_ == 0;
+    snapshot.playerRunning = playerRunning_;
+    snapshot.playerWalking = playerAnimationMode_ == 1U;
+    snapshot.underwater =
+        campaignMode_ && levelRuntime_.activeLevelType() ==
+                             PlatformerLevelType::Underwater;
+    snapshot.swimStrokeFrame = swimStrokeFrames_;
+    snapshot.playerAnimationFrame = playerAnimationFrame_;
+    const bool damageBlinking =
+        hurtInvincibleFrames_ > 0U && powerTransitionFrames_ == 0U;
+    const uint16_t hurtBlinkElapsed = damageBlinking
+                                          ? static_cast<uint16_t>(
+                                                150U - hurtInvincibleFrames_)
+                                          : 0U;
+    const uint16_t starBlinkElapsed = static_cast<uint16_t>(
+        600U - std::min<uint16_t>(600U, starBlinkFrames_));
+    const bool damageVisible =
+        !damageBlinking || ((hurtBlinkElapsed / 10U) & 1U) == 0U;
+    const bool starVisible =
+        starBlinkFrames_ == 0U || ((starBlinkElapsed / 5U) & 1U) == 0U;
+    snapshot.playerVisible = player_.active && damageVisible && starVisible;
+    snapshot.playerInvincible = starInvincibleFrames_ > 0;
+    snapshot.playerDamageBlinking = damageBlinking;
+    snapshot.playerFireballPose = fireballPoseFrames_ > 0U;
+    snapshot.playerPowerTransition = powerTransition_;
+    snapshot.playerPowerTransitionFrame = powerTransitionElapsedFrames_;
     snapshot.goalReached = phase_ == PlatformerPhase::Flagpole ||
                            phase_ == PlatformerPhase::CastleBridge ||
                            phase_ == PlatformerPhase::CastleWalk ||
@@ -275,8 +416,11 @@ PlatformerSnapshot PlatformerEngine::snapshot() const {
     snapshot.mapTestMode = mapTestMode_;
     snapshot.campaignMode = campaignMode_;
     snapshot.score = score_;
+    snapshot.logicFrame = logicFrame_;
+    snapshot.animationFrame = animationFrame_;
     snapshot.timeRemaining = timeRemaining_;
     snapshot.phaseElapsedMs = phaseElapsedMs_;
+    snapshot.phaseFrames = phaseFrames_;
     snapshot.lives = lives_;
     snapshot.coinsCollected = coinsCollected_;
     snapshot.totalBoxes = boxCount_;
@@ -313,8 +457,32 @@ PlatformerEnemyState PlatformerEngine::enemy(uint8_t index) const {
     state.height = source.height;
     state.stateMs = source.stateMs;
     state.sourceTileId = source.sourceTileId;
+    state.bornFrame = source.bornFrame;
+    state.animationFrame = source.animationFrame;
+    state.heldHammer = source.type == PlatformerEnemyType::HammerBro &&
+                       source.motion == PlatformerEnemyMotion::Walking &&
+                       source.callbackFrames > 0U;
+    state.heldHammerX =
+        source.actor.x + source.width * 0.5F - TILE_SIZE * 0.5F;
+    state.heldHammerY = source.heldHammerY;
     state.active = source.spawned && source.actor.active;
-    state.facingLeft = source.actor.vx < 0.0F;
+    state.facingLeft =
+        source.type == PlatformerEnemyType::Bowser ||
+                source.type == PlatformerEnemyType::HammerBro ||
+                source.type == PlatformerEnemyType::Lakitu ||
+                source.motion == PlatformerEnemyMotion::FallingDefeated ||
+                source.motion == PlatformerEnemyMotion::Defeated
+            ? source.facingLeft
+            : source.actor.vx < 0.0F;
+    state.alternatePose =
+        (source.type == PlatformerEnemyType::HammerBro &&
+         source.callbackFrames > 0U) ||
+        (source.type == PlatformerEnemyType::Lakitu &&
+         source.callbackFrames > 0U) ||
+        (source.type == PlatformerEnemyType::Bowser &&
+         source.fireCallbackFrames > 0U);
+    state.verticalFlipped = source.verticalFlipped;
+    state.flyingCheep = source.flyingCheep;
     return state;
 }
 
@@ -382,11 +550,22 @@ void PlatformerEngine::debugSetPlayer(float x, float y, float vx, float vy,
     player_.vx = vx;
     player_.vy = vy;
     player_.grounded = grounded;
+    playerAccelerationX_ = 0.0F;
+    playerAccelerationY_ = 0.0F;
+    cameraAdvanceX_ = 0.0F;
     updateCamera();
+}
+
+void PlatformerEngine::debugSetCamera(float x, float y) {
+    cameraX_ = x;
+    cameraY_ = y;
 }
 
 void PlatformerEngine::debugSetPlayerPower(PlatformerPlayerPower power) {
     const float oldHeight = playerHeight();
+    powerTransition_ = PlatformerPowerTransition::None;
+    powerTransitionFrames_ = 0U;
+    powerTransitionElapsedFrames_ = 0U;
     playerPower_ = power;
     playerCrouching_ = false;
     player_.y += oldHeight - playerHeight();
@@ -412,6 +591,7 @@ void PlatformerEngine::debugActivateEnemy(uint8_t index, float x, float y,
     enemy.actor.x = x;
     enemy.actor.y = y;
     enemy.actor.vy = 0.0F;
+    enemy.bornFrame = logicFrame_;
     enemy.motion = motion;
     if (motion == PlatformerEnemyMotion::ShellIdle ||
         motion == PlatformerEnemyMotion::ShellSliding) {
@@ -425,6 +605,7 @@ void PlatformerEngine::debugActivateEnemy(uint8_t index, float x, float y,
 void PlatformerEngine::debugSpawnCampaignEnemy(PlatformerEnemyType type,
                                                 float x, float y,
                                                 uint16_t sourceTileId) {
+    campaignEnemiesLoaded_ = true;
     if (enemyCount_ >= MAX_ENEMIES) {
         return;
     }
@@ -432,11 +613,15 @@ void PlatformerEngine::debugSpawnCampaignEnemy(PlatformerEnemyType type,
     enemy = EnemyActor{};
     enemy.type = type;
     enemy.sourceTileId = sourceTileId;
+    enemy.bornFrame = logicFrame_;
     enemy.actor.x = enemy.originX = x;
     enemy.actor.y = enemy.originY = y;
     enemy.actor.vx = -ENEMY_SPEED;
     enemy.actor.active = true;
     enemy.spawned = true;
+    enemy.flyingCheep =
+        type == PlatformerEnemyType::CheepCheep && sourceTileId == 498U &&
+        levelRuntime_.activeLevelType() != PlatformerLevelType::Underwater;
     if (type == PlatformerEnemyType::Koopa ||
         type == PlatformerEnemyType::KoopaParatroopa) {
         enemy.height = 24.0F;
@@ -449,6 +634,58 @@ void PlatformerEngine::debugSpawnCampaignEnemy(PlatformerEnemyType type,
         enemy.width = enemy.height = 32.0F;
         enemy.health = 5U;
     }
+    if (type == PlatformerEnemyType::PiranhaPlant ||
+        type == PlatformerEnemyType::Blooper ||
+        type == PlatformerEnemyType::Lakitu ||
+        type == PlatformerEnemyType::LavaBubble ||
+        type == PlatformerEnemyType::Bowser) {
+        enemy.actor.vx = 0.0F;
+    } else if (type == PlatformerEnemyType::HammerBro) {
+        enemy.actor.vx = 2.0F * REFERENCE_VELOCITY_SCALE;
+    } else if (type == PlatformerEnemyType::BulletBill) {
+        enemy.actor.vx = -3.0F * REFERENCE_VELOCITY_SCALE;
+    }
+    if (type == PlatformerEnemyType::Blooper) {
+        enemy.accelerationY =
+            -0.47480F * REFERENCE_VELOCITY_SCALE *
+            REFERENCE_TICKS_PER_SECOND;
+    } else if (type == PlatformerEnemyType::Bowser) {
+        enemy.accelerationY =
+            -0.30F * REFERENCE_VELOCITY_SCALE *
+            REFERENCE_TICKS_PER_SECOND;
+    }
+}
+
+void PlatformerEngine::debugSetEnemyVelocity(uint8_t index, float vx,
+                                              float vy,
+                                              float accelerationY) {
+    if (index >= enemyCount_) {
+        return;
+    }
+    enemies_[index].actor.vx = vx;
+    enemies_[index].actor.vy = vy;
+    enemies_[index].accelerationY = accelerationY;
+}
+
+void PlatformerEngine::debugSpawnProjectile(float x, float y, float vx,
+                                             float vy) {
+    if (projectileCount_ >= MAX_PROJECTILES) {
+        return;
+    }
+    PlatformerProjectile& projectile = projectiles_[projectileCount_++];
+    projectile = PlatformerProjectile{};
+    projectile.x = x;
+    projectile.y = y;
+    projectile.vx = vx;
+    projectile.vy = vy;
+    projectile.bornFrame = logicFrame_ - 1U;
+    projectile.active = true;
+}
+
+void PlatformerEngine::debugSpawnEnemyHazard(
+    PlatformerEnemyHazardKind kind, float x, float y, float vx, float vy,
+    float accelerationY) {
+    spawnEnemyHazard(kind, x, y, vx, vy, accelerationY);
 }
 
 void PlatformerEngine::debugBeginGoal() {
@@ -457,6 +694,26 @@ void PlatformerEngine::debugBeginGoal() {
 
 void PlatformerEngine::debugSetTimeRemaining(uint16_t value) {
     timeRemaining_ = value;
+}
+
+void PlatformerEngine::debugSetCoinsCollected(uint16_t value) {
+    coinsCollected_ = value;
+}
+
+void PlatformerEngine::debugSetLives(uint16_t value) {
+    lives_ = value;
+}
+
+void PlatformerEngine::debugSetRandomState(uint32_t value) {
+    randomState_ = value;
+}
+
+void PlatformerEngine::debugLoadCampaignEnemies() {
+    if (!campaignMode_ || campaignEnemiesLoaded_) {
+        return;
+    }
+    loadCampaignEnemies();
+    campaignEnemiesLoaded_ = true;
 }
 
 bool PlatformerEngine::debugTileSolid(uint16_t column, uint8_t row) const {
@@ -499,7 +756,7 @@ void PlatformerEngine::buildLevel() {
         box.visible = spawn.type != PlatformerObjectType::HiddenBox;
         box.remainingUses = spawn.uses == 0 ? 1 : spawn.uses;
         boxes_[boxCount_] = box;
-        boxBumpMs_[boxCount_] = 0;
+        boxBumpFrames_[boxCount_] = 0;
         ++boxCount_;
     }
 }
@@ -511,12 +768,16 @@ void PlatformerEngine::resetActors() {
                 PLAYER_HEIGHT;
     player_.active = true;
     enemyCount_ = 0;
+    campaignEnemiesLoaded_ = false;
     powerupCount_ = 0;
     effectCount_ = 0;
     projectileCount_ = 0;
     movingPlatformCount_ = 0;
     fireBarCount_ = 0;
+    cannonCount_ = 0;
+    cannonTimerFrames_ = CANNON_TIMER_FRAMES;
     enemyHazardCount_ = 0;
+    pendingBrickBreak_ = PendingBrickBreak{};
     for (auto& powerup : powerups_) {
         powerup = PlatformerPowerup{};
     }
@@ -535,17 +796,22 @@ void PlatformerEngine::resetActors() {
     for (auto& fireBar : fireBars_) {
         fireBar = PlatformerFireBarState{};
     }
+    for (auto& cannon : cannons_) {
+        cannon = CannonState{};
+    }
     vine_ = PlatformerVineState{};
     vineReturnActive_ = false;
+    vineSequenceState_ = 0U;
+    vineReturnFrames_ = 0U;
     activeVineIndex_ = 0;
     bridgeStartColumn_ = -1;
     bridgeEndColumn_ = -1;
     bridgeRow_ = 0;
     bridgeRemovedCount_ = 0;
-    for (auto& word : campaignEnemySpawned_) {
-        word = 0U;
-    }
-
+    bridgeSequenceState_ = 0U;
+    bridgeStepFrames_ = 0U;
+    bridgeDelayFrames_ = 0U;
+    castleClearFrames_ = 0U;
     for (uint8_t index = 0; index < PLATFORMER_LEVEL_1_1.enemyCount &&
                            index < MAX_ENEMIES;
          ++index) {
@@ -574,11 +840,13 @@ void PlatformerEngine::resetActors() {
             }
         }
         enemy.spawnOrder = order;
+        enemy.bornFrame = logicFrame_;
     }
     updateCamera();
 }
 
-void PlatformerEngine::resetCampaignLevel(bool resetPower) {
+void PlatformerEngine::resetCampaignLevel(bool resetPower,
+                                          bool queueRestartEvent) {
     const PlatformerCampaignLevel* level = levelRuntime_.level();
     if (level == nullptr) {
         phase_ = PlatformerPhase::Title;
@@ -586,8 +854,13 @@ void PlatformerEngine::resetCampaignLevel(bool resetPower) {
     }
 
     levelRuntime_.resetChanges();
+    animationFrame_ = 0U;
+    playerAnimationMode_ = 0U;
+    playerAnimationFrame_ = 0U;
+    playerAnimationTimer_ = 0U;
     boxCount_ = 0;
     enemyCount_ = 0;
+    campaignEnemiesLoaded_ = false;
     powerupCount_ = 0;
     effectCount_ = 0;
     projectileCount_ = 0;
@@ -607,9 +880,6 @@ void PlatformerEngine::resetCampaignLevel(bool resetPower) {
     for (auto& hazard : enemyHazards_) {
         hazard = PlatformerEnemyHazardState{};
     }
-    for (auto& word : campaignEnemySpawned_) {
-        word = 0U;
-    }
     resetCampaignDynamics();
 
     if (resetPower) {
@@ -618,6 +888,9 @@ void PlatformerEngine::resetCampaignLevel(bool resetPower) {
     playerCrouching_ = false;
     playerSkidding_ = false;
     playerFacingLeft_ = false;
+    playerRunning_ = false;
+    trampolineCollided_ = false;
+    swimStrokeFrames_ = 0U;
     player_ = Actor{};
     player_.x = static_cast<float>(level->playerStart.x * TILE_SIZE);
     player_.y = static_cast<float>(level->playerStart.y * TILE_SIZE);
@@ -629,6 +902,10 @@ void PlatformerEngine::resetCampaignLevel(bool resetPower) {
 
     cameraX_ = static_cast<float>(level->cameraStart.x * TILE_SIZE);
     cameraY_ = static_cast<float>(level->cameraStart.y * TILE_SIZE);
+#if !defined(PGOS_PLATFORMER_TESTING)
+    loadCampaignEnemies();
+    campaignEnemiesLoaded_ = true;
+#endif
     const int16_t flagColumn = levelRuntime_.goalColumn();
     const int16_t axeColumn = levelRuntime_.axeColumn();
     const int16_t finishColumn = flagColumn >= 0 ? flagColumn : axeColumn;
@@ -669,44 +946,96 @@ void PlatformerEngine::resetCampaignLevel(bool resetPower) {
     phase_ = PlatformerPhase::Running;
     deathReason_ = PlatformerDeathReason::None;
     phaseElapsedMs_ = 0;
-    levelClockMs_ = 0;
+    phaseFrames_ = 0U;
+    levelClockFrames_ = 0;
     timeRemaining_ = 400;
-    jumpHoldMs_ = 0;
-    coyoteMs_ = 0;
-    jumpBufferMs_ = 0;
-    powerTransitionMs_ = 0;
-    hurtInvincibleMs_ = 0;
-    starInvincibleMs_ = 0;
-    fireCooldownMs_ = 0;
-    warpCooldownMs_ = 0;
-    swimCooldownMs_ = 0;
+    powerTransitionFrames_ = 0;
+    powerTransitionElapsedFrames_ = 0;
+    hurtInvincibleFrames_ = 0;
+    starInvincibleFrames_ = 0;
+    starBlinkFrames_ = 0;
+    fireballPoseFrames_ = 0U;
+    powerTransition_ = PlatformerPowerTransition::None;
+    starProtectedThisFrame_ = false;
+    hurtProtectedThisFrame_ = false;
     stompChain_ = 0;
-    timeWarningSent_ = false;
+    playerAccelerationX_ = 0.0F;
+    playerAccelerationY_ = 0.0F;
+    cameraAdvanceX_ = 0.0F;
     jumpActive_ = false;
     mapTestMode_ = false;
     startIntro_ = level->levelType == PlatformerLevelType::StartUnderground;
     cameraFrozen_ = startIntro_;
-    warpTeleported_ = false;
+    warpState_ = 0U;
     activeWarpIndex_ = 0;
-    queueEvent(PlatformerEventType::LifeRestarted, lives_);
+    if (queueRestartEvent) {
+        queueEvent(PlatformerEventType::LifeRestarted, lives_);
+    }
+}
+
+bool PlatformerEngine::beginLevelTransition(uint8_t world, uint8_t stage,
+                                            bool resetPower) {
+    if (!campaignMode_ || world == 0U || stage == 0U ||
+        !levelRuntime_.load(world, stage)) {
+        return false;
+    }
+    resetCampaignLevel(resetPower, false);
+    phase_ = PlatformerPhase::LevelTransition;
+    phaseElapsedMs_ = 0U;
+    phaseFrames_ = 0U;
+    player_.active = false;
+    cameraFrozen_ = true;
+    return true;
+}
+
+void PlatformerEngine::completeCourse() {
+    const PlatformerCampaignLevel* cleared = levelRuntime_.level();
+    const uint16_t course =
+        cleared == nullptr
+            ? 0U
+            : static_cast<uint16_t>((static_cast<uint16_t>(cleared->world) << 8U) |
+                                    cleared->stage);
+    const uint8_t nextWorld = cleared == nullptr ? 0U : cleared->nextWorld;
+    const uint8_t nextStage = cleared == nullptr ? 0U : cleared->nextStage;
+    queueEvent(PlatformerEventType::CourseClear, course);
+
+    if (beginLevelTransition(nextWorld, nextStage)) {
+        return;
+    }
+
+    phase_ = PlatformerPhase::Won;
+    phaseElapsedMs_ = 0U;
+    phaseFrames_ = 0U;
 }
 
 void PlatformerEngine::resetCampaignDynamics() {
     movingPlatformCount_ = 0;
     fireBarCount_ = 0;
+    cannonCount_ = 0;
+    cannonTimerFrames_ = CANNON_TIMER_FRAMES;
     for (auto& platform : movingPlatforms_) {
         platform = PlatformerMovingPlatformState{};
     }
     for (auto& fireBar : fireBars_) {
         fireBar = PlatformerFireBarState{};
     }
+    for (auto& cannon : cannons_) {
+        cannon = CannonState{};
+    }
     vine_ = PlatformerVineState{};
     vineReturnActive_ = false;
+    vineSequenceState_ = 0U;
+    vineReturnFrames_ = 0U;
     activeVineIndex_ = 0;
     bridgeStartColumn_ = -1;
     bridgeEndColumn_ = -1;
     bridgeRow_ = 0;
     bridgeRemovedCount_ = 0;
+    bridgeSequenceState_ = 0U;
+    bridgeStepFrames_ = 0U;
+    bridgeDelayFrames_ = 0U;
+    castleClearFrames_ = 0U;
+    pendingBrickBreak_ = PendingBrickBreak{};
 
     const PlatformerCampaignLevel* level = levelRuntime_.level();
     if (level == nullptr) {
@@ -724,6 +1053,24 @@ void PlatformerEngine::resetCampaignDynamics() {
         }
         return source;
     };
+
+    for (PlatformerMapLayer layer : {PlatformerMapLayer::Underground,
+                                     PlatformerMapLayer::Foreground}) {
+        for (uint8_t row = 0; row < level->height; ++row) {
+            for (uint16_t column = 0; column < level->width; ++column) {
+                const uint16_t source = platformerCampaignTileAt(
+                    *level, layer, column, row);
+                if (source >= PLATFORMER_BLOCK_TILE_COUNT ||
+                    PLATFORMER_BLOCK_REFERENCE_IDS[source] != 63U) {
+                    continue;
+                }
+                if (cannonCount_ < MAX_CANNONS) {
+                    cannons_[cannonCount_++] =
+                        CannonState{column, row, source};
+                }
+            }
+        }
+    }
 
     for (uint8_t index = 0;
          index < level->movingPlatforms.count &&
@@ -747,6 +1094,25 @@ void PlatformerEngine::resetCampaignDynamics() {
         if (platform.sourceTileId < PLATFORMER_BLOCK_TILE_COUNT &&
             PLATFORMER_BLOCK_REFERENCE_IDS[platform.sourceTileId] == 761U) {
             platform.widthTiles = 2;
+        }
+        if (platform.motion == PlatformerMotionType::OneDirectionRepeated ||
+            platform.motion == PlatformerMotionType::OneDirectionContinuous) {
+            switch (platform.direction) {
+                case PlatformerDirection::Left:
+                    platform.vx = -2.0F * REFERENCE_VELOCITY_SCALE;
+                    break;
+                case PlatformerDirection::Right:
+                    platform.vx = 2.0F * REFERENCE_VELOCITY_SCALE;
+                    break;
+                case PlatformerDirection::Up:
+                    platform.vy = -2.0F * REFERENCE_VELOCITY_SCALE;
+                    break;
+                case PlatformerDirection::Down:
+                    platform.vy = 2.0F * REFERENCE_VELOCITY_SCALE;
+                    break;
+                default:
+                    break;
+            }
         }
         platform.active = true;
     }
@@ -774,6 +1140,28 @@ void PlatformerEngine::resetCampaignDynamics() {
         left.pulleyTop = right.pulleyTop =
             static_cast<float>((source.pulleyY + 1) * TILE_SIZE);
         left.active = right.active = true;
+    }
+
+    for (uint8_t row = 0; row < level->height; ++row) {
+        for (uint16_t column = 0;
+             column < level->width &&
+             movingPlatformCount_ < MAX_MOVING_PLATFORMS;
+             ++column) {
+            const uint16_t source = platformerCampaignTileAt(
+                *level, PlatformerMapLayer::Foreground, column, row);
+            if (source >= PLATFORMER_BLOCK_TILE_COUNT ||
+                PLATFORMER_BLOCK_REFERENCE_IDS[source] != 857U) {
+                continue;
+            }
+            PlatformerMovingPlatformState& cloud =
+                movingPlatforms_[movingPlatformCount_++];
+            cloud.x = static_cast<float>(column * TILE_SIZE);
+            cloud.y = static_cast<float>(row * TILE_SIZE);
+            cloud.sourceTileId = source;
+            cloud.widthTiles = 3U;
+            cloud.cloudPlatform = true;
+            cloud.active = true;
+        }
     }
 
     for (uint8_t index = 0;
@@ -849,27 +1237,62 @@ int8_t PlatformerEngine::landingPlatform(float previousBottom,
     return result;
 }
 
-void PlatformerEngine::updateMovingPlatforms(float dt) {
+void PlatformerEngine::updateMovingPlatforms(float dt, bool carryPlayer) {
     const int8_t stoodOn = standingPlatform();
-    float previousX = 0.0F;
-    float previousY = 0.0F;
-    if (stoodOn >= 0) {
-        previousX = movingPlatforms_[stoodOn].x;
-        previousY = movingPlatforms_[stoodOn].y;
-    }
-    constexpr float PLATFORM_SPEED = 45.0F;
-    constexpr float PLATFORM_GRAVITY = 160.0F;
-    const float damping = std::pow(0.92F, dt * 60.0F);
+    constexpr float PLATFORM_GRAVITY =
+        0.10F * REFERENCE_VELOCITY_SCALE * REFERENCE_TICKS_PER_SECOND;
+    constexpr float PULLEY_GRAVITY =
+        0.12F * REFERENCE_VELOCITY_SCALE * REFERENCE_TICKS_PER_SECOND;
+    constexpr float REFERENCE_CAMERA_HEIGHT = 15.0F * TILE_SIZE;
+    const auto inCamera = [this](const PlatformerMovingPlatformState& platform) {
+        const float width = static_cast<float>(platform.widthTiles * TILE_SIZE);
+        return platform.x + width >= cameraX_ &&
+               platform.x <= cameraX_ + VIEWPORT_WIDTH &&
+               platform.y + TILE_SIZE >= cameraY_ &&
+               platform.y <= cameraY_ + REFERENCE_CAMERA_HEIGHT;
+    };
+    const auto integrate = [dt](PlatformerMovingPlatformState& platform) {
+        platform.x += platform.vx * dt;
+        platform.y += platform.vy * dt;
+        platform.vy = std::min(
+            MAX_FALL_SPEED, platform.vy + platform.accelerationY * dt);
+    };
 
     for (uint8_t index = 0; index < movingPlatformCount_; ++index) {
         PlatformerMovingPlatformState& platform = movingPlatforms_[index];
-        if (!platform.active || platform.pulley) {
+        if (!platform.active) {
             continue;
         }
-        platform.vx = 0.0F;
-        if (platform.motion != PlatformerMotionType::Gravity) {
-            platform.vy = 0.0F;
+        if (platform.detachedFalling) {
+            if (!inCamera(platform)) {
+                platform.active = false;
+                continue;
+            }
+            platform.vy = std::min(
+                MAX_FALL_SPEED,
+                platform.vy + REFERENCE_GRAVITY *
+                                      REFERENCE_VELOCITY_SCALE);
+            platform.x += platform.vx * dt;
+            platform.y += platform.vy * dt;
+            continue;
         }
+        if (platform.pulley || !inCamera(platform)) {
+            continue;
+        }
+        if (platform.cloudPlatform) {
+            const float nextX = platform.x + platform.vx * dt;
+            const float width =
+                static_cast<float>(platform.widthTiles * TILE_SIZE);
+            if (platform.vx != 0.0F &&
+                rectHitsSolid(nextX, platform.y, width, TILE_SIZE)) {
+                platform.vx = 0.0F;
+            } else {
+                platform.x = nextX;
+            }
+            continue;
+        }
+        integrate(platform);
+
         if (platform.motion == PlatformerMotionType::BackAndForth) {
             const float width = static_cast<float>(platform.widthTiles * TILE_SIZE);
             if (platform.direction == PlatformerDirection::Left &&
@@ -884,34 +1307,62 @@ void PlatformerEngine::updateMovingPlatforms(float dt) {
             } else if (platform.direction == PlatformerDirection::Down &&
                        platform.y + TILE_SIZE >= platform.maximum) {
                 platform.direction = PlatformerDirection::Up;
+            } else {
+                const float travel =
+                    (platform.maximum - platform.minimum) / 3.8F;
+                if (travel > EPSILON) {
+                    float position = 0.0F;
+                    switch (platform.direction) {
+                        case PlatformerDirection::Left:
+                            position = platform.x + width - platform.minimum;
+                            platform.vx =
+                                -2.0F * std::exp(
+                                            -std::pow(position - 1.9F * travel,
+                                                      2.0F) /
+                                            (2.0F * travel * travel)) *
+                                REFERENCE_VELOCITY_SCALE;
+                            break;
+                        case PlatformerDirection::Right:
+                            position = platform.maximum - platform.x;
+                            platform.vx =
+                                2.0F * std::exp(
+                                           -std::pow(position - 1.9F * travel,
+                                                     2.0F) /
+                                           (2.0F * travel * travel)) *
+                                REFERENCE_VELOCITY_SCALE;
+                            break;
+                        case PlatformerDirection::Up:
+                            position = platform.y + TILE_SIZE - platform.minimum;
+                            platform.vy =
+                                -2.0F * std::exp(
+                                            -std::pow(position - 1.9F * travel,
+                                                      2.0F) /
+                                            (2.0F * travel * travel)) *
+                                REFERENCE_VELOCITY_SCALE;
+                            break;
+                        case PlatformerDirection::Down:
+                            position = platform.maximum - platform.y;
+                            platform.vy =
+                                2.0F * std::exp(
+                                           -std::pow(position - 1.9F * travel,
+                                                     2.0F) /
+                                           (2.0F * travel * travel)) *
+                                REFERENCE_VELOCITY_SCALE;
+                            break;
+                        default:
+                            break;
+                    }
+                }
             }
-        }
-        switch (platform.direction) {
-            case PlatformerDirection::Left:
-                platform.vx = -PLATFORM_SPEED;
-                break;
-            case PlatformerDirection::Right:
-                platform.vx = PLATFORM_SPEED;
-                break;
-            case PlatformerDirection::Up:
-                platform.vy = -PLATFORM_SPEED;
-                break;
-            case PlatformerDirection::Down:
-                platform.vy = PLATFORM_SPEED;
-                break;
-            default:
-                break;
         }
         if (platform.motion == PlatformerMotionType::Gravity) {
             if (stoodOn == static_cast<int8_t>(index)) {
-                platform.vy = std::min(120.0F,
-                                       platform.vy + PLATFORM_GRAVITY * dt);
+                platform.accelerationY = PLATFORM_GRAVITY;
             } else {
-                platform.vy *= damping;
+                platform.accelerationY = 0.0F;
+                platform.vy *= REFERENCE_FRICTION;
             }
         }
-        platform.x += platform.vx * dt;
-        platform.y += platform.vy * dt;
         if (platform.motion == PlatformerMotionType::OneDirectionRepeated) {
             if ((platform.direction == PlatformerDirection::Left ||
                  platform.direction == PlatformerDirection::Right) &&
@@ -941,55 +1392,263 @@ void PlatformerEngine::updateMovingPlatforms(float dt) {
         }
         PlatformerMovingPlatformState& other =
             movingPlatforms_[static_cast<uint8_t>(platform.pairIndex)];
-        if (stoodOn == static_cast<int8_t>(index)) {
-            platform.vy = std::min(120.0F,
-                                   platform.vy + PLATFORM_GRAVITY * dt);
-            other.vy = -platform.vy;
-        } else if (stoodOn == platform.pairIndex) {
-            other.vy = std::min(120.0F, other.vy + PLATFORM_GRAVITY * dt);
-            platform.vy = -other.vy;
-        } else {
-            platform.vy *= damping;
-            other.vy = -platform.vy;
+        const bool platformVisible = inCamera(platform);
+        const bool otherVisible = inCamera(other);
+        if (!platformVisible && !otherVisible) {
+            continue;
         }
-        platform.y += platform.vy * dt;
-        other.y += other.vy * dt;
-        if (platform.y < platform.pulleyTop || other.y < other.pulleyTop) {
-            if (platform.y < platform.pulleyTop) {
-                platform.y = platform.pulleyTop;
+        if (platformVisible) {
+            integrate(platform);
+        }
+        if (otherVisible) {
+            integrate(other);
+        }
+
+        const auto detachPair = [](PlatformerMovingPlatformState& stopped,
+                                   PlatformerMovingPlatformState& falling) {
+            stopped.y = stopped.pulleyTop;
+            stopped.vx = stopped.vy = stopped.accelerationY = 0.0F;
+            stopped.pulley = false;
+            stopped.pairIndex = -1;
+            stopped.motion = PlatformerMotionType::None;
+            falling.accelerationY = 0.0F;
+            falling.pulley = false;
+            falling.pairIndex = -1;
+            falling.detachedFalling = true;
+        };
+        if (platformVisible && platform.y < platform.pulleyTop) {
+            detachPair(platform, other);
+            continue;
+        }
+
+        if (platformVisible) {
+            if (stoodOn == static_cast<int8_t>(index)) {
+                platform.accelerationY = PULLEY_GRAVITY;
+                other.vy = -platform.vy;
+            } else {
+                if (other.accelerationY == 0.0F) {
+                    platform.vy *= REFERENCE_FRICTION;
+                    other.vy = -platform.vy;
+                }
+                platform.accelerationY = 0.0F;
             }
-            if (other.y < other.pulleyTop) {
-                other.y = other.pulleyTop;
+        }
+        if (otherVisible && other.y < other.pulleyTop) {
+            detachPair(other, platform);
+            continue;
+        }
+        if (otherVisible) {
+            if (stoodOn == platform.pairIndex) {
+                other.accelerationY = PULLEY_GRAVITY;
+                platform.vy = -other.vy;
+            } else {
+                if (platform.accelerationY == 0.0F) {
+                    other.vy *= REFERENCE_FRICTION;
+                    platform.vy = -other.vy;
+                }
+                other.accelerationY = 0.0F;
             }
-            platform.vy = other.vy = 0.0F;
         }
     }
 
-    if (stoodOn >= 0 && movingPlatforms_[stoodOn].active) {
-        player_.x += movingPlatforms_[stoodOn].x - previousX;
-        player_.y += movingPlatforms_[stoodOn].y - previousY;
+    if (carryPlayer && stoodOn >= 0 && movingPlatforms_[stoodOn].active &&
+        !movingPlatforms_[stoodOn].pulley &&
+        !movingPlatforms_[stoodOn].cloudPlatform) {
+        player_.x += movingPlatforms_[stoodOn].vx * dt;
+        player_.y += movingPlatforms_[stoodOn].vy * dt;
         player_.grounded = true;
     }
 }
 
+void PlatformerEngine::updateCloudPlatformCallbacks() {
+    const int8_t stoodOn = standingPlatform();
+    if (stoodOn < 0) {
+        return;
+    }
+    PlatformerMovingPlatformState& platform = movingPlatforms_[stoodOn];
+    if (!platform.cloudPlatform || platform.triggered) {
+        return;
+    }
+    platform.triggered = true;
+    platform.vx = 2.0F * REFERENCE_VELOCITY_SCALE;
+}
+
+void PlatformerEngine::updateTrampolines() {
+    bool anyCollision = false;
+    for (uint8_t index = 0; index < levelRuntime_.trampolineCount(); ++index) {
+        const PlatformerTrampolineRuntimeState* state =
+            levelRuntime_.trampoline(index);
+        if (state == nullptr) {
+            continue;
+        }
+        const float x = static_cast<float>(state->column * TILE_SIZE);
+        const float y = static_cast<float>(state->row * TILE_SIZE);
+        const bool inCamera =
+            x + TILE_SIZE >= cameraX_ && x <= cameraX_ + VIEWPORT_WIDTH &&
+            y + TILE_SIZE >= cameraY_ &&
+            y <= cameraY_ + VIEWPORT_WIDTH * 0.75F;
+        const float hitboxY =
+            y + (state->visualState == 0U
+                     ? 0.0F
+                     : state->visualState == 1U ? TILE_SIZE * 0.5F
+                                                : TILE_SIZE);
+        const float hitboxHeight =
+            state->visualState == 0U
+                ? TILE_SIZE
+                : state->visualState == 1U ? TILE_SIZE * 0.5F : 0.0F;
+        const bool collided =
+            inCamera && player_.x <= x + TILE_SIZE &&
+            player_.x + playerWidth() >= x &&
+            player_.y <= hitboxY + hitboxHeight &&
+            player_.y + playerHeight() >= hitboxY;
+        if (!collided) {
+            if (state->sequenceIndex != 0U) {
+                levelRuntime_.setTrampolineState(
+                    index, 0U, state->visualState, state->activated);
+            }
+            continue;
+        }
+
+        anyCollision = true;
+        if (state->sequenceIndex > 20U) {
+            continue;
+        }
+
+        uint8_t visualState = state->visualState;
+        switch (state->sequenceIndex) {
+            case 0U:
+                visualState = 1U;
+                break;
+            case 1U:
+                visualState = 2U;
+                break;
+            case 2U:
+                visualState = 1U;
+                player_.vy = -11.0F * REFERENCE_VELOCITY_SCALE;
+                queueEvent(PlatformerEventType::TrampolineBounced);
+                break;
+            case 3U:
+                visualState = 0U;
+                break;
+            default:
+                break;
+        }
+        levelRuntime_.setTrampolineState(
+            index, static_cast<uint8_t>(state->sequenceIndex + 1U),
+            visualState, true);
+        player_.grounded = false;
+        const float trampolineBottom = y + TILE_SIZE;
+        if (player_.y + playerHeight() * 0.5F > trampolineBottom) {
+            player_.y = trampolineBottom - playerHeight() * 0.5F;
+        }
+    }
+    trampolineCollided_ = anyCollision;
+}
+
 void PlatformerEngine::updateFireBars(float dt) {
-    constexpr float FIRE_BAR_DEGREES_PER_SECOND = 100.0F;
+    (void)dt;
+    constexpr float PI = 3.14159265358979323846F;
     for (uint8_t index = 0; index < fireBarCount_; ++index) {
         PlatformerFireBarState& fireBar = fireBars_[index];
         if (!fireBar.active) {
             continue;
         }
+        const float radians = fireBar.angleDegrees * PI / 180.0F;
+        for (uint8_t element = 0U; element < fireBar.length; ++element) {
+            const float distance = static_cast<float>(element) *
+                                   TILE_SIZE * 0.5F;
+            const float x = fireBar.x + std::cos(radians) * distance;
+            const float y = fireBar.y - std::sin(radians) * distance;
+            const bool inCamera =
+                x + TILE_SIZE >= cameraX_ &&
+                x <= cameraX_ + VIEWPORT_WIDTH &&
+                y + TILE_SIZE >= cameraY_ &&
+                y <= cameraY_ + VIEWPORT_HEIGHT;
+            if (inCamera) {
+                platformerAdvanceReferenceAnimation(
+                    fireBar.animationFrames[element],
+                    fireBar.animationTimers[element], 5U, 4U);
+            }
+        }
+        ++fireBar.timerFrames;
+        if (fireBar.timerFrames < 6U) {
+            continue;
+        }
+        fireBar.timerFrames = 0U;
         const float direction =
             fireBar.direction == PlatformerRotationDirection::Clockwise
                 ? -1.0F
                 : 1.0F;
-        fireBar.angleDegrees += direction * FIRE_BAR_DEGREES_PER_SECOND * dt;
+        fireBar.angleDegrees += direction * 10.0F;
         if (fireBar.angleDegrees >= 360.0F) {
             fireBar.angleDegrees -= 360.0F;
         } else if (fireBar.angleDegrees < 0.0F) {
             fireBar.angleDegrees += 360.0F;
         }
     }
+}
+
+void PlatformerEngine::updateCannonTimers() {
+    if (cannonCount_ == 0U) {
+        return;
+    }
+    if (cannonTimerFrames_ > 0U) {
+        --cannonTimerFrames_;
+    }
+    if (cannonTimerFrames_ != 0U) {
+        return;
+    }
+    cannonTimerFrames_ = CANNON_TIMER_FRAMES;
+
+    for (uint8_t index = 0; index < cannonCount_; ++index) {
+        const CannonState& cannon = cannons_[index];
+        const float x = static_cast<float>(cannon.column * TILE_SIZE);
+        const float y = static_cast<float>(cannon.row * TILE_SIZE);
+        const bool inCamera =
+            x + TILE_SIZE >= cameraX_ && x <= cameraX_ + VIEWPORT_WIDTH &&
+            y + TILE_SIZE >= cameraY_ && y <= cameraY_ + VIEWPORT_HEIGHT;
+        if (!inCamera) {
+            continue;
+        }
+        const bool movingRight = (nextRandom() & 1U) != 0U;
+        if (spawnCannonBullet(cannon, movingRight)) {
+            queueEvent(PlatformerEventType::CannonFired);
+        }
+    }
+}
+
+bool PlatformerEngine::spawnCannonBullet(const CannonState& cannon,
+                                          bool movingRight) {
+    uint8_t slot = MAX_ENEMIES;
+    for (uint8_t index = 0; index < enemyCount_; ++index) {
+        if (!enemies_[index].actor.active) {
+            slot = index;
+            break;
+        }
+    }
+    if (slot == MAX_ENEMIES && enemyCount_ < MAX_ENEMIES) {
+        slot = enemyCount_++;
+    }
+    if (slot >= MAX_ENEMIES) {
+        return false;
+    }
+
+    EnemyActor& bullet = enemies_[slot];
+    bullet = EnemyActor{};
+    bullet.type = PlatformerEnemyType::BulletBill;
+    bullet.sourceTileId = cannonBulletSource(cannon.sourceTileId);
+    bullet.bornFrame = logicFrame_;
+    bullet.actor.x = static_cast<float>(
+        (static_cast<int32_t>(cannon.column) + (movingRight ? 1 : -1)) *
+        TILE_SIZE);
+    bullet.actor.y = static_cast<float>(cannon.row * TILE_SIZE);
+    bullet.actor.vx =
+        (movingRight ? 3.0F : -3.0F) * REFERENCE_VELOCITY_SCALE;
+    bullet.actor.active = true;
+    bullet.spawned = true;
+    bullet.originX = bullet.actor.x;
+    bullet.originY = bullet.actor.y;
+    return true;
 }
 
 void PlatformerEngine::checkFireBarCollisions() {
@@ -1001,9 +1660,10 @@ void PlatformerEngine::checkFireBarCollisions() {
         }
         const float radians = fireBar.angleDegrees * PI / 180.0F;
         for (uint8_t element = 0; element + 1U < fireBar.length; ++element) {
-            const float distance = static_cast<float>(element * TILE_SIZE);
-            const float x = fireBar.x + std::cos(radians) * distance + 6.0F;
-            const float y = fireBar.y - std::sin(radians) * distance + 6.0F;
+            const float distance =
+                static_cast<float>(element) * TILE_SIZE * 0.5F;
+            const float x = fireBar.x + std::cos(radians) * distance;
+            const float y = fireBar.y - std::sin(radians) * distance;
             if (!overlaps(player_.x, player_.y, playerWidth(), playerHeight(),
                           x, y, 4.0F, 4.0F)) {
                 continue;
@@ -1041,55 +1701,120 @@ void PlatformerEngine::updateVine(float dt, const PlatformerInput& input) {
     if (!campaignMode_ || !vine_.active) {
         return;
     }
+    if (vineSequenceState_ != 0U) {
+        return;
+    }
     vine_.grownPixels =
-        std::min(96.0F, vine_.grownPixels + 60.0F * dt);
-    if (vine_.grownPixels < 48.0F || !input.jumpPressed) {
+        std::min(96.0F, vine_.grownPixels + 30.0F * dt);
+    if (vine_.grownPixels <= 0.0F) {
         return;
     }
     const float vineTop = vine_.baseY - vine_.grownPixels;
+    const float visibleHeight =
+        std::ceil(vine_.grownPixels / TILE_SIZE) * TILE_SIZE;
     if (!overlaps(player_.x, player_.y, playerWidth(), playerHeight(),
-                  vine_.x + 4.0F, vineTop, 8.0F,
-                  vine_.grownPixels + TILE_SIZE)) {
+                  vine_.x, vineTop, TILE_SIZE, visibleHeight)) {
         return;
     }
     vinePreviousLevelType_ = levelRuntime_.activeLevelType();
     vinePreviousBackground_ = levelRuntime_.activeBackground();
     phase_ = PlatformerPhase::VineClimb;
-    phaseElapsedMs_ = 0;
+    phaseElapsedMs_ = 0U;
+    phaseFrames_ = 0U;
+    vineSequenceState_ = 1U;
+    player_.x = vine_.x + TILE_SIZE * 0.5F;
     player_.vx = 0.0F;
     player_.vy = 0.0F;
     player_.grounded = false;
+    playerAccelerationX_ = 0.0F;
+    playerAccelerationY_ = 0.0F;
+    if (input.jumpHeld) {
+        player_.vy = -45.0F;
+        vineSequenceState_ = 2U;
+    }
 }
 
-void PlatformerEngine::updateVineClimb(float dt) {
+void PlatformerEngine::updateVineClimb(float dt,
+                                        const PlatformerInput& input) {
     const PlatformerCampaignLevel* level = levelRuntime_.level();
     if (level == nullptr || activeVineIndex_ >= level->vines.count) {
         phase_ = PlatformerPhase::Running;
+        vineSequenceState_ = 0U;
         return;
     }
     const PlatformerVineData& source =
         PLATFORMER_CAMPAIGN_VINES[level->vines.offset + activeVineIndex_];
-    player_.x = vine_.x + 6.0F;
-    player_.y -= 58.0F * dt;
-    if (phaseElapsedMs_ < 900U) {
+
+    if (vineSequenceState_ == 1U) {
+        player_.x = vine_.x + TILE_SIZE * 0.5F;
+        if (input.jumpHeld) {
+            player_.vy = -45.0F;
+            vineSequenceState_ = 2U;
+        }
         return;
     }
 
-    vine_.x = static_cast<float>(source.destination.x * TILE_SIZE);
-    vine_.baseY = static_cast<float>(source.destination.y * TILE_SIZE);
-    vine_.grownPixels = 96.0F;
-    player_.x = vine_.x + 6.0F;
-    player_.y = static_cast<float>((source.destination.y - 4) * TILE_SIZE);
-    cameraX_ = static_cast<float>(source.camera.x * TILE_SIZE);
-    cameraY_ = static_cast<float>(source.camera.y * TILE_SIZE);
-    cameraFrozen_ = false;
-    levelRuntime_.setSection(source.levelType, source.background);
-    vineReturnActive_ =
-        source.resetBelowY < 1000 &&
-        (source.resetDestination.x != 0 || source.resetDestination.y != 0);
-    warpCooldownMs_ = 450U;
+    if (vineSequenceState_ == 2U) {
+        player_.y += player_.vy * dt;
+        if (player_.y + playerHeight() < cameraY_) {
+            vineSequenceState_ = 3U;
+        }
+        return;
+    }
+
+    // SequenceCommand advances by one child per scheduler frame. This is the
+    // RunCommand after WaitUntil(player outside the old camera).
+    if (vineSequenceState_ == 3U) {
+        player_.y += player_.vy * dt;
+        cameraX_ = static_cast<float>(source.camera.x * TILE_SIZE);
+        cameraY_ = static_cast<float>(source.camera.y * TILE_SIZE);
+        levelRuntime_.setSection(source.levelType, source.background);
+        player_.x = vine_.x + TILE_SIZE * 0.5F;
+        player_.y = vine_.baseY - TILE_SIZE;
+        vineReturnActive_ = true;
+        vineSequenceState_ = 4U;
+        return;
+    }
+
+    if (vineSequenceState_ == 4U) {
+        vine_.baseY -= 30.0F * dt;
+        player_.y += player_.vy * dt;
+        const float destinationTop =
+            static_cast<float>((source.destination.y - 4) * TILE_SIZE);
+        if (vine_.baseY - vine_.grownPixels <= destinationTop) {
+            vineSequenceState_ = 5U;
+        }
+        return;
+    }
+
+    // The stop RunCommand follows on the next frame, after one final physics
+    // movement for both the vine and Mario.
+    if (vineSequenceState_ == 5U) {
+        vine_.baseY -= 30.0F * dt;
+        player_.y += player_.vy * dt;
+        vineSequenceState_ = 6U;
+        return;
+    }
+
+    const float secondPieceBottom =
+        vine_.baseY - vine_.grownPixels + TILE_SIZE * 2.0F;
+    if (vineSequenceState_ == 6U) {
+        player_.y += player_.vy * dt;
+        if (player_.y + playerHeight() <= secondPieceBottom) {
+            vineSequenceState_ = 7U;
+        }
+        return;
+    }
+
+    // The reference restores gravity and input without clearing the upward
+    // velocity established by VineCommand.
+    player_.y += player_.vy * dt;
+    player_.x = vine_.x + TILE_SIZE;
+    playerAccelerationY_ = 0.0F;
+    player_.grounded = false;
     phase_ = PlatformerPhase::Running;
-    phaseElapsedMs_ = 0;
+    phaseElapsedMs_ = 0U;
+    phaseFrames_ = 0U;
 }
 
 void PlatformerEngine::checkVineReturn() {
@@ -1103,14 +1828,29 @@ void PlatformerEngine::checkVineReturn() {
     }
     const PlatformerVineData& source =
         PLATFORMER_CAMPAIGN_VINES[level->vines.offset + activeVineIndex_];
-    if (player_.y <= static_cast<float>(source.resetBelowY * TILE_SIZE)) {
+    if (vineReturnFrames_ > 0U ||
+        player_.y <= static_cast<float>(
+                         (source.resetBelowY + 3) * TILE_SIZE)) {
         return;
     }
+    vineReturnFrames_ = 119U;
+    player_.vx = 0.0F;
+    player_.vy = 0.0F;
+    playerAccelerationX_ = 0.0F;
+    playerAccelerationY_ = 0.0F;
+}
+
+void PlatformerEngine::completeVineReturn() {
+    const PlatformerCampaignLevel* level = levelRuntime_.level();
+    if (!vineReturnActive_ || level == nullptr ||
+        activeVineIndex_ >= level->vines.count) {
+        vineReturnFrames_ = 0U;
+        return;
+    }
+    const PlatformerVineData& source =
+        PLATFORMER_CAMPAIGN_VINES[level->vines.offset + activeVineIndex_];
     player_.x = static_cast<float>(source.resetDestination.x * TILE_SIZE);
-    player_.y = static_cast<float>(source.resetDestination.y * TILE_SIZE) -
-                (playerPower_ == PlatformerPlayerPower::Small
-                     ? 0.0F
-                     : BIG_PLAYER_HEIGHT - PLAYER_HEIGHT);
+    player_.y = static_cast<float>(source.resetDestination.y * TILE_SIZE);
     player_.vx = 0.0F;
     player_.vy = 0.0F;
     cameraX_ = static_cast<float>(
@@ -1118,50 +1858,75 @@ void PlatformerEngine::checkVineReturn() {
     cameraY_ = static_cast<float>(
         std::max<int16_t>(0, source.resetDestination.y - 1) * TILE_SIZE);
     levelRuntime_.setSection(vinePreviousLevelType_, vinePreviousBackground_);
-    vine_.active = false;
     vineReturnActive_ = false;
+    vineReturnFrames_ = 0U;
     cameraFrozen_ = false;
 }
 
 void PlatformerEngine::resetLife() {
     if (campaignMode_) {
-        resetCampaignLevel(true);
+        const PlatformerCampaignLevel* level = levelRuntime_.level();
+        if (level != nullptr &&
+            beginLevelTransition(level->world, level->stage, true)) {
+            return;
+        }
+        phase_ = PlatformerPhase::GameOver;
         return;
     }
     buildLevel();
     resetActors();
+    animationFrame_ = 0U;
+    playerAnimationMode_ = 0U;
+    playerAnimationFrame_ = 0U;
+    playerAnimationTimer_ = 0U;
     phase_ = PlatformerPhase::Running;
     deathReason_ = PlatformerDeathReason::None;
     phaseElapsedMs_ = 0;
-    levelClockMs_ = 0;
+    phaseFrames_ = 0U;
+    levelClockFrames_ = 0;
     timeRemaining_ = 400;
     flagY_ = static_cast<float>(PLATFORMER_LEVEL_1_1.flagTopY);
     playerPower_ = PlatformerPlayerPower::Small;
     playerCrouching_ = false;
     playerSkidding_ = false;
-    powerTransitionMs_ = 0;
-    hurtInvincibleMs_ = 0;
-    starInvincibleMs_ = 0;
-    fireCooldownMs_ = 0;
-    jumpHoldMs_ = 0;
-    coyoteMs_ = 0;
-    jumpBufferMs_ = 0;
+    playerRunning_ = false;
+    trampolineCollided_ = false;
+    swimStrokeFrames_ = 0U;
+    powerTransitionFrames_ = 0;
+    powerTransitionElapsedFrames_ = 0;
+    hurtInvincibleFrames_ = 0;
+    starInvincibleFrames_ = 0;
+    starBlinkFrames_ = 0;
+    fireballPoseFrames_ = 0U;
+    powerTransition_ = PlatformerPowerTransition::None;
+    starProtectedThisFrame_ = false;
+    hurtProtectedThisFrame_ = false;
     stompChain_ = 0;
-    timeWarningSent_ = false;
+    playerAccelerationX_ = 0.0F;
+    playerAccelerationY_ = 0.0F;
+    cameraAdvanceX_ = 0.0F;
     queueEvent(PlatformerEventType::LifeRestarted, lives_);
 }
 
 void PlatformerEngine::updateRunning(float dt, uint16_t dtMs,
                                      const PlatformerInput& input) {
-    updateTimers(dtMs);
-    updateBoxes(dtMs);
+    if (campaignMode_ && !campaignEnemiesLoaded_) {
+        loadCampaignEnemies();
+        campaignEnemiesLoaded_ = true;
+    }
+    playerRunning_ = input.actionHeld;
+    starProtectedThisFrame_ = starInvincibleFrames_ > 0U;
+    hurtProtectedThisFrame_ = hurtInvincibleFrames_ > 0U;
+    if (timeRemaining_ == 0U) {
+        beginDeath(PlatformerDeathReason::Time);
+        return;
+    }
+    const bool playerFrozen = powerTransitionFrames_ > 0U;
+    updatePlayerStateTimers();
+    updateBoxes();
     updateEffects(dt, dtMs);
 
     if (phase_ != PlatformerPhase::Running) {
-        return;
-    }
-
-    if (powerTransitionMs_ > 0) {
         return;
     }
 
@@ -1170,8 +1935,26 @@ void PlatformerEngine::updateRunning(float dt, uint16_t dtMs,
         updateFireBars(dt);
     }
 
+    if (playerFrozen) {
+        updateEnemies(dt, dtMs);
+        updateEnemyHazards(dt, dtMs);
+        updatePowerups(dt, dtMs);
+        updateProjectiles(dt, dtMs);
+        checkEnemyPairCollisions();
+        updateCamera();
+        return;
+    }
+
+    if (vineReturnFrames_ > 0U) {
+        --vineReturnFrames_;
+        if (vineReturnFrames_ == 0U) {
+            completeVineReturn();
+        }
+        return;
+    }
+
     if (startIntro_) {
-        player_.vx = 38.0F;
+        player_.vx = 48.0F;
         playerFacingLeft_ = false;
         moveHorizontal(player_.vx * dt);
         PlatformerInput pipeInput;
@@ -1187,23 +1970,12 @@ void PlatformerEngine::updateRunning(float dt, uint16_t dtMs,
         return;
     }
 
-    updateCrouch(input.crouchHeld);
+    const bool underwater =
+        campaignMode_ && levelRuntime_.activeLevelType() ==
+                             PlatformerLevelType::Underwater;
+    updateCrouch(!underwater && input.crouchHeld);
 
-    if (input.jumpPressed) {
-        jumpBufferMs_ = JUMP_BUFFER_MS;
-    } else if (jumpBufferMs_ > 0) {
-        jumpBufferMs_ = static_cast<uint16_t>(
-            jumpBufferMs_ > dtMs ? jumpBufferMs_ - dtMs : 0);
-    }
-    if (player_.grounded) {
-        coyoteMs_ = COYOTE_TIME_MS;
-    } else if (coyoteMs_ > 0) {
-        coyoteMs_ = static_cast<uint16_t>(
-            coyoteMs_ > dtMs ? coyoteMs_ - dtMs : 0);
-    }
-
-    if (input.actionPressed && playerPower_ == PlatformerPlayerPower::Fire &&
-        fireCooldownMs_ == 0) {
+    if (input.actionPressed && playerPower_ == PlatformerPlayerPower::Fire) {
         shootFireball();
     }
 
@@ -1212,9 +1984,13 @@ void PlatformerEngine::updateRunning(float dt, uint16_t dtMs,
     updatePlayerHorizontal(dt, input);
     updatePlayerVertical(dt, dtMs, input);
     if (campaignMode_) {
+        updateTrampolines();
         applyTeleportPoints(previousX);
         collectMapCoins();
         checkVineReturn();
+        if (vineReturnFrames_ > 0U) {
+            return;
+        }
         if (tryEnterWarp(input)) {
             return;
         }
@@ -1269,12 +2045,11 @@ const PlatformerWarpData* PlatformerEngine::activeWarp() const {
 
 bool PlatformerEngine::tryEnterWarp(const PlatformerInput& input) {
     const PlatformerCampaignLevel* level = levelRuntime_.level();
-    if (!campaignMode_ || level == nullptr || warpCooldownMs_ > 0U) {
+    if (!campaignMode_ || level == nullptr) {
         return false;
     }
     const float playerLeft = player_.x;
     const float playerRight = player_.x + playerWidth();
-    const float playerCenter = player_.x + playerWidth() * 0.5F;
     const float playerTop = player_.y;
     const float playerBottom = player_.y + playerHeight();
     for (uint8_t index = 0; index < level->warps.count; ++index) {
@@ -1282,29 +2057,33 @@ bool PlatformerEngine::tryEnterWarp(const PlatformerInput& input) {
             PLATFORMER_CAMPAIGN_WARPS[level->warps.offset + index];
         const float pipeX = static_cast<float>(warp.pipe.x * TILE_SIZE);
         const float pipeY = static_cast<float>(warp.pipe.y * TILE_SIZE);
-        const bool horizontallyAligned =
-            playerCenter >= pipeX - 3.0F &&
-            playerCenter <= pipeX + TILE_SIZE * 2.0F + 3.0F;
-        const bool verticallyAligned =
-            player_.y + playerHeight() * 0.5F >= pipeY - TILE_SIZE &&
-            player_.y + playerHeight() * 0.5F <= pipeY + TILE_SIZE * 3.0F;
+        const bool verticalTrigger =
+            playerLeft <= pipeX + TILE_SIZE + EPSILON &&
+            playerRight >= pipeX + TILE_SIZE - EPSILON &&
+            playerTop <= pipeY + TILE_SIZE + EPSILON &&
+            playerBottom >= pipeY - EPSILON;
+        const bool horizontalTrigger =
+            playerLeft <= pipeX + TILE_SIZE + EPSILON &&
+            playerRight >= pipeX - EPSILON &&
+            playerTop <= pipeY + TILE_SIZE + EPSILON &&
+            playerBottom >= pipeY + TILE_SIZE - EPSILON;
         bool requested = false;
         switch (warp.enterDirection) {
             case PlatformerDirection::Down:
-                requested = input.crouchHeld && horizontallyAligned &&
-                            std::fabs(playerBottom - pipeY) <= 6.0F;
+                requested = verticalTrigger &&
+                            (input.crouchHeld || player_.vy > 0.0F);
                 break;
             case PlatformerDirection::Up:
-                requested = input.jumpPressed && horizontallyAligned &&
-                            std::fabs(playerTop - (pipeY + TILE_SIZE)) <= 8.0F;
+                requested = verticalTrigger &&
+                            (input.jumpHeld || player_.vy < 0.0F);
                 break;
             case PlatformerDirection::Right:
-                requested = input.moveAxis > 0.5F && verticallyAligned &&
-                            std::fabs(playerRight - pipeX) <= 7.0F;
+                requested = horizontalTrigger &&
+                            (input.moveAxis > 0.0F || player_.vx > 0.0F);
                 break;
             case PlatformerDirection::Left:
-                requested = input.moveAxis < -0.5F && verticallyAligned &&
-                            std::fabs(playerLeft - (pipeX + TILE_SIZE)) <= 7.0F;
+                requested = horizontalTrigger &&
+                            (input.moveAxis < 0.0F || player_.vx < 0.0F);
                 break;
             case PlatformerDirection::None:
                 break;
@@ -1313,9 +2092,10 @@ bool PlatformerEngine::tryEnterWarp(const PlatformerInput& input) {
             continue;
         }
         activeWarpIndex_ = index;
-        warpTeleported_ = false;
+        warpState_ = 0U;
         phase_ = PlatformerPhase::Warping;
         phaseElapsedMs_ = 0;
+        phaseFrames_ = 0U;
         player_.vx = 0.0F;
         player_.vy = 0.0F;
         player_.grounded = false;
@@ -1341,11 +2121,6 @@ void PlatformerEngine::applyTeleportPoints(float previousX) {
                                    TILE_SIZE);
             player_.x += difference;
             cameraX_ = std::max(0.0F, cameraX_ + difference);
-            for (uint8_t enemyIndex = 0; enemyIndex < enemyCount_;
-                 ++enemyIndex) {
-                enemies_[enemyIndex].actor.active = false;
-                enemies_[enemyIndex].motion = PlatformerEnemyMotion::Defeated;
-            }
             return;
         }
     }
@@ -1358,37 +2133,71 @@ void PlatformerEngine::updateWarp(float dt) {
         return;
     }
     auto moveInDirection = [this, dt](PlatformerDirection direction) {
-        constexpr float WARP_SPEED = 38.0F;
+        constexpr float WARP_SPEED = REFERENCE_VELOCITY_SCALE;
+        player_.vx = 0.0F;
+        player_.vy = 0.0F;
         switch (direction) {
             case PlatformerDirection::Up:
                 player_.y -= WARP_SPEED * dt;
+                player_.vy = -WARP_SPEED;
                 break;
             case PlatformerDirection::Down:
                 player_.y += WARP_SPEED * dt;
+                player_.vy = WARP_SPEED;
                 break;
             case PlatformerDirection::Left:
                 player_.x -= WARP_SPEED * dt;
+                player_.vx = -WARP_SPEED;
                 break;
             case PlatformerDirection::Right:
                 player_.x += WARP_SPEED * dt;
+                player_.vx = WARP_SPEED;
                 break;
             case PlatformerDirection::None:
                 break;
         }
     };
 
-    if (!warpTeleported_) {
-        moveInDirection(warp->enterDirection);
-        if (phaseElapsedMs_ < 430U) {
-            return;
+    auto crossed = [this, warp](PlatformerDirection direction,
+                                bool entering) {
+        const float anchorX = static_cast<float>(
+            (entering ? warp->pipe.x : warp->destination.x) * TILE_SIZE);
+        const float anchorY = static_cast<float>(
+            (entering ? warp->pipe.y : warp->destination.y) * TILE_SIZE);
+        switch (direction) {
+            case PlatformerDirection::Up:
+                return player_.y + playerHeight() <
+                       anchorY - (entering ? TILE_SIZE : 0.0F);
+            case PlatformerDirection::Down:
+                return player_.y >
+                       anchorY + (entering ? TILE_SIZE : 0.0F);
+            case PlatformerDirection::Left:
+                return player_.x + playerWidth() <
+                       anchorX - (entering ? TILE_SIZE : 0.0F);
+            case PlatformerDirection::Right:
+                return player_.x >
+                       anchorX + (entering ? TILE_SIZE : 0.0F);
+            case PlatformerDirection::None:
+                return true;
         }
+        return false;
+    };
+
+    if (warpState_ == 0U) {
+        moveInDirection(warp->enterDirection);
+        if (crossed(warp->enterDirection, true)) {
+            warpState_ = 1U;
+        }
+        return;
+    }
+
+    if (warpState_ == 1U) {
+        moveInDirection(warp->enterDirection);
 
         if (warp->destinationWorld != 0U && warp->destinationStage != 0U) {
             const uint8_t destinationWorld = warp->destinationWorld;
             const uint8_t destinationStage = warp->destinationStage;
-            if (levelRuntime_.load(destinationWorld, destinationStage)) {
-                resetCampaignLevel(false);
-                warpCooldownMs_ = 450U;
+            if (beginLevelTransition(destinationWorld, destinationStage)) {
                 queueEvent(PlatformerEventType::WarpCompleted);
             } else {
                 phase_ = PlatformerPhase::Running;
@@ -1396,109 +2205,261 @@ void PlatformerEngine::updateWarp(float dt) {
             return;
         }
 
+        resetPiranhasForWarp();
         player_.x = static_cast<float>(warp->destination.x * TILE_SIZE);
         player_.y = static_cast<float>(warp->destination.y * TILE_SIZE);
+        switch (warp->exitDirection) {
+            case PlatformerDirection::Up:
+                player_.y += TILE_SIZE;
+                break;
+            case PlatformerDirection::Down:
+                player_.y -= TILE_SIZE;
+                break;
+            case PlatformerDirection::Left:
+                player_.x += TILE_SIZE;
+                break;
+            case PlatformerDirection::Right:
+                player_.x -= TILE_SIZE;
+                break;
+            case PlatformerDirection::None:
+                break;
+        }
         cameraX_ = static_cast<float>(warp->camera.x * TILE_SIZE);
         cameraY_ = static_cast<float>(warp->camera.y * TILE_SIZE);
         cameraFrozen_ = warp->freezeCamera;
         levelRuntime_.setSection(warp->levelType, warp->background);
         startIntro_ = false;
-        warpTeleported_ = true;
+        warpState_ = 2U;
         phaseElapsedMs_ = 0;
-        if (warp->exitDirection == PlatformerDirection::None) {
-            phase_ = PlatformerPhase::Running;
-            warpCooldownMs_ = 450U;
-            queueEvent(PlatformerEventType::WarpCompleted);
+        phaseFrames_ = 0U;
+        return;
+    }
+
+    if (warpState_ == 2U) {
+        moveInDirection(warp->exitDirection);
+        if (crossed(warp->exitDirection, false)) {
+            warpState_ = 3U;
         }
         return;
     }
 
-    moveInDirection(warp->exitDirection);
-    if (phaseElapsedMs_ >= 430U) {
+    if (warpState_ == 3U) {
+        moveInDirection(warp->exitDirection);
         phase_ = PlatformerPhase::Running;
         startIntro_ = false;
-        warpCooldownMs_ = 450U;
+        player_.vx = 0.0F;
+        player_.vy = 0.0F;
         queueEvent(PlatformerEventType::WarpCompleted);
     }
 }
 
+void PlatformerEngine::resetPiranhasForWarp() {
+    for (uint8_t index = 0; index < enemyCount_; ++index) {
+        EnemyActor& enemy = enemies_[index];
+        if (!enemy.actor.active ||
+            enemy.type != PlatformerEnemyType::PiranhaPlant ||
+            enemy.behaviorState != 0U) {
+            continue;
+        }
+        enemy.actor.y = enemy.originY + 32.0F;
+        enemy.actor.vy = 0.0F;
+        enemy.behaviorState = 1U;
+        enemy.moveFrames = 0U;
+        enemy.stateMs = 0U;
+    }
+}
+
 void PlatformerEngine::updateCastleBridge(float dt) {
+    if (castleClearFrames_ > 0U) {
+        --castleClearFrames_;
+        if (castleClearFrames_ == 0U) {
+            queueEvent(PlatformerEventType::CastleClear);
+        }
+    }
     const uint8_t bridgeLength =
         bridgeStartColumn_ >= 0 && bridgeEndColumn_ >= bridgeStartColumn_
             ? static_cast<uint8_t>(bridgeEndColumn_ - bridgeStartColumn_ + 1)
             : 0U;
-    constexpr uint16_t COLLAPSE_STEP_MS = 80U;
-    const uint8_t targetRemoved = static_cast<uint8_t>(std::min<uint16_t>(
-        bridgeLength, phaseElapsedMs_ / COLLAPSE_STEP_MS));
-    while (bridgeRemovedCount_ < targetRemoved) {
+    if (bridgeSequenceState_ == 0U) {
+        if (bridgeLength == 0U) {
+            bridgeSequenceState_ = 1U;
+            return;
+        }
+        if (bridgeStepFrames_ > 0U) {
+            --bridgeStepFrames_;
+        }
+        if (bridgeStepFrames_ > 0U) {
+            return;
+        }
         const uint16_t column = static_cast<uint16_t>(
             bridgeEndColumn_ - bridgeRemovedCount_);
         levelRuntime_.removeTile(column, bridgeRow_);
         ++bridgeRemovedCount_;
         queueEvent(PlatformerEventType::BrickBroken);
-    }
-    if (bridgeRemovedCount_ < bridgeLength) {
+        if (bridgeRemovedCount_ >= bridgeLength) {
+            // WaitUntil completes here; its following RunCommand executes on
+            // the next scheduler frame.
+            bridgeSequenceState_ = 1U;
+        } else {
+            bridgeStepFrames_ = 5U;
+        }
         return;
     }
 
-    const uint16_t collapseDuration =
-        static_cast<uint16_t>(bridgeLength * COLLAPSE_STEP_MS);
-    for (uint8_t index = 0; index < enemyCount_; ++index) {
-        EnemyActor& enemy = enemies_[index];
-        if (!enemy.actor.active || enemy.type != PlatformerEnemyType::Bowser) {
-            continue;
+    const auto advanceFallingBowser = [this, dt]() {
+        bool visible = false;
+        for (uint8_t index = 0; index < enemyCount_; ++index) {
+            EnemyActor& enemy = enemies_[index];
+            if (!enemy.actor.active ||
+                enemy.type != PlatformerEnemyType::Bowser) {
+                continue;
+            }
+            enemy.actor.vy = std::min(
+                MAX_FALL_SPEED,
+                enemy.actor.vy + REFERENCE_GRAVITY *
+                                     REFERENCE_VELOCITY_SCALE);
+            enemy.actor.y += enemy.actor.vy * dt;
+            enemy.actor.vy = std::min(
+                MAX_FALL_SPEED, enemy.actor.vy + enemy.accelerationY * dt);
+            visible |= enemy.actor.x + enemy.width >= cameraX_ &&
+                       enemy.actor.x <= cameraX_ + VIEWPORT_WIDTH &&
+                       enemy.actor.y + enemy.height >= cameraY_ &&
+                       enemy.actor.y <= cameraY_ + 15.0F * TILE_SIZE;
+            if (!visible) {
+                enemy.actor.active = false;
+                enemy.motion = PlatformerEnemyMotion::Defeated;
+            }
         }
-        enemy.actor.vy = std::min(enemy.actor.vy + GRAVITY * dt,
-                                  MAX_FALL_SPEED);
-        enemy.actor.y += enemy.actor.vy * dt;
-        if (enemy.actor.y > cameraY_ + VIEWPORT_WIDTH * 0.75F + 48.0F) {
-            enemy.actor.active = false;
-            enemy.motion = PlatformerEnemyMotion::Defeated;
-        }
+        return visible;
+    };
+
+    if (bridgeSequenceState_ == 1U) {
+        // Bowser is unfrozen and marked dead after the world tick, so falling
+        // starts on the following frame.
+        queueEvent(PlatformerEventType::BowserFell);
+        bridgeSequenceState_ = 2U;
+        return;
     }
 
-    const uint16_t postCollapse = static_cast<uint16_t>(
-        phaseElapsedMs_ > collapseDuration ? phaseElapsedMs_ - collapseDuration
-                                           : 0U);
-    if (postCollapse >= 900U) {
-        player_.vx = 72.0F;
-        player_.x += player_.vx * dt;
-        updateCamera();
+    if (bridgeSequenceState_ == 2U) {
+        if (!advanceFallingBowser()) {
+            bridgeSequenceState_ = 3U;
+        }
+        return;
     }
-    if (postCollapse >= 2200U) {
-        phase_ = PlatformerPhase::TimeBonus;
-        phaseElapsedMs_ = 0;
-        player_.active = false;
+
+    if (bridgeSequenceState_ == 3U) {
+        advanceFallingBowser();
+        player_.vx = 3.0F * REFERENCE_VELOCITY_SCALE;
+        player_.vy = 0.0F;
+        playerAccelerationY_ = 0.0F;
+        player_.grounded = false;
+        castleClearFrames_ = 19U;
+        bridgeSequenceState_ = 4U;
+        return;
+    }
+
+    if (bridgeSequenceState_ == 4U) {
+        player_.vy = std::min(
+            MAX_FALL_SPEED,
+            player_.vy + REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE);
+        moveHorizontal(player_.vx * dt);
+        moveVertical(player_.vy * dt);
+        updateCamera();
+        if (player_.vx == 0.0F) {
+            bridgeSequenceState_ = 5U;
+        }
+        return;
+    }
+
+    if (bridgeSequenceState_ == 5U) {
+        // DelayedCommand(5.0) consumes its first tick on this RunCommand
+        // frame, leaving 299 subsequent scheduler ticks.
+        bridgeDelayFrames_ = 299U;
+        bridgeSequenceState_ = 6U;
+        return;
+    }
+
+    if (bridgeDelayFrames_ > 0U) {
+        --bridgeDelayFrames_;
+    }
+    if (bridgeDelayFrames_ == 0U) {
+        const PlatformerCampaignLevel* level = levelRuntime_.level();
+        if (level == nullptr || level->nextWorld != 0U ||
+            level->nextStage != 0U) {
+            player_.active = false;
+        }
+        completeCourse();
     }
 }
 
-void PlatformerEngine::updateScriptedPhase(float dt, uint16_t dtMs) {
+void PlatformerEngine::updateScriptedPhase(float dt, uint16_t dtMs,
+                                            const PlatformerInput& input) {
     phaseElapsedMs_ = static_cast<uint16_t>(
         std::min<uint32_t>(65535U, phaseElapsedMs_ + dtMs));
-    updateBoxes(dtMs);
+    phaseFrames_ = static_cast<uint16_t>(
+        std::min<uint32_t>(65535U, phaseFrames_ + 1U));
+    if (phase_ != PlatformerPhase::LevelTransition) {
+        updatePlayerStateTimers();
+    }
+    if (phase_ == PlatformerPhase::Warping ||
+        phase_ == PlatformerPhase::VineClimb) {
+        updateLevelTimer();
+    }
+    updateBoxes();
     updateEffects(dt, dtMs);
+
+    if (phase_ == PlatformerPhase::LevelTransition) {
+        if (phaseFrames_ >= 180U) {
+            phase_ = PlatformerPhase::Running;
+            phaseElapsedMs_ = 0U;
+            phaseFrames_ = 0U;
+            player_.active = true;
+            cameraFrozen_ = startIntro_;
+            queueEvent(PlatformerEventType::LifeRestarted, lives_);
+        }
+        return;
+    }
+
+    if (campaignMode_) {
+        updateMovingPlatforms(dt, false);
+        updateFireBars(dt);
+    }
+    const auto updateWorldActors = [this, dt, dtMs]() {
+        if (phase_ == PlatformerPhase::LevelTransition ||
+            phase_ == PlatformerPhase::GameOver ||
+            phase_ == PlatformerPhase::Won) {
+            return;
+        }
+        updateEnemies(dt, dtMs);
+        updateEnemyHazards(dt, dtMs);
+        updatePowerups(dt, dtMs);
+        updateProjectiles(dt, dtMs);
+        checkEnemyPairCollisions();
+    };
 
     if (phase_ == PlatformerPhase::Warping) {
         updateWarp(dt);
+        updateWorldActors();
         return;
     }
 
     if (phase_ == PlatformerPhase::VineClimb) {
-        updateVineClimb(dt);
+        updateVineClimb(dt, input);
+        updateWorldActors();
         return;
     }
 
     if (phase_ == PlatformerPhase::CastleBridge) {
         updateCastleBridge(dt);
+        updateWorldActors();
         return;
     }
 
     if (phase_ == PlatformerPhase::Dying) {
-        if (phaseElapsedMs_ > 350U) {
-            player_.vy = std::min(player_.vy + GRAVITY * dt, MAX_FALL_SPEED);
-            player_.y += player_.vy * dt;
-        }
-        if (phaseElapsedMs_ >= 2200U) {
+        player_.vy = std::min(player_.vy + GRAVITY * dt, MAX_FALL_SPEED);
+        player_.y += player_.vy * dt;
+        if (phaseFrames_ >= 179U) {
             if (lives_ > 1) {
                 --lives_;
                 resetLife();
@@ -1506,9 +2467,12 @@ void PlatformerEngine::updateScriptedPhase(float dt, uint16_t dtMs) {
                 lives_ = 0;
                 phase_ = PlatformerPhase::GameOver;
                 phaseElapsedMs_ = 0;
+                phaseFrames_ = 0U;
+                queueEvent(PlatformerEventType::GameOver);
             }
         }
         updateCamera();
+        updateWorldActors();
         return;
     }
 
@@ -1521,8 +2485,12 @@ void PlatformerEngine::updateScriptedPhase(float dt, uint16_t dtMs) {
                                  : static_cast<float>(
                                        PLATFORMER_LEVEL_1_1.groundY) -
                                        playerHeight();
-        player_.x = flagClimbPlayerX();
-        player_.y = std::min(floorY, player_.y + 90.0F * dt);
+        if (!flagShifted_) {
+            player_.x = flagClimbPlayerX();
+        }
+        if (!flagLanded_) {
+            player_.y = std::min(floorY, player_.y + 120.0F * dt);
+        }
         const float flagSlideY = campaignMode_ && level != nullptr
                                        ? static_cast<float>(
                                              (level->playerStart.y + 1) *
@@ -1530,75 +2498,193 @@ void PlatformerEngine::updateScriptedPhase(float dt, uint16_t dtMs) {
                                        : campaignMode_ ? floorY
                                                : static_cast<float>(
                                                      PLATFORMER_LEVEL_1_1.flagSlideY);
-        flagY_ = std::min(flagSlideY, flagY_ + 94.0F * dt);
-        if (phaseElapsedMs_ >= 1800U) {
+        if (!flagLanded_) {
+            flagY_ = std::min(flagSlideY, flagY_ + 120.0F * dt);
+            if (player_.y >= floorY && flagY_ >= flagSlideY) {
+                flagLanded_ = true;
+                phaseFrames_ = 0U;
+                player_.vy = 0.0F;
+            }
+        } else if (!flagShifted_ && phaseFrames_ >= 1U) {
+            player_.x += 17.0F;
+            flagShifted_ = true;
+        } else if (flagShifted_) {
+            player_.x = std::min(
+                flagClimbPlayerX() + TILE_SIZE * 1.5F,
+                player_.x + 0.25F);
+        }
+        if (flagLanded_ && phaseFrames_ >= 38U) {
             phase_ = PlatformerPhase::CastleWalk;
             phaseElapsedMs_ = 0;
-            player_.x = flagClimbPlayerX();
+            phaseFrames_ = 0U;
             player_.y = floorY;
-            player_.vx = 0.0F;
+            player_.vx = 2.0F * REFERENCE_VELOCITY_SCALE;
         }
         updateCamera();
+        updateWorldActors();
         return;
     }
 
     if (phase_ == PlatformerPhase::CastleWalk) {
-        player_.x = std::min(castleX_, player_.x + 72.0F * dt);
         const PlatformerCampaignLevel* level = levelRuntime_.level();
-        player_.y = campaignMode_ && level != nullptr
-                        ? static_cast<float>((level->playerStart.y + 1) *
-                                             TILE_SIZE) -
-                              playerHeight()
-                        : static_cast<float>(PLATFORMER_LEVEL_1_1.groundY) -
-                              playerHeight();
-        player_.vx = 72.0F;
-        if (player_.x >= castleX_) {
+        player_.vx = 2.0F * REFERENCE_VELOCITY_SCALE;
+        if (campaignMode_ && level != nullptr) {
+            player_.vy = std::min(
+                MAX_FALL_SPEED,
+                player_.vy + REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE);
+            moveHorizontal(player_.vx * dt);
+            moveVertical(player_.vy * dt);
+        } else {
+            player_.x = std::min(castleX_, player_.x + player_.vx * dt);
+            player_.y =
+                static_cast<float>(PLATFORMER_LEVEL_1_1.groundY) -
+                playerHeight();
+        }
+        if (player_.vx == 0.0F ||
+            (!campaignMode_ && player_.x >= castleX_)) {
             phase_ = PlatformerPhase::TimeBonus;
             phaseElapsedMs_ = 0;
-            player_.active = false;
+            phaseFrames_ = 0U;
+            timeBonusReady_ = false;
+            timeBonusCompletionFrames_ = 0U;
+            player_.vx = 0.0F;
         }
         updateCamera();
+        updateWorldActors();
         return;
     }
 
     if (phase_ == PlatformerPhase::TimeBonus) {
-        player_.active = false;
-        if (timeRemaining_ > 0 && phaseElapsedMs_ % 16U < dtMs) {
+        if (!timeBonusReady_ && timeRemaining_ > 0U) {
             --timeRemaining_;
-            addScore(50, player_.x, player_.y);
+            addScore(100, player_.x, player_.y);
+            queueEvent(PlatformerEventType::TimerTick);
         }
-        if (timeRemaining_ == 0 && phaseElapsedMs_ >= 500U) {
-            phase_ = PlatformerPhase::Won;
-            phaseElapsedMs_ = 0;
-            queueEvent(PlatformerEventType::CourseClear);
+        if (!timeBonusReady_ && timeRemaining_ == 0U &&
+            phaseFrames_ >= 270U) {
+            timeBonusReady_ = true;
+            timeBonusCompletionFrames_ = 0U;
+        } else if (timeBonusReady_) {
+            ++timeBonusCompletionFrames_;
+            if (timeBonusCompletionFrames_ == 1U) {
+                player_.active = false;
+            }
+        }
+        if (timeBonusReady_ && timeBonusCompletionFrames_ >= 120U) {
+            completeCourse();
         }
         updateCamera();
+        updateWorldActors();
     }
 }
 
-void PlatformerEngine::updateTimers(uint16_t dtMs) {
-    auto reduce = [dtMs](uint16_t& timer) {
-        timer = static_cast<uint16_t>(timer > dtMs ? timer - dtMs : 0);
-    };
-    reduce(powerTransitionMs_);
-    reduce(hurtInvincibleMs_);
-    reduce(starInvincibleMs_);
-    reduce(fireCooldownMs_);
-    reduce(warpCooldownMs_);
-    reduce(swimCooldownMs_);
+void PlatformerEngine::updatePlayerAnimation() {
+    constexpr uint8_t ANIMATION_NONE = 0U;
+    constexpr uint8_t ANIMATION_WALK = 1U;
+    constexpr uint8_t ANIMATION_SWIM = 2U;
+    constexpr uint8_t ANIMATION_SWIM_WALK = 3U;
+    constexpr uint8_t ANIMATION_CLIMB = 4U;
 
-    levelClockMs_ = static_cast<uint16_t>(levelClockMs_ + dtMs);
-    while (levelClockMs_ >= LEVEL_TICK_MS && timeRemaining_ > 0) {
-        levelClockMs_ = static_cast<uint16_t>(levelClockMs_ - LEVEL_TICK_MS);
+    uint8_t mode = ANIMATION_NONE;
+    uint8_t frameDelay = 0U;
+    uint8_t frameCount = 0U;
+    const bool animationBlocked =
+        !player_.active ||
+        powerTransition_ != PlatformerPowerTransition::None ||
+        fireballPoseFrames_ > 0U || playerCrouching_ || playerSkidding_ ||
+        phase_ == PlatformerPhase::Dying ||
+        phase_ == PlatformerPhase::Flagpole ||
+        phase_ == PlatformerPhase::TimeBonus ||
+        phase_ == PlatformerPhase::LevelTransition;
+    if (!animationBlocked && phase_ == PlatformerPhase::VineClimb &&
+        std::fabs(player_.vy) > EPSILON) {
+        mode = ANIMATION_CLIMB;
+        frameDelay = 8U;
+        frameCount = 2U;
+    } else if (!animationBlocked &&
+               campaignMode_ &&
+               levelRuntime_.activeLevelType() ==
+                   PlatformerLevelType::Underwater &&
+               swimStrokeFrames_ == 0U) {
+        if (player_.grounded && std::fabs(player_.vx) > EPSILON) {
+            mode = ANIMATION_SWIM_WALK;
+            frameDelay = 15U;
+            frameCount = 3U;
+        } else if (!player_.grounded) {
+            mode = ANIMATION_SWIM;
+            frameDelay = 4U;
+            frameCount = 2U;
+        }
+    } else if (!animationBlocked &&
+               (std::fabs(player_.vx) > EPSILON ||
+                std::fabs(playerAccelerationX_) > EPSILON) &&
+               (player_.grounded || startIntro_ ||
+                phase_ == PlatformerPhase::Warping ||
+                phase_ == PlatformerPhase::CastleBridge ||
+                phase_ == PlatformerPhase::CastleWalk)) {
+        mode = ANIMATION_WALK;
+        frameDelay = playerRunning_ ? 5U : 8U;
+        frameCount = 3U;
+    }
+
+    if (mode != playerAnimationMode_) {
+        playerAnimationMode_ = mode;
+        playerAnimationFrame_ = 0U;
+        playerAnimationTimer_ = 0U;
+    }
+    if (mode == ANIMATION_NONE) {
+        playerAnimationFrame_ = 0U;
+        playerAnimationTimer_ = 0U;
+        return;
+    }
+
+    const bool inCamera =
+        player_.x + playerWidth() >= cameraX_ &&
+        player_.x <= cameraX_ + VIEWPORT_WIDTH &&
+        player_.y + playerHeight() >= cameraY_ &&
+        player_.y <= cameraY_ + VIEWPORT_HEIGHT;
+    if (inCamera) {
+        platformerAdvanceReferenceAnimation(
+            playerAnimationFrame_, playerAnimationTimer_, frameDelay,
+            frameCount);
+    }
+}
+
+void PlatformerEngine::updatePlayerStateTimers() {
+    auto reduceFrame = [](uint16_t& timer) {
+        timer = static_cast<uint16_t>(timer > 0U ? timer - 1U : 0U);
+    };
+    if (powerTransition_ != PlatformerPowerTransition::None) {
+        if (powerTransitionFrames_ > 0U) {
+            --powerTransitionFrames_;
+            ++powerTransitionElapsedFrames_;
+            if (powerTransitionFrames_ == 0U) {
+                if (powerTransition_ == PlatformerPowerTransition::Grow) {
+                    playerPower_ = PlatformerPlayerPower::Big;
+                } else if (powerTransition_ ==
+                           PlatformerPowerTransition::Fire) {
+                    playerPower_ = PlatformerPlayerPower::Fire;
+                }
+            }
+        } else {
+            powerTransition_ = PlatformerPowerTransition::None;
+            powerTransitionElapsedFrames_ = 0U;
+        }
+    }
+    reduceFrame(hurtInvincibleFrames_);
+    reduceFrame(starInvincibleFrames_);
+    reduceFrame(starBlinkFrames_);
+    if (fireballPoseFrames_ > 0U) {
+        --fireballPoseFrames_;
+    }
+}
+
+void PlatformerEngine::updateLevelTimer() {
+    ++levelClockFrames_;
+    while (levelClockFrames_ >= LEVEL_TICK_FRAMES && timeRemaining_ > 0) {
+        levelClockFrames_ = static_cast<uint8_t>(
+            levelClockFrames_ - LEVEL_TICK_FRAMES);
         --timeRemaining_;
-        if (timeRemaining_ <= 100 && !timeWarningSent_) {
-            timeWarningSent_ = true;
-            queueEvent(PlatformerEventType::TimeWarning);
-        }
-        if (timeRemaining_ == 0) {
-            beginDeath(PlatformerDeathReason::Time);
-            return;
-        }
     }
 }
 
@@ -1621,13 +2707,10 @@ void PlatformerEngine::updateCamera() {
         return;
     }
 
-    constexpr float CAMERA_LEFT_EDGE = 80.0F;
-    constexpr float CAMERA_RIGHT_EDGE = REFERENCE_VIEWPORT_WIDTH / 3.0F;
-    const float screenX = player_.x - cameraX_;
-    if (!campaignMode_ && screenX < CAMERA_LEFT_EDGE) {
-        cameraX_ = player_.x - CAMERA_LEFT_EDGE;
-    } else if (screenX > CAMERA_RIGHT_EDGE) {
-        cameraX_ = player_.x - CAMERA_RIGHT_EDGE;
+    const float playerCenter = player_.x + playerWidth() * 0.5F;
+    const float cameraCenter = cameraX_ + VIEWPORT_WIDTH * 0.5F;
+    if (playerCenter > cameraCenter && player_.vx > 0.0F) {
+        cameraX_ += cameraAdvanceX_;
     }
     const float minimum = campaignMode_ && level != nullptr
                               ? static_cast<float>(level->cameraStart.x *
@@ -1638,100 +2721,173 @@ void PlatformerEngine::updateCamera() {
 
 void PlatformerEngine::updatePlayerHorizontal(float dt,
                                                const PlatformerInput& input) {
+    cameraAdvanceX_ = 0.0F;
     const float axis = clampValue(input.moveAxis, -1.0F, 1.0F);
-    if (axis < -0.01F) {
-        playerFacingLeft_ = true;
-    } else if (axis > 0.01F) {
-        playerFacingLeft_ = false;
-    }
-
     const bool underwater = campaignMode_ &&
                             levelRuntime_.activeLevelType() ==
                                 PlatformerLevelType::Underwater;
-    const float speedScale = underwater ? 0.68F : 1.0F;
-    const float target =
-        axis * (input.actionHeld ? RUN_SPEED : WALK_SPEED) * speedScale;
-    const bool reversing = std::fabs(target) > 0.01F &&
-                           std::fabs(player_.vx) > 0.01F &&
-                           ((target > 0.0F) != (player_.vx > 0.0F));
-    const float acceleration = (reversing
-                                   ? TURN_ACCELERATION
-                                   : player_.grounded
-                                         ? (input.actionHeld ? RUN_ACCELERATION
-                                                              : WALK_ACCELERATION)
-                                         : AIR_ACCELERATION) *
-                               (underwater ? 0.72F : 1.0F);
-    if (target > player_.vx) {
-        player_.vx = std::min(target, player_.vx + acceleration * dt);
-    } else if (target < player_.vx) {
-        player_.vx = std::max(target, player_.vx - acceleration * dt);
-    } else if (player_.vx > 0.0F) {
-        player_.vx = std::max(0.0F, player_.vx - WALK_ACCELERATION * dt);
-    } else if (player_.vx < 0.0F) {
-        player_.vx = std::min(0.0F, player_.vx + WALK_ACCELERATION * dt);
-    }
-    playerSkidding_ = reversing && std::fabs(player_.vx) > 20.0F;
-    if (std::fabs(player_.vx) < 0.5F) {
-        player_.vx = 0.0F;
+    if (underwater) {
+        playerAccelerationX_ = 0.0F;
         playerSkidding_ = false;
+        moveHorizontal(player_.vx * dt);
+        return;
     }
+
+    // Reference PhysicsSystem moves with the current velocity, then applies
+    // the acceleration selected by PlayerSystem on the preceding 60Hz tick.
+    moveHorizontal(player_.vx * dt);
+    player_.vx += playerAccelerationX_ * dt;
+    const float referenceFrames = dt * REFERENCE_TICKS_PER_SECOND;
+    player_.vx *= std::pow(REFERENCE_FRICTION, referenceFrames);
+    player_.vx = clampValue(player_.vx, -MAX_PLAYER_SPEED, MAX_PLAYER_SPEED);
+    if (std::fabs(player_.vx) <
+            REFERENCE_ACCELERATION * REFERENCE_VELOCITY_SCALE * 0.5F &&
+        playerAccelerationX_ == 0.0F) {
+        player_.vx = 0.0F;
+    }
+
+    float referenceAcceleration = axis * REFERENCE_ACCELERATION;
+    if (player_.grounded) {
+        if (axis < -0.01F) {
+            playerFacingLeft_ = true;
+        } else if (axis > 0.01F) {
+            playerFacingLeft_ = false;
+        }
+        if (playerCrouching_) {
+            referenceAcceleration = 0.0F;
+            const float crouchSlowdown =
+                0.5F * REFERENCE_VELOCITY_SCALE * referenceFrames;
+            if (player_.vx > 1.5F * REFERENCE_VELOCITY_SCALE) {
+                player_.vx -= crouchSlowdown;
+            } else if (player_.vx < -1.5F * REFERENCE_VELOCITY_SCALE) {
+                player_.vx += crouchSlowdown;
+            }
+        } else {
+            referenceAcceleration *=
+                input.actionHeld ? REFERENCE_RUN_MULTIPLIER
+                                 : REFERENCE_WALK_MULTIPLIER;
+        }
+    } else if (input.actionHeld) {
+        const float referenceVelocity =
+            player_.vx / REFERENCE_VELOCITY_SCALE;
+        const bool sameDirection =
+            (referenceAcceleration >= 0.0F && referenceVelocity >= 0.0F) ||
+            (referenceAcceleration <= 0.0F && referenceVelocity <= 0.0F);
+        referenceAcceleration *=
+            sameDirection ? REFERENCE_RUN_MULTIPLIER : 0.35F;
+    }
+    playerAccelerationX_ =
+        referenceAcceleration * REFERENCE_VELOCITY_SCALE *
+        REFERENCE_TICKS_PER_SECOND;
+    cameraAdvanceX_ = std::max(0.0F, player_.vx * dt);
+    playerSkidding_ =
+        player_.grounded && referenceAcceleration * player_.vx < 0.0F;
     if (player_.grounded && player_.vy == 0.0F && std::fabs(axis) < 0.01F) {
         stompChain_ = 0;
     }
-    moveHorizontal(player_.vx * dt);
 }
 
 void PlatformerEngine::updatePlayerVertical(float dt, uint16_t dtMs,
                                              const PlatformerInput& input) {
+    (void)dtMs;
     if (campaignMode_ && levelRuntime_.activeLevelType() ==
                              PlatformerLevelType::Underwater) {
-        if (input.jumpPressed && swimCooldownMs_ == 0U &&
-            !playerCrouching_) {
-            player_.vy = -122.0F;
-            swimCooldownMs_ = 180U;
-            queueEvent(PlatformerEventType::Jumped);
+        if (swimStrokeFrames_ > 0U) {
+            ++swimStrokeFrames_;
+            const uint8_t finalFrame =
+                playerPower_ == PlatformerPlayerPower::Small ? 17U : 21U;
+            if (swimStrokeFrames_ > finalFrame) {
+                swimStrokeFrames_ = 0U;
+            }
         }
+        const float referenceFrames = dt * REFERENCE_TICKS_PER_SECOND;
+        player_.vy += REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE *
+                      referenceFrames;
         moveVertical(player_.vy * dt);
-        player_.grounded = false;
-        player_.vy = std::min(92.0F, player_.vy + 310.0F * dt);
-        jumpBufferMs_ = 0;
-        jumpActive_ = false;
+        player_.vy += playerAccelerationY_ * dt;
+        player_.vy = std::min(
+            player_.vy,
+            REFERENCE_MAX_FALL_SPEED * REFERENCE_VELOCITY_SCALE);
+
+        constexpr float WATER_PID_GAIN = 0.20F + 0.02F / 60.0F;
+        const float referenceVelocityX =
+            player_.vx / REFERENCE_VELOCITY_SCALE;
+        const float waterTarget =
+            clampValue(input.moveAxis, -1.0F, 1.0F) *
+            (player_.grounded ? 1.0F : 3.0F);
+        const float controlledVelocity =
+            referenceVelocityX +
+            (waterTarget - referenceVelocityX) * WATER_PID_GAIN *
+                referenceFrames;
+        player_.vx = controlledVelocity * REFERENCE_VELOCITY_SCALE;
+        if (input.moveAxis < -0.01F) {
+            playerFacingLeft_ = true;
+        } else if (input.moveAxis > 0.01F) {
+            playerFacingLeft_ = false;
+        }
+
+        playerAccelerationY_ =
+            -0.45480F * REFERENCE_VELOCITY_SCALE *
+            REFERENCE_TICKS_PER_SECOND;
+        player_.vy = std::min(player_.vy,
+                              2.0F * REFERENCE_VELOCITY_SCALE);
+        if (input.jumpPressed) {
+            player_.vy = -3.53F * REFERENCE_VELOCITY_SCALE;
+            swimStrokeFrames_ = 1U;
+            queueEvent(PlatformerEventType::SwimStroke);
+        }
+        cameraAdvanceX_ = std::max(0.0F, player_.vx * dt);
+        jumpActive_ = true;
         return;
     }
-    if (jumpBufferMs_ > 0 && !playerCrouching_ &&
-        (player_.grounded || coyoteMs_ > 0)) {
-        player_.vy = std::fabs(player_.vx) > WALK_SPEED * 0.75F
-                         ? -FAST_JUMP_SPEED
-                         : -JUMP_SPEED;
-        player_.grounded = false;
-        jumpBufferMs_ = 0;
-        jumpHoldMs_ = 0;
-        jumpActive_ = true;
-        queueEvent(PlatformerEventType::Jumped);
-    }
 
+    swimStrokeFrames_ = 0U;
+
+    const float referenceFrames = dt * REFERENCE_TICKS_PER_SECOND;
+    player_.vy += REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE *
+                  referenceFrames;
     const float previousY = player_.y;
     const float verticalVelocity = player_.vy;
     moveVertical(player_.vy * dt);
-    if (player_.grounded) {
+    player_.vy += playerAccelerationY_ * dt;
+    player_.vy = std::min(
+        player_.vy,
+        REFERENCE_MAX_FALL_SPEED * REFERENCE_VELOCITY_SCALE);
+    if (std::fabs(player_.vy) <
+            REFERENCE_ACCELERATION * REFERENCE_VELOCITY_SCALE * 0.5F &&
+        playerAccelerationY_ == 0.0F) {
         player_.vy = 0.0F;
-        jumpActive_ = false;
-        jumpHoldMs_ = 0;
-        coyoteMs_ = COYOTE_TIME_MS;
-    } else if (jumpActive_ && player_.vy < 0.0F &&
-               (input.jumpHeld || jumpHoldMs_ < MIN_JUMP_HOLD_MS) &&
-               jumpHoldMs_ < MAX_JUMP_HOLD_MS) {
-        player_.vy = std::min(player_.vy + JUMP_HOLD_GRAVITY * dt,
-                              MAX_FALL_SPEED);
-        jumpHoldMs_ = static_cast<uint16_t>(
-            std::min<uint32_t>(MAX_JUMP_HOLD_MS, jumpHoldMs_ + dtMs));
-    } else {
-        jumpActive_ = false;
-        player_.vy = std::min(player_.vy + GRAVITY * dt, MAX_FALL_SPEED);
     }
 
     if (verticalVelocity < 0.0F) {
         checkBoxCollision(previousY, verticalVelocity);
+    }
+
+    if (player_.grounded) {
+        playerAccelerationY_ = 0.0F;
+        if (input.jumpPressed && !trampolineCollided_) {
+            player_.vy = REFERENCE_JUMP_VELOCITY *
+                         REFERENCE_VELOCITY_SCALE;
+            player_.grounded = false;
+            jumpActive_ = true;
+            queueEvent(PlatformerEventType::Jumped);
+        } else {
+            player_.vy = 0.0F;
+            jumpActive_ = false;
+        }
+    } else {
+        const bool runningJump = input.actionHeld &&
+            std::fabs(player_.vx) > 3.5F * REFERENCE_VELOCITY_SCALE;
+        const float referenceAcceleration =
+            input.jumpHeld &&
+                    player_.vy < -1.0F * REFERENCE_VELOCITY_SCALE
+                ? (runningJump ? REFERENCE_RUNNING_JUMP_ACCELERATION
+                               : REFERENCE_JUMP_ACCELERATION)
+                : 0.0F;
+        playerAccelerationY_ =
+            referenceAcceleration * REFERENCE_VELOCITY_SCALE *
+            REFERENCE_TICKS_PER_SECOND;
+        jumpActive_ = true;
     }
 }
 
@@ -1782,6 +2938,7 @@ void PlatformerEngine::moveHorizontal(float distance) {
         }
         player_.x = std::max(player_.x, cameraX_);
         player_.vx = 0.0F;
+        playerAccelerationX_ = 0.0F;
         return;
     }
 
@@ -1824,6 +2981,7 @@ void PlatformerEngine::moveHorizontal(float distance) {
     player_.x = clampValue(player_.x, 0.0F,
                            static_cast<float>(WORLD_WIDTH) - playerWidth());
     player_.vx = 0.0F;
+    playerAccelerationX_ = 0.0F;
 }
 
 void PlatformerEngine::moveVertical(float distance) {
@@ -1845,6 +3003,7 @@ void PlatformerEngine::moveVertical(float distance) {
         player_.y = movingPlatforms_[platformIndex].y - playerHeight();
         player_.grounded = true;
         player_.vy = 0.0F;
+        playerAccelerationY_ = 0.0F;
         return;
     }
     const bool rising = distance < 0.0F;
@@ -1878,20 +3037,11 @@ void PlatformerEngine::moveVertical(float distance) {
                             ? static_cast<float>(row * TILE_SIZE) -
                                   playerHeight()
                             : static_cast<float>((row + 1) * TILE_SIZE);
-            const PlatformerRuntimeTile collisionTile = levelRuntime_.tile(
-                static_cast<uint16_t>(column), static_cast<uint8_t>(row));
-            if (distance > 0.0F && collisionTile.kind ==
-                                       PlatformerRuntimeTileKind::Trampoline) {
-                player_.grounded = false;
-                player_.vy = -310.0F;
-                jumpActive_ = false;
-                queueEvent(PlatformerEventType::Jumped);
-                return;
-            }
             player_.grounded = distance > 0.0F;
             break;
         }
         player_.vy = 0.0F;
+        playerAccelerationY_ = 0.0F;
         return;
     }
 
@@ -1933,6 +3083,7 @@ void PlatformerEngine::moveVertical(float distance) {
         player_.grounded = distance > 0.0F;
     }
     player_.vy = 0.0F;
+    playerAccelerationY_ = 0.0F;
 }
 
 bool PlatformerEngine::rectHitsSolid(float x, float y, float width, float height,
@@ -2044,26 +3195,50 @@ bool PlatformerEngine::rectHitsPlayerHorizontal(float x, float y, float width,
                                TILE_COLLISION_ROUNDNESS * 2.0F, 0.0F);
 }
 
-void PlatformerEngine::updateBoxes(uint16_t dtMs) {
+void PlatformerEngine::updateBoxes() {
+    static constexpr int8_t OFFSETS[] = {-2, -3, -4, -5,
+                                          -4, -3, -2, 0};
+    if (campaignMode_) {
+        levelRuntime_.updateBlockBumps();
+        for (uint8_t index = 0;
+             index < PlatformerLevelRuntime::MAX_BLOCK_BUMPS; ++index) {
+            const PlatformerBlockBumpState* bump =
+                levelRuntime_.blockBump(index);
+            if (bump == nullptr) {
+                continue;
+            }
+            PlatformerBox block;
+            block.x = static_cast<int16_t>(bump->column * TILE_SIZE);
+            block.y = static_cast<int16_t>(bump->row * TILE_SIZE +
+                                           bump->offset);
+            bumpEnemiesAbove(block);
+        }
+        return;
+    }
     for (uint8_t index = 0; index < boxCount_; ++index) {
-        if (boxBumpMs_[index] == 0) {
+        if (boxBumpFrames_[index] == 0U) {
             boxes_[index].bumpOffset = 0;
             continue;
         }
-        boxBumpMs_[index] = static_cast<uint16_t>(
-            boxBumpMs_[index] > dtMs ? boxBumpMs_[index] - dtMs : 0);
-        const float progress =
-            1.0F - static_cast<float>(boxBumpMs_[index]) / 180.0F;
-        boxes_[index].bumpOffset = static_cast<int8_t>(
-            std::lround(-5.0F * std::sin(progress * 3.14159265F)));
+        const uint8_t step = static_cast<uint8_t>(boxBumpFrames_[index] - 1U);
+        boxes_[index].bumpOffset = OFFSETS[step];
+        if (step + 1U < sizeof(OFFSETS) / sizeof(OFFSETS[0])) {
+            ++boxBumpFrames_[index];
+            bumpEnemiesAbove(boxes_[index]);
+        } else {
+            boxBumpFrames_[index] = 0U;
+            boxes_[index].bumpOffset = 0;
+        }
     }
 }
 
 void PlatformerEngine::updateEnemies(float dt, uint16_t dtMs) {
-    if (campaignMode_) {
-        activateCampaignEnemies();
+    if (campaignMode_ && !campaignEnemiesLoaded_) {
+        loadCampaignEnemies();
+        campaignEnemiesLoaded_ = true;
     }
-    for (uint8_t index = 0; index < enemyCount_; ++index) {
+    const uint8_t enemiesAtFrameStart = enemyCount_;
+    for (uint8_t index = 0; index < enemiesAtFrameStart; ++index) {
         EnemyActor& enemy = enemies_[index];
         if (!enemy.spawned) {
             if (player_.x < enemy.activationX) {
@@ -2074,8 +3249,42 @@ void PlatformerEngine::updateEnemies(float dt, uint16_t dtMs) {
             placeEnemyAtSpawn(enemy);
             enemy.spawned = true;
             enemy.actor.active = true;
+            enemy.bornFrame = logicFrame_;
         }
         if (!enemy.actor.active) {
+            if (phase_ == PlatformerPhase::CastleBridge &&
+                enemy.type == PlatformerEnemyType::Bowser) {
+                updateBowserCallbacks(enemy);
+            }
+            continue;
+        }
+        if (enemy.bornFrame == logicFrame_ &&
+            enemy.type == PlatformerEnemyType::Spiny &&
+            enemy.sourceTileId == 500U) {
+            continue;
+        }
+        if (enemy.motion == PlatformerEnemyMotion::FallingDefeated) {
+            if (enemy.bornFrame == logicFrame_) {
+                updateQueuedEnemyCommands(enemy);
+                continue;
+            }
+            if (enemy.actor.x + enemy.width < cameraX_ ||
+                enemy.actor.x > cameraX_ + VIEWPORT_WIDTH ||
+                enemy.actor.y + enemy.height < cameraY_ ||
+                enemy.actor.y > cameraY_ + VIEWPORT_HEIGHT) {
+                enemy.actor.active = false;
+                enemy.motion = PlatformerEnemyMotion::Defeated;
+                continue;
+            }
+            if (enemy.type != PlatformerEnemyType::BulletBill) {
+                enemy.actor.vy = std::min(
+                    enemy.actor.vy +
+                        REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE,
+                    MAX_FALL_SPEED);
+            }
+            enemy.actor.x += enemy.actor.vx * dt;
+            enemy.actor.y += enemy.actor.vy * dt;
+            updateQueuedEnemyCommands(enemy);
             continue;
         }
         if (enemy.motion == PlatformerEnemyMotion::Squashed) {
@@ -2088,149 +3297,262 @@ void PlatformerEngine::updateEnemies(float dt, uint16_t dtMs) {
             continue;
         }
         if (enemy.motion == PlatformerEnemyMotion::Defeated) {
+            if (enemy.bornFrame == logicFrame_) {
+                continue;
+            }
             enemy.actor.active = false;
             continue;
         }
 
-        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking) {
-            const uint16_t previousState = enemy.stateMs;
-            switch (enemy.type) {
-                case PlatformerEnemyType::PiranhaPlant: {
-                    constexpr uint16_t EXPOSED_MS = 3000U;
-                    constexpr uint16_t TRAVEL_MS = 533U;
-                    constexpr uint16_t HIDDEN_MS = 3000U;
-                    constexpr uint16_t CYCLE_MS =
-                        EXPOSED_MS + TRAVEL_MS + HIDDEN_MS + TRAVEL_MS;
-                    enemy.actor.vx = 0.0F;
-                    enemy.stateMs = static_cast<uint16_t>(
-                        (enemy.stateMs + dtMs) % CYCLE_MS);
-                    const uint16_t cycle = enemy.stateMs;
-                    if (cycle < EXPOSED_MS) {
-                        enemy.actor.y = enemy.originY;
-                    } else if (cycle < EXPOSED_MS + TRAVEL_MS) {
-                        enemy.actor.y = enemy.originY +
-                            32.0F * (cycle - EXPOSED_MS) / TRAVEL_MS;
-                    } else if (cycle <
-                               EXPOSED_MS + TRAVEL_MS + HIDDEN_MS) {
-                        enemy.actor.y = enemy.originY + 32.0F;
-                    } else {
-                        enemy.actor.y = enemy.originY +
-                            32.0F * (CYCLE_MS - cycle) / TRAVEL_MS;
-                    }
-                    continue;
-                }
-                case PlatformerEnemyType::Blooper: {
-                    enemy.stateMs = static_cast<uint16_t>(
-                        (enemy.stateMs + dtMs) % 1500U);
-                    if (enemy.stateMs < 500U) {
-                        enemy.actor.vx = player_.x >= enemy.actor.x ? 64.0F
-                                                                    : -64.0F;
-                        enemy.actor.vy =
-                            player_.y >= enemy.actor.y ? 58.0F : -58.0F;
-                    } else {
-                        const float damping = std::pow(0.94F, dt * 60.0F);
-                        enemy.actor.vx *= damping;
-                        enemy.actor.vy = std::min(52.0F,
-                                                  enemy.actor.vy + 48.0F * dt);
-                    }
-                } break;
-                case PlatformerEnemyType::CheepCheep: {
-                    enemy.stateMs = static_cast<uint16_t>(
-                        (enemy.stateMs + dtMs) % 2500U);
-                    if (levelRuntime_.activeLevelType() ==
-                        PlatformerLevelType::Underwater) {
-                        enemy.actor.vx = -48.0F;
-                        enemy.actor.vy = 0.0F;
-                        enemy.actor.y = enemy.originY +
-                            std::sin(enemy.stateMs * 0.004F) * 8.0F;
-                    } else {
-                        if (previousState > enemy.stateMs ||
-                            (previousState == 0U && enemy.actor.vy == 0.0F)) {
-                            enemy.actor.x = enemy.originX;
-                            enemy.actor.y = enemy.originY + TILE_SIZE;
-                            enemy.actor.vx = 88.0F;
-                            enemy.actor.vy = -270.0F;
-                        }
-                        enemy.actor.x += enemy.actor.vx * dt;
-                        enemy.actor.y += enemy.actor.vy * dt;
-                        enemy.actor.vy = std::min(
-                            MAX_FALL_SPEED, enemy.actor.vy + GRAVITY * dt);
-                        continue;
-                    }
-                } break;
-                case PlatformerEnemyType::Lakitu: {
-                    enemy.stateMs = static_cast<uint16_t>(
-                        enemy.stateMs + dtMs);
-                    const float target = cameraX_ + VIEWPORT_WIDTH * 0.5F +
-                        std::sin(enemy.stateMs * 0.0012F) * 86.0F;
-                    enemy.actor.vx = clampValue(
-                        (target - enemy.actor.x) * 1.8F, -105.0F, 105.0F);
-                    enemy.actor.vy = 0.0F;
-                    if (enemy.stateMs >= 3000U) {
-                        enemy.stateMs = 0U;
-                        spawnSpiny(enemy);
-                    }
-                } break;
-                case PlatformerEnemyType::HammerBro:
-                    enemy.stateMs = static_cast<uint16_t>(
-                        enemy.stateMs + dtMs);
-                    if (enemy.stateMs >= 2000U) {
-                        enemy.stateMs = 0U;
-                        enemy.actor.vx = -enemy.actor.vx;
-                        if (std::fabs(enemy.actor.vx) < 1.0F) {
-                            enemy.actor.vx = player_.x < enemy.actor.x
-                                                 ? -60.0F
-                                                 : 60.0F;
-                        }
-                        if ((enemy.spawnOrder++ & 1U) != 0U) {
-                            enemy.actor.vy = -230.0F;
-                        }
-                        spawnEnemyHazard(
-                            PlatformerEnemyHazardKind::Hammer,
-                            enemy.actor.x, enemy.actor.y,
-                            player_.x < enemy.actor.x ? -82.0F : 82.0F,
-                            -205.0F);
-                    }
-                    break;
-                case PlatformerEnemyType::LavaBubble:
-                    enemy.stateMs = static_cast<uint16_t>(
-                        enemy.stateMs + dtMs);
-                    if (enemy.stateMs >= 6000U) {
-                        enemy.stateMs = 0U;
-                        enemy.actor.y = enemy.originY;
-                        enemy.actor.vy = -300.0F;
-                    }
-                    if (enemy.actor.vy != 0.0F) {
-                        enemy.actor.y += enemy.actor.vy * dt;
-                        enemy.actor.vy = std::min(
-                            MAX_FALL_SPEED, enemy.actor.vy + GRAVITY * dt);
-                        if (enemy.actor.y >= enemy.originY) {
-                            enemy.actor.y = enemy.originY;
-                            enemy.actor.vy = 0.0F;
-                        }
-                    }
-                    continue;
-                case PlatformerEnemyType::Bowser:
-                    enemy.stateMs = static_cast<uint16_t>(
-                        enemy.stateMs + dtMs);
-                    if (enemy.stateMs >= 2000U) {
-                        enemy.stateMs = 0U;
-                        enemy.actor.vx = enemy.actor.vx < 0.0F ? 38.0F
-                                                               : -38.0F;
-                        enemy.actor.vy = -185.0F;
-                        const bool fire = (enemy.spawnOrder++ & 1U) == 0U;
-                        spawnEnemyHazard(
-                            fire ? PlatformerEnemyHazardKind::BowserFire
-                                 : PlatformerEnemyHazardKind::Hammer,
-                            enemy.actor.x,
-                            enemy.actor.y + (fire ? 8.0F : 0.0F),
-                            player_.x < enemy.actor.x ? -96.0F : 96.0F,
-                            fire ? 0.0F : -210.0F);
-                    }
-                    break;
-                default:
-                    break;
+        const bool inCamera =
+            enemy.actor.x + enemy.width >= cameraX_ &&
+            enemy.actor.x <= cameraX_ + VIEWPORT_WIDTH &&
+            enemy.actor.y + enemy.height >= cameraY_ &&
+            enemy.actor.y <= cameraY_ + VIEWPORT_HEIGHT;
+        if (inCamera) {
+            const uint8_t frameDelay = enemyAnimationDelay(enemy.type);
+            if (frameDelay > 0U) {
+                platformerAdvanceReferenceAnimation(
+                    enemy.animationFrame, enemy.animationTimer, frameDelay,
+                    2U);
             }
+        }
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::PiranhaPlant) {
+            enemy.actor.y += enemy.actor.vy * dt;
+            if (enemy.actor.vy > 0.0F &&
+                enemy.actor.y >= enemy.originY + 32.0F) {
+                enemy.actor.y = enemy.originY + 32.0F;
+                enemy.actor.vy = 0.0F;
+            } else if (enemy.actor.vy < 0.0F &&
+                       enemy.actor.y <= enemy.originY) {
+                enemy.actor.y = enemy.originY;
+                enemy.actor.vy = 0.0F;
+            }
+            ++enemy.moveFrames;
+            if (enemy.moveFrames >= 180U) {
+                enemy.moveFrames = 0U;
+                if (enemy.behaviorState != 0U) {
+                    enemy.actor.vy = -REFERENCE_VELOCITY_SCALE;
+                    enemy.behaviorState = 0U;
+                } else {
+                    enemy.actor.vy = REFERENCE_VELOCITY_SCALE;
+                    enemy.behaviorState = 1U;
+                }
+            }
+            enemy.stateMs = enemy.moveFrames;
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::Blooper) {
+            if (inCamera) {
+                enemy.actor.vy += REFERENCE_GRAVITY *
+                                  REFERENCE_VELOCITY_SCALE;
+                enemy.actor.x += enemy.actor.vx * dt;
+                enemy.actor.y += enemy.actor.vy * dt;
+                enemy.actor.vy += enemy.accelerationY * dt;
+            }
+
+            if (enemy.callbackFrames > 0U) {
+                --enemy.callbackFrames;
+                if (enemy.callbackFrames == 0U) {
+                    enemy.behaviorState = 0U;
+                    enemy.actor.vx = 0.0F;
+                    enemy.actor.vy = 0.0F;
+                    enemy.accelerationY =
+                        -0.47480F * REFERENCE_VELOCITY_SCALE *
+                        REFERENCE_TICKS_PER_SECOND;
+                }
+            }
+            ++enemy.attackFrames;
+            if (enemy.attackFrames >= 60U) {
+                enemy.attackFrames = 0U;
+                if (inCamera) {
+                    enemy.behaviorState = 1U;
+                    enemy.callbackFrames = 30U;
+                    enemy.accelerationY = 0.0F;
+                    enemy.actor.vx =
+                        player_.x > enemy.actor.x ? 90.0F : -90.0F;
+                    const float cameraCenterY =
+                        cameraY_ + VIEWPORT_HEIGHT * 0.5F;
+                    enemy.actor.vy = enemy.actor.y < cameraCenterY
+                                         ? 90.0F
+                                         : -90.0F;
+                }
+            }
+            enemy.stateMs = enemy.attackFrames;
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::Lakitu) {
+            if (inCamera) {
+                enemy.facingLeft = player_.x > enemy.actor.x;
+                enemy.actor.x += enemy.actor.vx * dt;
+
+                ++enemy.moveFrames;
+                if (enemy.moveFrames >= 480U) {
+                    enemy.moveFrames = 0U;
+                    enemy.behaviorState ^= 1U;
+                }
+                if (flagX_ - player_.x < 30.0F * TILE_SIZE) {
+                    enemy.actor.vx = -4.0F * REFERENCE_VELOCITY_SCALE;
+                } else {
+                    const float target = cameraX_ + VIEWPORT_WIDTH * 0.5F +
+                        (enemy.behaviorState != 0U ? 6.0F * TILE_SIZE
+                                                   : -6.0F * TILE_SIZE);
+                    enemy.actor.vx = clampValue(
+                        (target - enemy.actor.x) * 3.6F, -180.0F, 180.0F);
+                }
+            }
+
+            updateQueuedEnemyCommands(enemy);
+            ++enemy.attackFrames;
+            if (enemy.attackFrames >= 180U) {
+                enemy.attackFrames = 0U;
+                if (inCamera) {
+                    enemy.actor.y += TILE_SIZE;
+                    enemy.height = TILE_SIZE;
+                    enemy.callbackFrames = 46U;
+                }
+            }
+            enemy.stateMs = enemy.attackFrames;
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::CheepCheep &&
+            !enemy.flyingCheep) {
+            if (!inCamera) {
+                continue;
+            }
+            enemy.actor.vx = -ENEMY_SPEED;
+            enemy.actor.vy = 0.0F;
+            enemy.actor.x += enemy.actor.vx * dt;
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::CheepCheep) {
+            if (enemy.attackFrames == 0U && enemy.callbackFrames == 0U &&
+                enemy.accelerationY == 0.0F &&
+                std::fabs(enemy.actor.x - enemy.originX) < EPSILON &&
+                enemy.actor.vx == -ENEMY_SPEED) {
+                enemy.actor.vx = 0.0F;
+            }
+            enemy.actor.vy += REFERENCE_GRAVITY *
+                              REFERENCE_VELOCITY_SCALE;
+            enemy.actor.x += enemy.actor.vx * dt;
+            enemy.actor.y += enemy.actor.vy * dt;
+            enemy.actor.vy = std::min(
+                MAX_FALL_SPEED,
+                enemy.actor.vy + enemy.accelerationY * dt);
+
+            if (enemy.callbackFrames > 0U) {
+                --enemy.callbackFrames;
+                if (enemy.callbackFrames == 0U) {
+                    const bool inCameraY =
+                        enemy.actor.y + enemy.height >= cameraY_ &&
+                        enemy.actor.y <= cameraY_ + 15.0F * TILE_SIZE;
+                    if (!inCameraY) {
+                        enemy.actor.x = enemy.originX;
+                        enemy.actor.y = enemy.originY;
+                        const bool inCameraX =
+                            enemy.actor.x + enemy.width >= cameraX_ &&
+                            enemy.actor.x <= cameraX_ + VIEWPORT_WIDTH;
+                        if (inCameraX) {
+                            const float randomX =
+                                static_cast<float>(nextRandom()) /
+                                4294967295.0F;
+                            enemy.actor.vx =
+                                (2.0F + randomX * 3.0F) *
+                                REFERENCE_VELOCITY_SCALE;
+                            enemy.actor.vy =
+                                -10.0F * REFERENCE_VELOCITY_SCALE;
+                            enemy.accelerationY =
+                                -0.4542F * REFERENCE_VELOCITY_SCALE *
+                                REFERENCE_TICKS_PER_SECOND;
+                        }
+                    }
+                }
+            }
+            ++enemy.attackFrames;
+            if (enemy.attackFrames >= 150U) {
+                enemy.attackFrames = 0U;
+                const float randomDelay =
+                    static_cast<float>(nextRandom()) / 4294967295.0F;
+                enemy.callbackFrames = static_cast<uint16_t>(
+                    (0.5F + randomDelay * 2.0F) *
+                    REFERENCE_TICKS_PER_SECOND);
+            }
+            enemy.stateMs = enemy.attackFrames;
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::BulletBill) {
+            if (!inCamera) {
+                enemy.actor.active = false;
+                enemy.motion = PlatformerEnemyMotion::Defeated;
+                continue;
+            }
+            enemy.actor.x += enemy.actor.vx * dt;
+            if (enemy.actor.x + enemy.width < cameraX_) {
+                enemy.actor.active = false;
+                enemy.motion = PlatformerEnemyMotion::Defeated;
+            }
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::Bowser) {
+            if (phase_ == PlatformerPhase::CastleBridge) {
+                updateBowserCallbacks(enemy);
+            } else {
+                updateBowserBehavior(enemy, dt);
+            }
+            continue;
+        }
+
+        if (campaignMode_ && enemy.motion == PlatformerEnemyMotion::Walking &&
+            enemy.type == PlatformerEnemyType::LavaBubble) {
+            if (inCamera) {
+                enemy.actor.vy +=
+                    REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE;
+                enemy.actor.y += enemy.actor.vy * dt;
+                enemy.actor.vy = std::min(
+                    MAX_FALL_SPEED,
+                    enemy.actor.vy + enemy.accelerationY * dt);
+            }
+            ++enemy.attackFrames;
+            if (enemy.attackFrames >= 360U) {
+                enemy.attackFrames = 0U;
+                enemy.actor.y = enemy.originY;
+                enemy.actor.vy = -10.0F * REFERENCE_VELOCITY_SCALE;
+                enemy.accelerationY =
+                    -0.40F * REFERENCE_VELOCITY_SCALE *
+                    REFERENCE_TICKS_PER_SECOND;
+            }
+            enemy.stateMs = enemy.attackFrames;
+            continue;
+        }
+
+        if (!inCamera) {
+            if (enemy.type == PlatformerEnemyType::HammerBro) {
+                updateHammerBroCallbacks(enemy);
+            }
+            // Reference CSV enemies freeze offscreen and can reappear after an
+            // 8-4 loop. Only shells and Lakitu's spawned Spinies carry the
+            // reference DestroyOutsideCameraComponent here.
+            if (enemy.motion == PlatformerEnemyMotion::ShellIdle ||
+                enemy.motion == PlatformerEnemyMotion::ShellSliding ||
+                (enemy.type == PlatformerEnemyType::Spiny &&
+                 enemy.sourceTileId >= 500U)) {
+                enemy.actor.active = false;
+                enemy.motion = PlatformerEnemyMotion::Defeated;
+            }
+            continue;
         }
 
         if (enemy.motion == PlatformerEnemyMotion::ShellSliding) {
@@ -2273,20 +3595,43 @@ void PlatformerEngine::updateEnemies(float dt, uint16_t dtMs) {
         const float nextY = enemy.actor.y + enemy.actor.vy * dt;
         if (!rectHitsSolid(enemy.actor.x, nextY, enemy.width, enemy.height)) {
             enemy.actor.y = nextY;
+            enemy.actor.vy = std::min(
+                enemy.actor.vy + enemy.accelerationY * dt,
+                MAX_FALL_SPEED);
+            if (enemy.type == PlatformerEnemyType::Koopa &&
+                enemy.motion == PlatformerEnemyMotion::Walking) {
+                enemy.actor.vx = -enemy.actor.vx;
+            }
+            if (enemy.type == PlatformerEnemyType::HammerBro) {
+                updateHammerBroBehavior(enemy);
+            }
             continue;
         }
         if (campaignMode_) {
             const int32_t row = static_cast<int32_t>(std::floor(
                 (nextY + enemy.height - EPSILON) / TILE_SIZE));
             enemy.actor.y = static_cast<float>(row * TILE_SIZE) - enemy.height;
-            enemy.actor.vy =
-                enemy.type == PlatformerEnemyType::KoopaParatroopa
-                    ? -190.0F
-                    : 0.0F;
+            enemy.actor.vy = 0.0F;
+            enemy.accelerationY = 0.0F;
+            if (enemy.type == PlatformerEnemyType::KoopaParatroopa) {
+                enemy.actor.vy = -8.0F * REFERENCE_VELOCITY_SCALE;
+                enemy.accelerationY =
+                    -0.22F * REFERENCE_VELOCITY_SCALE *
+                    REFERENCE_TICKS_PER_SECOND;
+            }
+            if (enemy.type == PlatformerEnemyType::Spiny &&
+                enemy.sourceTileId == 500U) {
+                enemy.sourceTileId = 502U;
+                enemy.bornFrame = logicFrame_;
+            }
             if (enemy.actor.x + enemy.width < cameraX_ - 64.0F ||
                 enemy.actor.y > cameraY_ + VIEWPORT_WIDTH) {
                 enemy.actor.active = false;
                 enemy.motion = PlatformerEnemyMotion::Defeated;
+            }
+            if (enemy.actor.active &&
+                enemy.type == PlatformerEnemyType::HammerBro) {
+                updateHammerBroBehavior(enemy);
             }
             continue;
         }
@@ -2307,6 +3652,7 @@ void PlatformerEngine::updateEnemies(float dt, uint16_t dtMs) {
                 enemy.actor.y + enemy.height <= solid.y + EPSILON) {
                 enemy.actor.y = static_cast<float>(solid.y) - enemy.height;
                 enemy.actor.vy = 0.0F;
+                enemy.accelerationY = 0.0F;
                 landed = true;
             }
             break;
@@ -2317,6 +3663,263 @@ void PlatformerEngine::updateEnemies(float dt, uint16_t dtMs) {
         if (enemy.actor.y > WORLD_HEIGHT + 32.0F) {
             enemy.actor.active = false;
             enemy.motion = PlatformerEnemyMotion::Defeated;
+        }
+        if (enemy.actor.active &&
+            enemy.type == PlatformerEnemyType::HammerBro) {
+            enemy.facingLeft = player_.x > enemy.actor.x;
+            updateHammerBroBehavior(enemy);
+        }
+    }
+}
+
+void PlatformerEngine::updateHammerBroBehavior(EnemyActor& enemy) {
+    enemy.facingLeft = player_.x > enemy.actor.x;
+    ++enemy.attackFrames;
+    ++enemy.jumpFrames;
+    ++enemy.moveFrames;
+
+    if (enemy.attackFrames == 120U) {
+        enemy.callbackFrames = 30U;
+        enemy.heldHammerY = enemy.actor.y;
+        if (enemy.jumpFrames >= 240U) {
+            // DelayedCommand(0.75) is first executed later in this same frame.
+            enemy.stateMs = 45U;
+        }
+    }
+    if (enemy.moveFrames >= 180U) {
+        enemy.actor.vx = -enemy.actor.vx;
+        enemy.moveFrames = 0U;
+    }
+
+    updateHammerBroCallbacks(enemy);
+}
+
+void PlatformerEngine::updateHammerBroCallbacks(EnemyActor& enemy) {
+    // CallbackSystem runs after EnemySystem. A callback created above consumes
+    // its first frame immediately, while the delayed jump does the same in the
+    // command scheduler after the world tick.
+    if (enemy.callbackFrames > 0U) {
+        --enemy.callbackFrames;
+        if (enemy.callbackFrames == 0U) {
+            const bool right = enemy.facingLeft;
+            spawnEnemyHazard(
+                PlatformerEnemyHazardKind::Hammer,
+                right ? enemy.actor.x + enemy.width
+                      : enemy.actor.x - TILE_SIZE,
+                enemy.actor.y - TILE_SIZE,
+                right ? 90.0F : -90.0F,
+                -6.0F * REFERENCE_VELOCITY_SCALE);
+            enemy.attackFrames = 0U;
+        }
+    }
+    updateQueuedEnemyCommands(enemy);
+}
+
+void PlatformerEngine::updateQueuedEnemyCommands(EnemyActor& enemy) {
+    if (enemy.type == PlatformerEnemyType::Lakitu &&
+        enemy.callbackFrames > 0U) {
+        --enemy.callbackFrames;
+        if (enemy.callbackFrames == 0U) {
+            enemy.actor.y -= TILE_SIZE;
+            enemy.height = TILE_SIZE * 2.0F;
+            spawnSpiny(enemy);
+        }
+    }
+    if (enemy.type == PlatformerEnemyType::HammerBro &&
+        enemy.stateMs > 0U) {
+        --enemy.stateMs;
+        if (enemy.stateMs == 0U) {
+            enemy.actor.vy = -10.0F * REFERENCE_VELOCITY_SCALE;
+            enemy.jumpFrames = 0U;
+        }
+    }
+}
+
+void PlatformerEngine::updatePausedCommands() {
+    for (uint8_t index = 0; index < enemyCount_; ++index) {
+        EnemyActor& enemy = enemies_[index];
+        if (!enemy.actor.active) {
+            continue;
+        }
+        updateQueuedEnemyCommands(enemy);
+    }
+}
+
+uint32_t PlatformerEngine::nextRandom() {
+    uint32_t value = randomState_;
+    value ^= value << 13U;
+    value ^= value >> 17U;
+    value ^= value << 5U;
+    randomState_ = value;
+    return value;
+}
+
+void PlatformerEngine::updateBowserBehavior(EnemyActor& enemy, float dt) {
+    const bool inCamera =
+        enemy.actor.x + enemy.width >= cameraX_ &&
+        enemy.actor.x <= cameraX_ + VIEWPORT_WIDTH &&
+        enemy.actor.y + enemy.height >= cameraY_ &&
+        enemy.actor.y <= cameraY_ + 15.0F * TILE_SIZE;
+    if (!inCamera) {
+        updateBowserCallbacks(enemy);
+        return;
+    }
+
+    enemy.actor.vy = std::min(
+        MAX_FALL_SPEED,
+        enemy.actor.vy + REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE);
+    const float nextX = enemy.actor.x + enemy.actor.vx * dt;
+    if (!rectHitsSolid(nextX, enemy.actor.y, enemy.width, enemy.height)) {
+        enemy.actor.x = nextX;
+    } else {
+        enemy.actor.vx = -enemy.actor.vx;
+    }
+    const float nextY = enemy.actor.y + enemy.actor.vy * dt;
+    if (!rectHitsSolid(enemy.actor.x, nextY, enemy.width, enemy.height)) {
+        enemy.actor.y = nextY;
+        enemy.actor.vy = std::min(
+            MAX_FALL_SPEED, enemy.actor.vy + enemy.accelerationY * dt);
+    } else {
+        const int32_t row = static_cast<int32_t>(std::floor(
+            (nextY + enemy.height - EPSILON) / TILE_SIZE));
+        enemy.actor.y = static_cast<float>(row * TILE_SIZE) - enemy.height;
+        enemy.actor.vy = 0.0F;
+        enemy.accelerationY = 0.0F;
+    }
+
+    const bool flipped = player_.x > enemy.actor.x;
+    if (flipped != enemy.facingLeft) {
+        enemy.bowserMoveDirection =
+            enemy.bowserMoveDirection == -1 ? 1 : -1;
+        enemy.facingLeft = flipped;
+    }
+
+    ++enemy.moveFrames;
+    ++enemy.stateMs;
+    ++enemy.jumpFrames;
+    ++enemy.attackFrames;
+
+    const auto move = [&enemy]() {
+        enemy.actor.vx = REFERENCE_VELOCITY_SCALE;
+        enemy.bowserMoveDirection =
+            enemy.bowserMoveDirection == -1 ? 1 : -1;
+        enemy.moveFrames = 0U;
+    };
+    const auto stop = [&enemy]() {
+        enemy.actor.vx = 0.0F;
+        enemy.stateMs = 0U;
+    };
+    const auto jump = [&enemy]() {
+        enemy.actor.vy = -5.0F * REFERENCE_VELOCITY_SCALE;
+        enemy.accelerationY =
+            -0.35F * REFERENCE_VELOCITY_SCALE *
+            REFERENCE_TICKS_PER_SECOND;
+        enemy.jumpFrames = 0U;
+    };
+
+    switch (enemy.behaviorState) {
+        case 0U:
+            if (enemy.stateMs >= 120U) {
+                move();
+                jump();
+                enemy.behaviorState = 1U;
+            }
+            break;
+        case 1U:
+            if (enemy.moveFrames >= 180U) {
+                stop();
+                enemy.behaviorState = 2U;
+            }
+            break;
+        case 2U:
+            if (enemy.stateMs >= 120U) {
+                move();
+                jump();
+                enemy.behaviorState = 3U;
+            }
+            break;
+        case 3U:
+            if (enemy.moveFrames >= 180U) {
+                stop();
+                enemy.behaviorState = 4U;
+            }
+            break;
+        case 4U:
+            if (enemy.stateMs >= 120U) {
+                move();
+                enemy.behaviorState = 5U;
+            }
+            break;
+        case 5U:
+            if (enemy.moveFrames >= 180U) {
+                stop();
+                enemy.behaviorState = 0U;
+            }
+            break;
+        default:
+            enemy.behaviorState = 0U;
+            break;
+    }
+
+    if (enemy.attackFrames >= 120U) {
+        enemy.attackFrames = 0U;
+        const bool fireAttack = (nextRandom() & 1U) == 0U;
+        const uint8_t hammerAmount =
+            static_cast<uint8_t>(nextRandom() % 5U + 6U);
+        if (fireAttack) {
+            enemy.fireCallbackFrames = 120U;
+        } else {
+            enemy.hammerBurstRemaining =
+                static_cast<uint8_t>(hammerAmount - 1U);
+            enemy.hammerBurstFrames = 4U;
+        }
+    }
+
+    updateBowserCallbacks(enemy);
+}
+
+void PlatformerEngine::updateBowserCallbacks(EnemyActor& enemy) {
+    if (enemy.fireCallbackFrames > 0U) {
+        --enemy.fireCallbackFrames;
+        if (enemy.fireCallbackFrames == 0U) {
+            const bool right = enemy.facingLeft;
+            if (spawnEnemyHazard(
+                PlatformerEnemyHazardKind::BowserFire,
+                right ? enemy.actor.x + enemy.width
+                      : enemy.actor.x - 24.0F,
+                enemy.actor.y + 2.0F,
+                right ? 3.0F * REFERENCE_VELOCITY_SCALE
+                      : -3.0F * REFERENCE_VELOCITY_SCALE,
+                0.0F)) {
+                queueEvent(PlatformerEventType::BowserFire);
+            }
+        }
+    }
+
+    if (enemy.hammerBurstRemaining > 0U && enemy.hammerBurstFrames > 0U) {
+        --enemy.hammerBurstFrames;
+        if (enemy.hammerBurstFrames == 0U) {
+            const float randomX =
+                static_cast<float>(nextRandom()) / 4294967295.0F;
+            const float randomY =
+                static_cast<float>(nextRandom()) / 4294967295.0F;
+            float vx = -(randomX + 2.25F) * REFERENCE_VELOCITY_SCALE;
+            if (enemy.facingLeft) {
+                vx = -vx;
+            }
+            spawnEnemyHazard(
+                PlatformerEnemyHazardKind::Hammer,
+                enemy.facingLeft ? enemy.actor.x + enemy.width
+                                 : enemy.actor.x - TILE_SIZE,
+                enemy.actor.y, vx,
+                -(randomY * 0.5F + 6.0F) *
+                    REFERENCE_VELOCITY_SCALE,
+                -0.35F * REFERENCE_VELOCITY_SCALE *
+                    REFERENCE_TICKS_PER_SECOND);
+            --enemy.hammerBurstRemaining;
+            if (enemy.hammerBurstRemaining > 0U) {
+                enemy.hammerBurstFrames = 4U;
+            }
         }
     }
 }
@@ -2339,19 +3942,21 @@ void PlatformerEngine::spawnSpiny(const EnemyActor& lakitu) {
     spiny = EnemyActor{};
     spiny.type = PlatformerEnemyType::Spiny;
     spiny.sourceTileId = 500U;
+    spiny.bornFrame = logicFrame_;
     spiny.actor.x = lakitu.actor.x;
-    spiny.actor.y = lakitu.actor.y + TILE_SIZE;
-    spiny.actor.vx = player_.x < lakitu.actor.x ? -58.0F : 58.0F;
-    spiny.actor.vy = 15.0F;
+    spiny.actor.y = lakitu.actor.y;
+    spiny.actor.vx = (lakitu.facingLeft ? 2.5F : -2.5F) *
+                     REFERENCE_VELOCITY_SCALE;
+    spiny.actor.vy = 0.0F;
     spiny.originX = spiny.actor.x;
     spiny.originY = spiny.actor.y;
     spiny.actor.active = true;
     spiny.spawned = true;
 }
 
-void PlatformerEngine::spawnEnemyHazard(PlatformerEnemyHazardKind kind,
+bool PlatformerEngine::spawnEnemyHazard(PlatformerEnemyHazardKind kind,
                                          float x, float y, float vx,
-                                         float vy) {
+                                         float vy, float accelerationY) {
     uint8_t slot = MAX_ENEMY_HAZARDS;
     for (uint8_t index = 0; index < enemyHazardCount_; ++index) {
         if (!enemyHazards_[index].active) {
@@ -2364,7 +3969,7 @@ void PlatformerEngine::spawnEnemyHazard(PlatformerEnemyHazardKind kind,
         slot = enemyHazardCount_++;
     }
     if (slot >= MAX_ENEMY_HAZARDS) {
-        return;
+        return false;
     }
     PlatformerEnemyHazardState& hazard = enemyHazards_[slot];
     hazard = PlatformerEnemyHazardState{};
@@ -2373,9 +3978,12 @@ void PlatformerEngine::spawnEnemyHazard(PlatformerEnemyHazardKind kind,
     hazard.y = y;
     hazard.vx = vx;
     hazard.vy = vy;
+    hazard.accelerationY = accelerationY;
+    hazard.bornFrame = logicFrame_;
     hazard.sourceTileId =
         kind == PlatformerEnemyHazardKind::Hammer ? 60U : 470U;
     hazard.active = true;
+    return true;
 }
 
 void PlatformerEngine::updateEnemyHazards(float dt, uint16_t dtMs) {
@@ -2384,101 +3992,133 @@ void PlatformerEngine::updateEnemyHazards(float dt, uint16_t dtMs) {
         if (!hazard.active) {
             continue;
         }
+        if (hazard.bornFrame == logicFrame_) {
+            hazard.ageMs = dtMs;
+            continue;
+        }
         hazard.ageMs = static_cast<uint16_t>(std::min<uint32_t>(
             65535U, static_cast<uint32_t>(hazard.ageMs) + dtMs));
-        hazard.x += hazard.vx * dt;
-        hazard.y += hazard.vy * dt;
-        if (hazard.kind == PlatformerEnemyHazardKind::Hammer) {
-            hazard.vy = std::min(MAX_FALL_SPEED,
-                                 hazard.vy + GRAVITY * dt);
-        }
         const float width =
             hazard.kind == PlatformerEnemyHazardKind::BowserFire ? 24.0F
                                                                  : 16.0F;
         const float height =
             hazard.kind == PlatformerEnemyHazardKind::BowserFire ? 8.0F
                                                                  : 16.0F;
-        if (overlaps(player_.x, player_.y, playerWidth(), playerHeight(),
-                     hazard.x, hazard.y, width, height)) {
-            if (starInvincibleMs_ == 0U) {
-                hurtPlayer();
-            }
+        if (hazard.x + width < cameraX_ ||
+            hazard.x > cameraX_ + VIEWPORT_WIDTH ||
+            hazard.y + height < cameraY_ ||
+            hazard.y > cameraY_ + VIEWPORT_HEIGHT) {
             hazard.active = false;
             continue;
         }
-        if (hazard.ageMs >= 6000U || hazard.x < cameraX_ - 96.0F ||
-            hazard.x > cameraX_ + VIEWPORT_WIDTH + 128.0F ||
-            hazard.y > cameraY_ + VIEWPORT_WIDTH) {
-            hazard.active = false;
+        if (hazard.kind == PlatformerEnemyHazardKind::BowserFire) {
+            platformerAdvanceReferenceAnimation(
+                hazard.animationFrame, hazard.animationTimer, 4U, 2U);
+        }
+        if (hazard.kind == PlatformerEnemyHazardKind::Hammer) {
+            hazard.vy = std::min(
+                MAX_FALL_SPEED,
+                hazard.vy + REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE);
+        }
+        hazard.x += hazard.vx * dt;
+        hazard.y += hazard.vy * dt;
+        hazard.vy = std::min(
+            MAX_FALL_SPEED, hazard.vy + hazard.accelerationY * dt);
+        if (phase_ == PlatformerPhase::Running &&
+            overlaps(player_.x, player_.y, playerWidth(), playerHeight(),
+                     hazard.x, hazard.y, width, height) &&
+            powerTransition_ == PlatformerPowerTransition::None &&
+            hurtInvincibleFrames_ == 0U && !starProtectedThisFrame_) {
+            hurtPlayer();
         }
     }
 }
 
-void PlatformerEngine::activateCampaignEnemies() {
+void PlatformerEngine::updateEnemyActivationCallbacks() {
+    for (uint8_t index = 0; index < enemyCount_; ++index) {
+        EnemyActor& enemy = enemies_[index];
+        if (!enemy.activationSoundPending) {
+            continue;
+        }
+        if (!enemy.actor.active) {
+            enemy.activationSoundPending = false;
+            continue;
+        }
+        const bool inCamera =
+            enemy.actor.x + enemy.width >= cameraX_ &&
+            enemy.actor.x <= cameraX_ + VIEWPORT_WIDTH &&
+            enemy.actor.y + enemy.height >= cameraY_ &&
+            enemy.actor.y <= cameraY_ + VIEWPORT_HEIGHT;
+        if (inCamera) {
+            enemy.activationSoundPending = false;
+            queueEvent(PlatformerEventType::CannonFired);
+        }
+    }
+}
+
+void PlatformerEngine::loadCampaignEnemies() {
     const PlatformerCampaignLevel* level = levelRuntime_.level();
     if (level == nullptr) {
         return;
     }
-    const int32_t firstColumn = std::max<int32_t>(
-        0, static_cast<int32_t>(cameraX_ / TILE_SIZE) - 1);
-    const int32_t lastColumn = std::min<int32_t>(
-        level->width - 1,
-        static_cast<int32_t>((cameraX_ + VIEWPORT_WIDTH + 32.0F) /
-                             TILE_SIZE));
-    const int32_t firstRow = std::max<int32_t>(
-        0, static_cast<int32_t>(cameraY_ / TILE_SIZE) - 1);
-    const int32_t lastRow = std::min<int32_t>(
-        level->height - 1,
-        static_cast<int32_t>((cameraY_ + VIEWPORT_WIDTH * 0.75F + 16.0F) /
-                             TILE_SIZE));
-    for (int32_t row = firstRow; row <= lastRow; ++row) {
-        for (int32_t column = firstColumn; column <= lastColumn; ++column) {
+    for (uint8_t row = 0U; row < level->height; ++row) {
+        for (uint16_t column = 0U; column < level->width; ++column) {
             const uint16_t sourceId = platformerCampaignTileAt(
-                *level, PlatformerMapLayer::Enemies,
-                static_cast<uint16_t>(column), static_cast<uint8_t>(row));
-            if (sourceId == PLATFORMER_EMPTY_TILE ||
-                sourceId >= PLATFORMER_ENEMY_TILE_COUNT || sourceId == 73U ||
-                sourceId == 79U || sourceId == 83U || sourceId == 85U ||
-                sourceId == 91U || sourceId == 490U || sourceId == 492U ||
-                sourceId == 496U) {
+                *level, PlatformerMapLayer::Enemies, column, row);
+            if (!platformerEnemySourceCreatesEntity(sourceId)) {
                 continue;
             }
-            const uint32_t spawnIndex =
-                static_cast<uint32_t>(row) * level->width + column;
-            const uint16_t wordIndex =
-                static_cast<uint16_t>(spawnIndex >> 5U);
-            const uint32_t mask = 1UL << (spawnIndex & 31U);
-            if (wordIndex >= CAMPAIGN_SPAWN_WORDS ||
-                (campaignEnemySpawned_[wordIndex] & mask) != 0U) {
-                continue;
-            }
-
-            uint8_t slot = MAX_ENEMIES;
-            for (uint8_t index = 0; index < enemyCount_; ++index) {
-                if (!enemies_[index].actor.active) {
-                    slot = index;
-                    break;
-                }
-            }
-            if (slot == MAX_ENEMIES && enemyCount_ < MAX_ENEMIES) {
-                slot = enemyCount_++;
-            }
-            if (slot >= MAX_ENEMIES) {
-                continue;
-            }
-
-            campaignEnemySpawned_[wordIndex] |= mask;
-            EnemyActor& enemy = enemies_[slot];
-            enemy = EnemyActor{};
             const uint16_t reference =
                 PLATFORMER_ENEMY_REFERENCE_IDS[sourceId];
-            enemy.type = campaignEnemyType(reference);
+            PlatformerEnemyType type = PlatformerEnemyType::Goomba;
+            if (!campaignEnemyType(reference, type)) {
+                continue;
+            }
+            float spawnX = static_cast<float>(column * TILE_SIZE);
+            float spawnY = static_cast<float>(row * TILE_SIZE);
+            if (reference == 39U || reference == 71U) {
+                spawnX += TILE_SIZE * 0.5F;
+            }
+            bool flyingCheep = false;
+            if (reference == 498U) {
+                const uint16_t background = platformerCampaignTileAt(
+                    *level, PlatformerMapLayer::Background, column, row);
+                const bool underwaterBackground =
+                    background < PLATFORMER_BLOCK_TILE_COUNT &&
+                    PLATFORMER_BLOCK_REFERENCE_IDS[background] == 186U;
+                flyingCheep = !underwaterBackground;
+                if (flyingCheep) {
+                    spawnY += TILE_SIZE;
+                }
+            }
+            if (type == PlatformerEnemyType::BulletBill) {
+                // Pre-placed Bullet Bills have DestroyOutsideCameraComponent
+                // in the reference and disappear in the first PhysicsSystem
+                // tick unless they start inside the initial viewport.
+                const bool inInitialCamera =
+                    spawnX + TILE_SIZE >= cameraX_ &&
+                    spawnX <= cameraX_ + VIEWPORT_WIDTH &&
+                    spawnY + TILE_SIZE >= cameraY_ &&
+                    spawnY <= cameraY_ + VIEWPORT_HEIGHT;
+                if (!inInitialCamera) {
+                    continue;
+                }
+            }
+            if (enemyCount_ >= MAX_LEVEL_ENEMIES) {
+                return;
+            }
+
+            EnemyActor& enemy = enemies_[enemyCount_++];
+            enemy = EnemyActor{};
+            enemy.type = type;
             enemy.sourceTileId = sourceId;
-            enemy.actor.x = static_cast<float>(column * TILE_SIZE);
-            enemy.actor.y = static_cast<float>(row * TILE_SIZE);
+            enemy.bornFrame = logicFrame_;
+            enemy.actor.x = spawnX;
+            enemy.actor.y = spawnY;
             enemy.actor.vx = -ENEMY_SPEED;
             enemy.actor.active = true;
             enemy.spawned = true;
+            enemy.flyingCheep = flyingCheep;
             if (enemy.type == PlatformerEnemyType::Koopa ||
                 enemy.type == PlatformerEnemyType::KoopaParatroopa) {
                 enemy.actor.y += 8.0F;
@@ -2487,9 +4127,15 @@ void PlatformerEngine::activateCampaignEnemies() {
             } else if (enemy.type == PlatformerEnemyType::HammerBro ||
                        enemy.type == PlatformerEnemyType::Bowser) {
                 enemy.height = 32.0F;
-                if (enemy.type == PlatformerEnemyType::Bowser) {
+                if (enemy.type == PlatformerEnemyType::HammerBro) {
+                    enemy.actor.vx = 2.0F * REFERENCE_VELOCITY_SCALE;
+                } else {
+                    enemy.actor.vx = 0.0F;
                     enemy.width = 32.0F;
                     enemy.health = 5U;
+                    enemy.accelerationY =
+                        -0.30F * REFERENCE_VELOCITY_SCALE *
+                        REFERENCE_TICKS_PER_SECOND;
                 }
             } else if (enemy.type == PlatformerEnemyType::PiranhaPlant ||
                        enemy.type == PlatformerEnemyType::LavaBubble) {
@@ -2501,16 +4147,23 @@ void PlatformerEngine::activateCampaignEnemies() {
                     enemy.actor.y += TILE_SIZE;
                 }
             } else if (enemy.type == PlatformerEnemyType::BulletBill) {
-                enemy.actor.vx = -150.0F;
+                enemy.actor.vx = -3.0F * REFERENCE_VELOCITY_SCALE;
+                enemy.activationSoundPending = true;
             } else if (enemy.type == PlatformerEnemyType::CheepCheep ||
                        enemy.type == PlatformerEnemyType::Blooper ||
                        enemy.type == PlatformerEnemyType::Lakitu) {
-                enemy.actor.vx = -55.0F;
-                enemy.actor.vy = enemy.type == PlatformerEnemyType::CheepCheep
-                                     ? -35.0F
-                                     : 0.0F;
+                enemy.actor.vx =
+                    enemy.type == PlatformerEnemyType::CheepCheep
+                        ? -ENEMY_SPEED
+                        : 0.0F;
+                enemy.actor.vy = 0.0F;
                 if (enemy.type != PlatformerEnemyType::CheepCheep) {
                     enemy.height = 32.0F;
+                }
+                if (enemy.type == PlatformerEnemyType::Blooper) {
+                    enemy.accelerationY =
+                        -0.47480F * REFERENCE_VELOCITY_SCALE *
+                        REFERENCE_TICKS_PER_SECOND;
                 }
             }
             enemy.originX = enemy.actor.x;
@@ -2543,19 +4196,45 @@ void PlatformerEngine::updatePowerups(float dt, uint16_t dtMs) {
         if (!powerup.active) {
             continue;
         }
-        powerup.ageMs = static_cast<uint16_t>(
-            std::min<uint32_t>(65535U, powerup.ageMs + dtMs));
-        if (powerup.state == PlatformerPowerupState::Emerging) {
-            powerup.y -= 80.0F * dt;
-            if (powerup.ageMs >= 200U) {
-                powerup.state = powerup.kind == PlatformerPowerupKind::FireFlower
-                                    ? PlatformerPowerupState::Resting
-                                    : PlatformerPowerupState::Moving;
+        const bool inCamera =
+            powerup.x + TILE_SIZE >= cameraX_ &&
+            powerup.x <= cameraX_ + VIEWPORT_WIDTH &&
+            powerup.y + TILE_SIZE >= cameraY_ &&
+            powerup.y <= cameraY_ + VIEWPORT_HEIGHT;
+        if (inCamera &&
+            (powerup.kind == PlatformerPowerupKind::FireFlower ||
+             powerup.kind == PlatformerPowerupKind::Star)) {
+            platformerAdvanceReferenceAnimation(
+                powerup.animationFrame, powerup.animationTimer, 8U, 4U);
+        }
+        if (powerup.bornFrame == logicFrame_) {
+            continue;
+        }
+        if (!inCamera) {
+            if (powerup.x + TILE_SIZE < cameraX_) {
+                powerup.active = false;
             }
             continue;
         }
-
-        if (powerup.kind == PlatformerPowerupKind::FireFlower) {
+        powerup.ageMs = static_cast<uint16_t>(
+            std::min<uint32_t>(65535U, powerup.ageMs + dtMs));
+        powerup.stateFrames = static_cast<uint16_t>(
+            std::min<uint32_t>(65535U, powerup.stateFrames + 1U));
+        if (powerup.state == PlatformerPowerupState::Emerging) {
+            powerup.y += powerup.vy * dt;
+            // The reference starts the collectible inside the block at vy=-1
+            // and enables collisions only once its 32px body is fully above it.
+            // With 16px PGOS tiles that is the 33rd 60Hz logic frame.
+            if (powerup.stateFrames >= 33U) {
+                powerup.state = powerup.kind == PlatformerPowerupKind::FireFlower
+                                    ? PlatformerPowerupState::Resting
+                                    : PlatformerPowerupState::Moving;
+                powerup.vx = powerup.kind == PlatformerPowerupKind::FireFlower
+                                 ? 0.0F
+                                 : POWERUP_SPEED;
+                powerup.vy = 0.0F;
+                powerup.stateFrames = 0U;
+            }
             continue;
         }
 
@@ -2586,25 +4265,52 @@ void PlatformerEngine::updatePowerups(float dt, uint16_t dtMs) {
                     foundLanding = true;
                 }
             };
-            for (uint8_t solidIndex = 0;
-                 solidIndex < PLATFORMER_LEVEL_1_1.solidCount; ++solidIndex) {
-                const auto& solid = PLATFORMER_LEVEL_1_1.solids[solidIndex];
-                considerTop(static_cast<float>(solid.x),
-                            static_cast<float>(solid.y),
-                            static_cast<float>(solid.width));
-            }
-            for (uint8_t boxIndex = 0; boxIndex < boxCount_; ++boxIndex) {
-                const auto& box = boxes_[boxIndex];
-                if (box.visible) {
-                    considerTop(static_cast<float>(box.x),
-                                static_cast<float>(box.y), TILE_SIZE);
+            if (campaignMode_) {
+                const int32_t firstColumn = static_cast<int32_t>(
+                    std::floor(powerup.x / TILE_SIZE));
+                const int32_t lastColumn = static_cast<int32_t>(std::floor(
+                    (powerup.x + TILE_SIZE - EPSILON) / TILE_SIZE));
+                const int32_t firstRow = static_cast<int32_t>(
+                    std::floor((powerup.y + TILE_SIZE) / TILE_SIZE));
+                const int32_t lastRow = static_cast<int32_t>(std::floor(
+                    (nextY + TILE_SIZE) / TILE_SIZE));
+                for (int32_t row = firstRow; row <= lastRow; ++row) {
+                    for (int32_t column = firstColumn; column <= lastColumn;
+                         ++column) {
+                        if (column < 0 || row < 0 || row > 255 ||
+                            !levelRuntime_.isSolid(
+                                static_cast<uint16_t>(column),
+                                static_cast<uint8_t>(row))) {
+                            continue;
+                        }
+                        considerTop(static_cast<float>(column * TILE_SIZE),
+                                    static_cast<float>(row * TILE_SIZE),
+                                    TILE_SIZE);
+                    }
+                }
+            } else {
+                for (uint8_t solidIndex = 0;
+                     solidIndex < PLATFORMER_LEVEL_1_1.solidCount;
+                     ++solidIndex) {
+                    const auto& solid =
+                        PLATFORMER_LEVEL_1_1.solids[solidIndex];
+                    considerTop(static_cast<float>(solid.x),
+                                static_cast<float>(solid.y),
+                                static_cast<float>(solid.width));
+                }
+                for (uint8_t boxIndex = 0; boxIndex < boxCount_; ++boxIndex) {
+                    const auto& box = boxes_[boxIndex];
+                    if (box.visible) {
+                        considerTop(static_cast<float>(box.x),
+                                    static_cast<float>(box.y), TILE_SIZE);
+                    }
                 }
             }
             if (foundLanding) {
                 powerup.y = landingY;
             }
             if (powerup.kind == PlatformerPowerupKind::Star) {
-                powerup.vy = -180.0F;
+                powerup.vy = -10.0F * REFERENCE_VELOCITY_SCALE;
                 powerup.state = PlatformerPowerupState::Bouncing;
             } else {
                 powerup.vy = 0.0F;
@@ -2623,20 +4329,45 @@ void PlatformerEngine::updateEffects(float dt, uint16_t dtMs) {
         }
         effect.ageMs = static_cast<uint16_t>(
             std::min<uint32_t>(65535U, effect.ageMs + dtMs));
-        effect.x += effect.vx * dt;
-        effect.y += effect.vy * dt;
         if (effect.kind == PlatformerEffectKind::RisingCoin) {
-            effect.vy += 620.0F * dt;
-            if (effect.ageMs > 750U) {
+            const bool inCamera =
+                effect.x + TILE_SIZE >= cameraX_ &&
+                effect.x <= cameraX_ + VIEWPORT_WIDTH &&
+                effect.y + TILE_SIZE >= cameraY_ &&
+                effect.y <= cameraY_ + VIEWPORT_HEIGHT;
+            if (inCamera) {
+                platformerAdvanceReferenceAnimation(
+                    effect.animationFrame, effect.animationTimer, 8U, 4U);
+            }
+            effect.vy += REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE;
+            effect.y += effect.vy * dt;
+            effect.vy = std::min(
+                MAX_FALL_SPEED,
+                effect.vy + 0.3F * REFERENCE_VELOCITY_SCALE);
+            if (effect.vy >= 0.0F && effect.y + TILE_SIZE >= effect.value) {
                 effect.active = false;
             }
         } else if (effect.kind == PlatformerEffectKind::BrickPiece) {
-            effect.vy += 720.0F * dt;
-            if (effect.y > WORLD_HEIGHT + 20.0F) {
+            if (effect.x + TILE_SIZE < cameraX_ ||
+                effect.x > cameraX_ + VIEWPORT_WIDTH ||
+                effect.y + TILE_SIZE < cameraY_ ||
+                effect.y > cameraY_ + VIEWPORT_HEIGHT) {
                 effect.active = false;
+                continue;
             }
-        } else if (effect.ageMs > 900U) {
+            effect.vy = std::min(
+                MAX_FALL_SPEED,
+                effect.vy +
+                    REFERENCE_GRAVITY * REFERENCE_VELOCITY_SCALE);
+            effect.x += effect.vx * dt;
+            effect.y += effect.vy * dt;
+        } else if ((effect.kind == PlatformerEffectKind::Score ||
+                    effect.kind == PlatformerEffectKind::OneUp) &&
+                   logicFrame_ - effect.bornFrame >= 35U) {
             effect.active = false;
+        } else {
+            effect.x += effect.vx * dt;
+            effect.y += effect.vy * dt;
         }
     }
 }
@@ -2647,54 +4378,149 @@ void PlatformerEngine::updateProjectiles(float dt, uint16_t dtMs) {
         if (!projectile.active) {
             continue;
         }
+        if (projectile.bornFrame == logicFrame_) {
+            continue;
+        }
         projectile.ageMs = static_cast<uint16_t>(
             std::min<uint32_t>(65535U, projectile.ageMs + dtMs));
         if (projectile.exploding) {
-            if (projectile.ageMs > 120U) {
+            if (projectile.explosionFrames > 0U) {
+                --projectile.explosionFrames;
+            }
+            if (projectile.explosionFrames == 0U) {
                 projectile.active = false;
             }
             continue;
         }
-        projectile.x += projectile.vx * dt;
-        projectile.vy = std::min(projectile.vy + 820.0F * dt, 210.0F);
-        projectile.y += projectile.vy * dt;
-        if (rectHitsSolid(projectile.x, projectile.y, 8.0F, 8.0F)) {
-            projectile.y -= projectile.vy * dt;
-            projectile.vy = -180.0F;
-        }
-        if (projectile.x < cameraX_ - 64.0F ||
-            projectile.x > cameraX_ + VIEWPORT_WIDTH + 128.0F ||
-            projectile.y > WORLD_HEIGHT + 24.0F) {
+        if (projectile.x + 8.0F < cameraX_ ||
+            projectile.x > cameraX_ + VIEWPORT_WIDTH ||
+            projectile.y + 8.0F < cameraY_ ||
+            projectile.y > cameraY_ + VIEWPORT_HEIGHT) {
             projectile.active = false;
+            continue;
+        }
+        projectile.vy = std::min(projectile.vy + GRAVITY * dt,
+                                 MAX_FALL_SPEED);
+        const float previousY = projectile.y;
+        projectile.x += projectile.vx * dt;
+        projectile.y += projectile.vy * dt;
+
+        const bool falling = projectile.vy >= 0.0F;
+        const float verticalInset =
+            falling ? TILE_COLLISION_ROUNDNESS * 0.5F
+                    : TILE_COLLISION_ROUNDNESS;
+        const float predictedY = projectile.y + projectile.vy * dt;
+        float verticalEdge = falling ? 1000000.0F : -1000000.0F;
+        bool verticalCollision = false;
+        const auto considerVertical = [&](float solidX, float solidY,
+                                          float solidWidth,
+                                          float solidHeight) {
+            if (!overlaps(projectile.x + verticalInset, predictedY,
+                          8.0F - verticalInset * 2.0F, 8.0F,
+                          solidX + verticalInset, solidY,
+                          solidWidth - verticalInset * 2.0F,
+                          solidHeight)) {
+                return;
+            }
+            if (falling && previousY + 8.0F <= solidY + EPSILON &&
+                solidY < verticalEdge) {
+                verticalEdge = solidY;
+                verticalCollision = true;
+            } else if (!falling &&
+                       previousY >= solidY + solidHeight - EPSILON &&
+                       solidY + solidHeight > verticalEdge) {
+                verticalEdge = solidY + solidHeight;
+                verticalCollision = true;
+            }
+        };
+
+        if (campaignMode_) {
+            const PlatformerCampaignLevel* level = levelRuntime_.level();
+            if (level != nullptr) {
+                const int32_t firstColumn = static_cast<int32_t>(std::floor(
+                    (projectile.x + verticalInset) / TILE_SIZE));
+                const int32_t lastColumn = static_cast<int32_t>(std::floor(
+                    (projectile.x + 8.0F - verticalInset - EPSILON) /
+                    TILE_SIZE));
+                const int32_t firstRow = static_cast<int32_t>(
+                    std::floor(predictedY / TILE_SIZE));
+                const int32_t lastRow = static_cast<int32_t>(std::floor(
+                    (predictedY + 8.0F - EPSILON) / TILE_SIZE));
+                for (int32_t row = firstRow; row <= lastRow; ++row) {
+                    for (int32_t column = firstColumn;
+                         column <= lastColumn; ++column) {
+                        if (column < 0 || column >= level->width || row < 0 ||
+                            row >= level->height ||
+                            !levelRuntime_.isSolid(
+                                static_cast<uint16_t>(column),
+                                static_cast<uint8_t>(row))) {
+                            continue;
+                        }
+                        considerVertical(column * TILE_SIZE,
+                                         row * TILE_SIZE, TILE_SIZE,
+                                         TILE_SIZE);
+                    }
+                }
+            }
+        } else {
+            for (uint8_t solidIndex = 0;
+                 solidIndex < PLATFORMER_LEVEL_1_1.solidCount;
+                 ++solidIndex) {
+                const auto& solid = PLATFORMER_LEVEL_1_1.solids[solidIndex];
+                considerVertical(static_cast<float>(solid.x),
+                                 static_cast<float>(solid.y),
+                                 static_cast<float>(solid.width),
+                                 static_cast<float>(solid.height));
+            }
+            for (uint8_t boxIndex = 0; boxIndex < boxCount_; ++boxIndex) {
+                const PlatformerBox& box = boxes_[boxIndex];
+                if (box.visible) {
+                    considerVertical(static_cast<float>(box.x),
+                                     static_cast<float>(box.y), TILE_SIZE,
+                                     TILE_SIZE);
+                }
+            }
+        }
+
+        if (verticalCollision) {
+            projectile.y = falling ? verticalEdge - 8.0F : verticalEdge;
+            projectile.vy = falling
+                                ? -4.0F * REFERENCE_VELOCITY_SCALE
+                                : 0.0F;
+        }
+
+        const float predictedX = projectile.x + projectile.vx * dt;
+        if (rectHitsSolid(predictedX,
+                          projectile.y + TILE_COLLISION_ROUNDNESS,
+                          8.0F, 8.0F - TILE_COLLISION_ROUNDNESS * 2.0F)) {
+            projectile.exploding = true;
+            projectile.explosionFrames = 4U;
+            projectile.ageMs = 0U;
+            queueEvent(PlatformerEventType::FireballHit);
             continue;
         }
         for (uint8_t enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
             EnemyActor& enemy = enemies_[enemyIndex];
-            if (!enemy.actor.active ||
+            float enemyX = 0.0F;
+            float enemyY = 0.0F;
+            float enemyWidth = 0.0F;
+            float enemyHeight = 0.0F;
+            enemyCollisionBounds(enemy, enemyX, enemyY, enemyWidth,
+                                 enemyHeight);
+            if (!enemy.actor.active || isDefeatedParticle(enemy.motion) ||
                 !overlaps(projectile.x, projectile.y, 8.0F, 8.0F,
-                          enemy.actor.x, enemy.actor.y, enemy.width,
-                          enemy.height)) {
+                          enemyX, enemyY, enemyWidth, enemyHeight)) {
                 continue;
             }
-            if (enemy.type == PlatformerEnemyType::BuzzyBeetle ||
-                enemy.type == PlatformerEnemyType::LavaBubble ||
+            if (enemy.type == PlatformerEnemyType::LavaBubble ||
                 enemy.type == PlatformerEnemyType::BulletBill) {
-                projectile.exploding = true;
-                projectile.ageMs = 0;
-                break;
+                continue;
             }
-            if (enemy.type == PlatformerEnemyType::Bowser && enemy.health > 1U) {
-                --enemy.health;
-                projectile.exploding = true;
-                projectile.ageMs = 0;
-                break;
+            if (enemy.type == PlatformerEnemyType::Bowser) {
+                continue;
             }
-            defeatEnemy(enemy, enemy.type == PlatformerEnemyType::Bowser
-                                   ? 5000U
-                                   : 200U,
-                        true);
-            projectile.exploding = true;
-            projectile.ageMs = 0;
+            defeatEnemy(enemy, 0, true);
+            projectile.active = false;
             break;
         }
     }
@@ -2711,28 +4537,40 @@ void PlatformerEngine::collectPowerups() {
         powerup.active = false;
         switch (powerup.kind) {
             case PlatformerPowerupKind::Mushroom:
-                if (playerPower_ == PlatformerPlayerPower::Small) {
-                    playerPower_ = PlatformerPlayerPower::Big;
+                if (playerPower_ == PlatformerPlayerPower::Small &&
+                    powerTransition_ == PlatformerPowerTransition::None) {
                     player_.y -= BIG_PLAYER_HEIGHT - PLAYER_HEIGHT;
-                    powerTransitionMs_ = 950;
+                    powerTransition_ = PlatformerPowerTransition::Grow;
+                    powerTransitionFrames_ = 44U;
+                    powerTransitionElapsedFrames_ = 0U;
                 }
                 addScore(1000, player_.x, player_.y);
+                spawnEffect(PlatformerEffectKind::Score, player_.x,
+                            player_.y, 0.0F, -30.0F, 1000U);
                 break;
             case PlatformerPowerupKind::FireFlower:
                 if (playerPower_ == PlatformerPlayerPower::Small) {
-                    playerPower_ = PlatformerPlayerPower::Big;
                     player_.y -= BIG_PLAYER_HEIGHT - PLAYER_HEIGHT;
+                    powerTransition_ = PlatformerPowerTransition::Grow;
+                    powerTransitionFrames_ = 44U;
+                    powerTransitionElapsedFrames_ = 0U;
+                } else if (playerPower_ == PlatformerPlayerPower::Big) {
+                    powerTransition_ = PlatformerPowerTransition::Fire;
+                    powerTransitionFrames_ = 59U;
+                    powerTransitionElapsedFrames_ = 0U;
                 }
-                playerPower_ = PlatformerPlayerPower::Fire;
-                powerTransitionMs_ = 950;
                 addScore(1000, player_.x, player_.y);
+                spawnEffect(PlatformerEffectKind::Score, player_.x,
+                            player_.y, 0.0F, -30.0F, 1000U);
                 break;
             case PlatformerPowerupKind::Star:
-                starInvincibleMs_ = 11000;
-                addScore(1000, player_.x, player_.y);
+                starInvincibleFrames_ = 599U;
+                starBlinkFrames_ = 600U;
                 break;
             case PlatformerPowerupKind::OneUp:
-                lives_ = static_cast<uint8_t>(std::min<uint16_t>(99, lives_ + 1));
+                ++lives_;
+                spawnEffect(PlatformerEffectKind::OneUp, player_.x,
+                            player_.y - 2.0F, 0.0F, -30.0F);
                 queueEvent(PlatformerEventType::OneUp, lives_);
                 break;
         }
@@ -2765,15 +4603,9 @@ void PlatformerEngine::collectMapCoins() {
                 continue;
             }
             ++coinsCollected_;
-            addScore(200, static_cast<float>(column * TILE_SIZE),
+            addScore(100, static_cast<float>(column * TILE_SIZE),
                      static_cast<float>(row * TILE_SIZE));
-            queueEvent(PlatformerEventType::CoinBoxHit);
-            if (coinsCollected_ >= 100U) {
-                coinsCollected_ = 0U;
-                lives_ = static_cast<uint8_t>(
-                    std::min<uint16_t>(99U, static_cast<uint16_t>(lives_) + 1U));
-                queueEvent(PlatformerEventType::OneUp, lives_);
-            }
+            queueEvent(PlatformerEventType::CoinCollected);
         }
     }
 }
@@ -2849,8 +4681,13 @@ void PlatformerEngine::checkBoxCollision(float previousY,
         const uint8_t row = static_cast<uint8_t>(selectedRow);
         const float blockX = static_cast<float>(column * TILE_SIZE);
         const float blockY = static_cast<float>(row * TILE_SIZE);
-        const PlatformerBlockHitResult hit = levelRuntime_.hitBlock(
-            column, row, playerPower_ != PlatformerPlayerPower::Small);
+        const PlatformerRuntimeTile source = levelRuntime_.tile(column, row);
+        const bool shouldBreak =
+            playerPower_ != PlatformerPlayerPower::Small &&
+            source.kind == PlatformerRuntimeTileKind::Brick &&
+            source.reward == PlatformerRuntimeReward::None;
+        const PlatformerBlockHitResult hit =
+            levelRuntime_.hitBlock(column, row, false);
         if (!hit.accepted) {
             return;
         }
@@ -2861,27 +4698,23 @@ void PlatformerEngine::checkBoxCollision(float previousY,
         bumped.y = static_cast<int16_t>(blockY);
         bumpEnemiesAbove(bumped);
 
-        if (hit.broken) {
-            for (int8_t xSign : {-1, 1}) {
-                for (int8_t ySign : {-1, 1}) {
-                    spawnEffect(PlatformerEffectKind::BrickPiece,
-                                blockX + (xSign > 0 ? 8.0F : 0.0F),
-                                blockY + (ySign > 0 ? 8.0F : 0.0F),
-                                xSign * 66.0F,
-                                ySign < 0 ? -235.0F : -155.0F);
-                }
-            }
-            addScore(50, blockX, blockY);
-            queueEvent(PlatformerEventType::BrickBroken, 50);
+        if (shouldBreak) {
+            queueCampaignBrickBreak(column, row);
             return;
         }
+        levelRuntime_.startBlockBump(column, row);
+        queueEvent(PlatformerEventType::BlockHit);
 
         switch (hit.reward) {
             case PlatformerRuntimeReward::Coin:
                 ++coinsCollected_;
-                addScore(200, blockX, blockY - 8.0F);
+                addScore(100, blockX, blockY - 8.0F);
+                spawnEffect(PlatformerEffectKind::Score, blockX,
+                            blockY - 2.0F, 0.0F, -30.0F, 100U);
                 spawnEffect(PlatformerEffectKind::RisingCoin,
-                            blockX + 4.0F, blockY - 16.0F, 0.0F, -220.0F);
+                            blockX, blockY, 0.0F, -300.0F,
+                            static_cast<uint16_t>(blockY));
+                queueEvent(PlatformerEventType::CoinCollected);
                 break;
             case PlatformerRuntimeReward::Mushroom:
                 spawnPowerup(playerPower_ == PlatformerPlayerPower::Small
@@ -2901,7 +4734,6 @@ void PlatformerEngine::checkBoxCollision(float previousY,
             case PlatformerRuntimeReward::None:
                 break;
         }
-        queueEvent(PlatformerEventType::CoinBoxHit);
         return;
     }
 
@@ -2910,8 +4742,8 @@ void PlatformerEngine::checkBoxCollision(float previousY,
     float bestCenterDistance = static_cast<float>(WORLD_WIDTH);
     for (uint8_t index = 0; index < boxCount_; ++index) {
         PlatformerBox& box = boxes_[index];
-        bool canHit = box.visible;
-        if (!box.visible) {
+        bool canHit = box.visible && !box.opened;
+        if (!box.visible && !box.opened) {
             const float hiddenBottom = static_cast<float>(box.y + TILE_SIZE);
             canHit = previousY >= hiddenBottom - EPSILON &&
                      player_.y <= hiddenBottom + EPSILON;
@@ -2958,46 +4790,53 @@ void PlatformerEngine::hitBox(uint8_t index) {
     }
     PlatformerBox& box = boxes_[index];
     box.visible = true;
-    boxBumpMs_[index] = 180;
+    if (box.opened) {
+        return;
+    }
 
     if (box.type == PlatformerObjectType::CoinBrick &&
         box.reward == PlatformerBoxReward::None) {
-        if (box.opened) {
-            return;
-        }
         if (playerPower_ != PlatformerPlayerPower::Small) {
             breakBrick(index);
+            return;
         }
-        queueEvent(PlatformerEventType::CoinBoxHit);
+        boxBumpFrames_[index] = 1U;
+        queueEvent(PlatformerEventType::BlockHit);
         bumpEnemiesAbove(box);
         return;
     }
+
+    boxBumpFrames_[index] = 1U;
+    queueEvent(PlatformerEventType::BlockHit);
 
     if (box.reward == PlatformerBoxReward::MultiCoin && box.remainingUses > 0) {
         --box.remainingUses;
         ++coinsCollected_;
-        addScore(200, box.x, box.y - 8);
-        spawnEffect(PlatformerEffectKind::RisingCoin, box.x + 4.0F,
-                    box.y - 16.0F, 0.0F, -220.0F);
+        addScore(100, box.x, box.y - 8);
+        spawnEffect(PlatformerEffectKind::Score, box.x, box.y - 2.0F,
+                    0.0F, -30.0F, 100U);
+        spawnEffect(PlatformerEffectKind::RisingCoin, box.x, box.y,
+                    0.0F, -300.0F, static_cast<uint16_t>(box.y));
         if (box.remainingUses == 0) {
             box.opened = true;
         }
-        queueEvent(PlatformerEventType::CoinBoxHit, box.remainingUses);
+        queueEvent(PlatformerEventType::CoinCollected,
+                   box.remainingUses);
         bumpEnemiesAbove(box);
         return;
     }
 
-    if (box.opened) {
-        queueEvent(PlatformerEventType::CoinBoxHit);
-        return;
-    }
     box.opened = true;
     switch (box.reward) {
         case PlatformerBoxReward::Coin:
             ++coinsCollected_;
-            addScore(200, box.x, box.y - 8);
-            spawnEffect(PlatformerEffectKind::RisingCoin, box.x + 4.0F,
-                        box.y - 16.0F, 0.0F, -220.0F);
+            addScore(100, box.x, box.y - 8);
+            spawnEffect(PlatformerEffectKind::Score, box.x,
+                        box.y - 2.0F, 0.0F, -30.0F, 100U);
+            spawnEffect(PlatformerEffectKind::RisingCoin, box.x, box.y,
+                        0.0F, -300.0F,
+                        static_cast<uint16_t>(box.y));
+            queueEvent(PlatformerEventType::CoinCollected);
             break;
         case PlatformerBoxReward::Mushroom:
             spawnPowerup(playerPower_ == PlatformerPlayerPower::Small
@@ -3015,158 +4854,176 @@ void PlatformerEngine::hitBox(uint8_t index) {
         case PlatformerBoxReward::MultiCoin:
             break;
     }
-    queueEvent(PlatformerEventType::CoinBoxHit);
     bumpEnemiesAbove(box);
 }
 
 void PlatformerEngine::breakBrick(uint8_t index) {
-    if (index >= boxCount_) {
+    if (index >= boxCount_ || pendingBrickBreak_.active) {
         return;
     }
     PlatformerBox& box = boxes_[index];
-    box.opened = true;
-    box.visible = false;
-    box.remainingUses = 0;
-    for (int8_t xSign : {-1, 1}) {
-        for (int8_t ySign : {-1, 1}) {
-            spawnEffect(PlatformerEffectKind::BrickPiece,
-                        box.x + (xSign > 0 ? 8.0F : 0.0F),
-                        box.y + (ySign > 0 ? 8.0F : 0.0F),
-                        xSign * 66.0F, ySign < 0 ? -235.0F : -155.0F);
-        }
-    }
-    addScore(50, box.x, box.y);
-    queueEvent(PlatformerEventType::BrickBroken, 50);
+    pendingBrickBreak_.legacyBox = index;
+    pendingBrickBreak_.bornFrame = logicFrame_;
+    pendingBrickBreak_.campaign = false;
+    pendingBrickBreak_.active = true;
     bumpEnemiesAbove(box);
+}
+
+void PlatformerEngine::queueCampaignBrickBreak(uint16_t column, uint8_t row) {
+    if (pendingBrickBreak_.active) {
+        return;
+    }
+    pendingBrickBreak_.column = column;
+    pendingBrickBreak_.row = row;
+    pendingBrickBreak_.bornFrame = logicFrame_;
+    pendingBrickBreak_.campaign = true;
+    pendingBrickBreak_.active = true;
+}
+
+void PlatformerEngine::completePendingBrickBreak() {
+    if (!pendingBrickBreak_.active ||
+        pendingBrickBreak_.bornFrame == logicFrame_) {
+        return;
+    }
+
+    float blockX = 0.0F;
+    float blockY = 0.0F;
+    if (pendingBrickBreak_.campaign) {
+        if (!levelRuntime_.removeTile(pendingBrickBreak_.column,
+                                      pendingBrickBreak_.row)) {
+            pendingBrickBreak_ = PendingBrickBreak{};
+            return;
+        }
+        blockX = static_cast<float>(pendingBrickBreak_.column * TILE_SIZE);
+        blockY = static_cast<float>(pendingBrickBreak_.row * TILE_SIZE);
+    } else {
+        if (pendingBrickBreak_.legacyBox >= boxCount_) {
+            pendingBrickBreak_ = PendingBrickBreak{};
+            return;
+        }
+        PlatformerBox& box = boxes_[pendingBrickBreak_.legacyBox];
+        box.opened = true;
+        box.visible = false;
+        box.remainingUses = 0;
+        blockX = static_cast<float>(box.x);
+        blockY = static_cast<float>(box.y);
+    }
+    pendingBrickBreak_ = PendingBrickBreak{};
+
+    spawnEffect(PlatformerEffectKind::BrickPiece, blockX,
+                blockY - TILE_SIZE, -240.0F, -60.0F);
+    spawnEffect(PlatformerEffectKind::BrickPiece, blockX,
+                blockY - TILE_SIZE, 240.0F, -60.0F);
+    spawnEffect(PlatformerEffectKind::BrickPiece, blockX,
+                blockY, -240.0F, -60.0F);
+    spawnEffect(PlatformerEffectKind::BrickPiece, blockX,
+                blockY, 240.0F, -60.0F);
+    queueEvent(PlatformerEventType::BrickBroken);
 }
 
 void PlatformerEngine::bumpEnemiesAbove(const PlatformerBox& box) {
     for (uint8_t index = 0; index < enemyCount_; ++index) {
         EnemyActor& enemy = enemies_[index];
+        float enemyX = 0.0F;
+        float enemyY = 0.0F;
+        float enemyWidth = 0.0F;
+        float enemyHeight = 0.0F;
+        enemyCollisionBounds(enemy, enemyX, enemyY, enemyWidth, enemyHeight);
         if (!enemy.actor.active ||
             !overlaps(static_cast<float>(box.x), box.y - 6.0F, TILE_SIZE, 8.0F,
-                      enemy.actor.x, enemy.actor.y, enemy.width,
-                      enemy.height)) {
+                      enemyX, enemyY, enemyWidth, enemyHeight)) {
             continue;
         }
-        defeatEnemy(enemy, 100, true);
+        defeatEnemy(enemy, 0, true);
     }
 }
 
 void PlatformerEngine::checkEnemyCollisions(float previousBottom) {
+    (void)previousBottom;
     const float collisionX = player_.x;
     const float collisionY = player_.y;
     const float collisionWidth = playerWidth();
     const float collisionHeight = playerHeight();
     const bool descending = player_.vy > 0.0F;
-    bool hasStompCandidate = false;
-    for (uint8_t index = 0; index < enemyCount_; ++index) {
-        const EnemyActor& enemy = enemies_[index];
-        if (!enemy.actor.active ||
-            enemy.motion == PlatformerEnemyMotion::Squashed ||
-            enemy.motion == PlatformerEnemyMotion::Defeated ||
-            !overlaps(collisionX, collisionY, collisionWidth, collisionHeight,
-                      enemy.actor.x, enemy.actor.y, enemy.width,
-                      enemy.height)) {
-            continue;
-        }
-        const bool stompable =
-            enemy.type != PlatformerEnemyType::PiranhaPlant &&
-            enemy.type != PlatformerEnemyType::Spiny &&
-            enemy.type != PlatformerEnemyType::BulletBill &&
-            enemy.type != PlatformerEnemyType::LavaBubble &&
-            enemy.type != PlatformerEnemyType::Bowser;
-        hasStompCandidate |= stompable && descending &&
-                             previousBottom <= enemy.actor.y + 5.0F;
-    }
     bool stomped = false;
     float bounceY = player_.y;
     for (uint8_t index = 0; index < enemyCount_; ++index) {
         EnemyActor& enemy = enemies_[index];
+        float enemyX = 0.0F;
+        float enemyY = 0.0F;
+        float enemyWidth = 0.0F;
+        float enemyHeight = 0.0F;
+        enemyCollisionBounds(enemy, enemyX, enemyY, enemyWidth, enemyHeight);
         if (!enemy.actor.active ||
             enemy.motion == PlatformerEnemyMotion::Squashed ||
+            enemy.motion == PlatformerEnemyMotion::FallingDefeated ||
             enemy.motion == PlatformerEnemyMotion::Defeated ||
             !overlaps(collisionX, collisionY, collisionWidth, collisionHeight,
-                      enemy.actor.x, enemy.actor.y, enemy.width,
-                      enemy.height)) {
+                      enemyX, enemyY, enemyWidth, enemyHeight)) {
             continue;
         }
-        if (starInvincibleMs_ > 0) {
-            defeatEnemy(enemy, enemy.motion == PlatformerEnemyMotion::ShellSliding
-                                  ? 200
-                                  : 100,
-                        true);
-            continue;
-        }
-        if (enemy.motion == PlatformerEnemyMotion::ShellIdle &&
-            !(descending && previousBottom <= enemy.actor.y + 5.0F)) {
-            enemy.motion = PlatformerEnemyMotion::ShellSliding;
-            enemy.actor.vx = player_.x < enemy.actor.x ? SHELL_SPEED
-                                                        : -SHELL_SPEED;
-            queueEvent(PlatformerEventType::ShellKicked);
-            continue;
-        }
-        const bool stompable =
-            enemy.type != PlatformerEnemyType::PiranhaPlant &&
-            enemy.type != PlatformerEnemyType::Spiny &&
-            enemy.type != PlatformerEnemyType::BulletBill &&
-            enemy.type != PlatformerEnemyType::LavaBubble &&
-            enemy.type != PlatformerEnemyType::Bowser;
-        if (stompable && descending &&
-            previousBottom <= enemy.actor.y + 5.0F) {
-            if (enemy.motion == PlatformerEnemyMotion::Walking) {
-                if (enemy.type == PlatformerEnemyType::KoopaParatroopa) {
-                    enemy.type = PlatformerEnemyType::Koopa;
-                    enemy.sourceTileId = enemy.sourceTileId >= 2U
-                                             ? enemy.sourceTileId - 2U
-                                             : enemy.sourceTileId;
-                    enemy.actor.vy = 0.0F;
-                } else if (enemy.type == PlatformerEnemyType::Koopa ||
-                           enemy.type == PlatformerEnemyType::BuzzyBeetle) {
-                    const float previousHeight = enemy.height;
-                    enemy.motion = PlatformerEnemyMotion::ShellIdle;
-                    enemy.height = 16.0F;
-                    enemy.actor.y += previousHeight - enemy.height;
-                    enemy.actor.vx = 0.0F;
-                } else {
-                    enemy.motion = PlatformerEnemyMotion::Squashed;
-                    enemy.stateMs = 300;
-                    enemy.height = 8.0F;
-                    enemy.actor.y += 8.0F;
-                }
-                ++stompChain_;
-                const uint16_t points = stompChain_ == 1
-                                             ? 100
-                                             : stompChain_ == 2
-                                                   ? 200
-                                                   : stompChain_ == 3 ? 500
-                                                                      : 1000;
-                addScore(points, enemy.actor.x, enemy.actor.y);
-                queueEvent(PlatformerEventType::EnemyStomped, points);
-            } else if (enemy.motion == PlatformerEnemyMotion::ShellIdle) {
-                enemy.motion = PlatformerEnemyMotion::ShellSliding;
-                enemy.actor.vx = player_.x < enemy.actor.x ? SHELL_SPEED
-                                                            : -SHELL_SPEED;
-                queueEvent(PlatformerEventType::ShellKicked);
-            } else if (enemy.motion == PlatformerEnemyMotion::ShellSliding) {
-                enemy.motion = PlatformerEnemyMotion::ShellIdle;
-                enemy.actor.vx = 0.0F;
-                queueEvent(PlatformerEventType::ShellKicked);
+        if (starProtectedThisFrame_) {
+            if (enemy.type != PlatformerEnemyType::Bowser &&
+                enemy.type != PlatformerEnemyType::HammerBro &&
+                enemy.type != PlatformerEnemyType::Lakitu) {
+                enemy.facingLeft = enemy.actor.vx < 0.0F;
             }
+            enemy.actor.vx = 0.0F;
+            defeatEnemy(enemy, 100, true);
+            continue;
+        }
+        if (enemy.motion == PlatformerEnemyMotion::ShellIdle ||
+            enemy.motion == PlatformerEnemyMotion::ShellSliding) {
+            if (descending) {
+                if (std::fabs(enemy.actor.vx) > EPSILON) {
+                    enemy.motion = PlatformerEnemyMotion::ShellIdle;
+                    enemy.actor.vx = 0.0F;
+                    player_.vy = -STOMP_BOUNCE_SPEED;
+                    stomped = true;
+                } else {
+                    enemy.motion = PlatformerEnemyMotion::ShellSliding;
+                    enemy.actor.vx = SHELL_SPEED;
+                }
+            } else if (player_.x <= enemyX &&
+                       player_.x + collisionWidth <
+                           enemyX + enemyWidth) {
+                enemy.motion = PlatformerEnemyMotion::ShellSliding;
+                enemy.actor.vx = SHELL_SPEED;
+            } else if (player_.x > enemyX &&
+                       player_.x + collisionWidth >
+                           enemyX + enemyWidth) {
+                enemy.motion = PlatformerEnemyMotion::ShellSliding;
+                enemy.actor.vx = -SHELL_SPEED;
+            }
+            continue;
+        }
+        const bool risingCheepContact =
+            enemy.type == PlatformerEnemyType::CheepCheep &&
+            player_.vy == 0.0F && enemy.actor.vy < 0.0F;
+        if ((descending || risingCheepContact) &&
+            enemyIsCrushable(enemy)) {
+            crushEnemy(enemy);
+            addScore(100, enemy.actor.x, enemy.actor.y);
+            spawnEffect(PlatformerEffectKind::Score, enemy.actor.x,
+                        enemy.actor.y - 2.0F, 0.0F, -30.0F, 100U);
+            queueEvent(PlatformerEventType::EnemyStomped, 100);
             bounceY = stomped
                           ? std::min(bounceY,
-                                     enemy.actor.y - collisionHeight)
-                          : enemy.actor.y - collisionHeight;
+                                     enemyY - collisionHeight)
+                          : enemyY - collisionHeight;
             stomped = true;
             continue;
         }
-        if (hasStompCandidate) {
-            continue;
-        }
-        if (enemy.motion == PlatformerEnemyMotion::ShellSliding) {
+        if (!stomped && player_.vy <= 0.0F) {
             hurtPlayer();
-        } else if (enemy.motion != PlatformerEnemyMotion::Squashed) {
-            hurtPlayer();
+        } else if (stomped) {
+            if (enemyIsCrushable(enemy)) {
+                crushEnemy(enemy);
+            }
+            addScore(100, enemy.actor.x, enemy.actor.y);
+            spawnEffect(PlatformerEffectKind::Score, enemy.actor.x,
+                        enemy.actor.y - 2.0F, 0.0F, -30.0F, 100U);
+            queueEvent(PlatformerEventType::EnemyStomped, 100);
         }
         if (phase_ != PlatformerPhase::Running) {
             return;
@@ -3179,42 +5036,183 @@ void PlatformerEngine::checkEnemyCollisions(float previousBottom) {
     }
 }
 
+void PlatformerEngine::enemyCollisionBounds(const EnemyActor& enemy,
+                                             float& x, float& y,
+                                             float& width,
+                                             float& height) const {
+    x = enemy.actor.x;
+    y = enemy.actor.y;
+    width = enemy.width;
+    height = enemy.height;
+
+    if ((enemy.type == PlatformerEnemyType::Koopa ||
+         enemy.type == PlatformerEnemyType::KoopaParatroopa) &&
+        enemy.motion != PlatformerEnemyMotion::ShellIdle &&
+        enemy.motion != PlatformerEnemyMotion::ShellSliding) {
+        y += 8.0F;
+        width = 16.0F;
+        height = 16.0F;
+    } else if (enemy.type == PlatformerEnemyType::PiranhaPlant) {
+        x += 12.0F;
+        y += 24.0F;
+        width = 8.0F;
+        height = 8.0F;
+    } else if (enemy.type == PlatformerEnemyType::Blooper) {
+        y += 8.0F;
+        width = 16.0F;
+        height = 16.0F;
+    } else if (enemy.type == PlatformerEnemyType::BulletBill) {
+        y += 16.0F;
+        width = 16.0F;
+        height = 16.0F;
+    }
+}
+
+bool PlatformerEngine::enemyIsCrushable(const EnemyActor& enemy) const {
+    switch (enemy.type) {
+        case PlatformerEnemyType::Goomba:
+        case PlatformerEnemyType::Koopa:
+        case PlatformerEnemyType::KoopaParatroopa:
+        case PlatformerEnemyType::BuzzyBeetle:
+        case PlatformerEnemyType::Lakitu:
+        case PlatformerEnemyType::HammerBro:
+        case PlatformerEnemyType::BulletBill:
+            return true;
+        case PlatformerEnemyType::CheepCheep:
+            return enemy.flyingCheep;
+        default:
+            return false;
+    }
+}
+
+void PlatformerEngine::crushEnemy(EnemyActor& enemy) {
+    const bool facingLeft = enemy.actor.vx < 0.0F;
+    enemy.actor.vx = 0.0F;
+    if (enemy.type == PlatformerEnemyType::KoopaParatroopa) {
+        enemy.type = PlatformerEnemyType::Koopa;
+        enemy.sourceTileId = enemy.sourceTileId >= 2U
+                                 ? enemy.sourceTileId - 2U
+                                 : enemy.sourceTileId;
+        return;
+    }
+    if (enemy.type == PlatformerEnemyType::Koopa ||
+        enemy.type == PlatformerEnemyType::BuzzyBeetle) {
+        const float previousHeight = enemy.height;
+        enemy.motion = PlatformerEnemyMotion::ShellIdle;
+        enemy.height = 16.0F;
+        enemy.actor.y += previousHeight - enemy.height;
+        return;
+    }
+    if (enemy.type == PlatformerEnemyType::Goomba) {
+        enemy.motion = PlatformerEnemyMotion::Squashed;
+        enemy.stateMs = 20U * 17U;
+        enemy.height = 8.0F;
+        enemy.actor.y += 8.0F;
+        return;
+    }
+    enemy.motion = PlatformerEnemyMotion::FallingDefeated;
+    enemy.bornFrame = logicFrame_;
+    enemy.facingLeft = facingLeft;
+    enemy.verticalFlipped = enemy.type != PlatformerEnemyType::BulletBill;
+}
+
+// Flags assigned to an already-visited entity persist until the next tick,
+// matching the reference EnemySystem's ordered ECS iteration.
 void PlatformerEngine::checkEnemyPairCollisions() {
-    for (uint8_t left = 0; left < enemyCount_; ++left) {
-        EnemyActor& first = enemies_[left];
-        if (!first.actor.active ||
-            first.motion != PlatformerEnemyMotion::ShellSliding) {
-            continue;
+    for (uint8_t currentIndex = 0; currentIndex < enemyCount_;
+         ++currentIndex) {
+        EnemyActor& current = enemies_[currentIndex];
+        const bool currentCanSetCollisions =
+            current.actor.active &&
+            !isDefeatedParticle(current.motion) &&
+            current.type != PlatformerEnemyType::PiranhaPlant &&
+            current.type != PlatformerEnemyType::Spiny &&
+            current.type != PlatformerEnemyType::BulletBill;
+        if (currentCanSetCollisions) {
+            float currentX = 0.0F;
+            float currentY = 0.0F;
+            float currentWidth = 0.0F;
+            float currentHeight = 0.0F;
+            enemyCollisionBounds(current, currentX, currentY, currentWidth,
+                                 currentHeight);
+            for (uint8_t otherIndex = 0; otherIndex < enemyCount_;
+                 ++otherIndex) {
+                if (currentIndex == otherIndex) {
+                    continue;
+                }
+                EnemyActor& other = enemies_[otherIndex];
+                if (!other.actor.active ||
+                    isDefeatedParticle(other.motion)) {
+                    continue;
+                }
+                float otherX = 0.0F;
+                float otherY = 0.0F;
+                float otherWidth = 0.0F;
+                float otherHeight = 0.0F;
+                enemyCollisionBounds(other, otherX, otherY, otherWidth,
+                                     otherHeight);
+                if (!overlaps(currentX, currentY, currentWidth, currentHeight,
+                              otherX, otherY, otherWidth, otherHeight)) {
+                    continue;
+                }
+                if (other.motion ==
+                    PlatformerEnemyMotion::ShellSliding) {
+                    defeatEnemy(current, 100U, true);
+                    break;
+                }
+                if (otherX < currentX &&
+                    otherX + otherWidth < currentX + currentWidth) {
+                    other.enemyRightCollision = true;
+                } else if (otherX > currentX &&
+                           otherX + otherWidth >
+                               currentX + currentWidth) {
+                    other.enemyLeftCollision = true;
+                }
+            }
         }
-        for (uint8_t right = 0; right < enemyCount_; ++right) {
-            if (left == right) {
-                continue;
-            }
-            EnemyActor& second = enemies_[right];
-            if (!second.actor.active ||
-                second.motion == PlatformerEnemyMotion::ShellSliding ||
-                !overlaps(first.actor.x, first.actor.y, first.width,
-                          first.height, second.actor.x, second.actor.y,
-                          second.width, second.height)) {
-                continue;
-            }
-            defeatEnemy(second, 100, true);
+
+        const bool reversesOnEnemyCollision =
+            current.type != PlatformerEnemyType::PiranhaPlant &&
+            current.type != PlatformerEnemyType::CheepCheep &&
+            current.type != PlatformerEnemyType::Blooper &&
+            current.type != PlatformerEnemyType::Lakitu &&
+            current.type != PlatformerEnemyType::LavaBubble &&
+            current.type != PlatformerEnemyType::BulletBill;
+        if (reversesOnEnemyCollision && current.enemyLeftCollision) {
+            current.actor.vx =
+                current.motion == PlatformerEnemyMotion::ShellSliding
+                    ? SHELL_SPEED
+                    : ENEMY_SPEED;
+        } else if (reversesOnEnemyCollision &&
+                   current.enemyRightCollision) {
+            current.actor.vx =
+                current.motion == PlatformerEnemyMotion::ShellSliding
+                    ? -SHELL_SPEED
+                    : -ENEMY_SPEED;
+        }
+        if (reversesOnEnemyCollision) {
+            current.enemyLeftCollision = false;
+            current.enemyRightCollision = false;
         }
     }
 }
 
 void PlatformerEngine::hurtPlayer() {
-    if (hurtInvincibleMs_ > 0 || starInvincibleMs_ > 0 ||
+    if (hurtProtectedThisFrame_ || starProtectedThisFrame_ ||
+        powerTransition_ != PlatformerPowerTransition::None ||
         phase_ != PlatformerPhase::Running) {
         return;
     }
     if (playerPower_ != PlatformerPlayerPower::Small) {
-        const float previousBottom = player_.y + playerHeight();
+        if (playerCrouching_) {
+            player_.y -= BIG_PLAYER_HEIGHT - CROUCH_PLAYER_HEIGHT;
+        }
         playerPower_ = PlatformerPlayerPower::Small;
         playerCrouching_ = false;
-        player_.y = previousBottom - PLAYER_HEIGHT;
-        powerTransitionMs_ = DAMAGE_CONTROL_LOCK_MS;
-        hurtInvincibleMs_ = DAMAGE_INVINCIBLE_MS;
+        powerTransition_ = PlatformerPowerTransition::Shrink;
+        powerTransitionFrames_ = 44U;
+        powerTransitionElapsedFrames_ = 0U;
+        hurtInvincibleFrames_ = 194U;
         queueEvent(PlatformerEventType::PlayerHurt);
         return;
     }
@@ -3226,10 +5224,26 @@ void PlatformerEngine::beginDeath(PlatformerDeathReason reason) {
         return;
     }
     phase_ = PlatformerPhase::Dying;
+    if (reason != PlatformerDeathReason::Enemy &&
+        playerPower_ != PlatformerPlayerPower::Small) {
+        if (playerCrouching_) {
+            player_.y -= BIG_PLAYER_HEIGHT - CROUCH_PLAYER_HEIGHT;
+        }
+        playerPower_ = PlatformerPlayerPower::Small;
+        playerCrouching_ = false;
+    }
+    powerTransition_ = PlatformerPowerTransition::None;
+    powerTransitionFrames_ = 0U;
+    powerTransitionElapsedFrames_ = 0U;
+    starInvincibleFrames_ = 0U;
+    starBlinkFrames_ = 0U;
+    starProtectedThisFrame_ = false;
+    hurtProtectedThisFrame_ = false;
     deathReason_ = reason;
     phaseElapsedMs_ = 0;
+    phaseFrames_ = 0;
     player_.vx = 0.0F;
-    player_.vy = -245.0F;
+    player_.vy = -12.5F * REFERENCE_VELOCITY_SCALE;
     player_.grounded = false;
     queueEvent(PlatformerEventType::PlayerDied,
                static_cast<uint16_t>(reason));
@@ -3241,20 +5255,16 @@ void PlatformerEngine::beginGoal() {
     }
     phase_ = PlatformerPhase::Flagpole;
     phaseElapsedMs_ = 0;
+    phaseFrames_ = 0U;
+    flagLanded_ = false;
+    flagShifted_ = false;
+    timeBonusReady_ = false;
+    timeBonusCompletionFrames_ = 0U;
     player_.x = flagClimbPlayerX();
     player_.vx = 0.0F;
     player_.vy = 0.0F;
     player_.grounded = false;
-    const float bottom = player_.y + playerHeight();
-    const uint16_t points = bottom > 171.0F
-                                ? 100
-                                : bottom > 126.0F
-                                      ? 400
-                                      : bottom > 96.0F ? 800
-                                                       : bottom > 52.0F ? 2000
-                                                                         : 5000;
-    addScore(points, goalX_, player_.y);
-    queueEvent(PlatformerEventType::ReachedGoal, points);
+    queueEvent(PlatformerEventType::ReachedGoal);
 }
 
 float PlatformerEngine::flagClimbPlayerX() const {
@@ -3267,11 +5277,15 @@ void PlatformerEngine::beginCastleClear() {
     }
     phase_ = PlatformerPhase::CastleBridge;
     phaseElapsedMs_ = 0;
+    phaseFrames_ = 0U;
     bridgeRemovedCount_ = 0;
+    bridgeSequenceState_ = 0U;
+    bridgeStepFrames_ = 4U;
+    bridgeDelayFrames_ = 0U;
+    castleClearFrames_ = 0U;
     player_.vx = 0.0F;
     player_.vy = 0.0F;
     player_.grounded = true;
-    queueEvent(PlatformerEventType::ReachedGoal);
 }
 
 void PlatformerEngine::spawnPowerup(PlatformerPowerupKind kind, float x,
@@ -3295,11 +5309,9 @@ void PlatformerEngine::spawnPowerup(PlatformerPowerupKind kind, float x,
     powerup.state = PlatformerPowerupState::Emerging;
     powerup.x = x;
     powerup.y = y;
-    powerup.vx = kind == PlatformerPowerupKind::FireFlower
-                     ? 0.0F
-                     : kind == PlatformerPowerupKind::Star ? STAR_SPEED
-                                                           : POWERUP_SPEED;
-    powerup.vy = kind == PlatformerPowerupKind::Star ? -180.0F : 0.0F;
+    powerup.vx = 0.0F;
+    powerup.vy = -REFERENCE_VELOCITY_SCALE;
+    powerup.bornFrame = logicFrame_;
     powerup.active = true;
     queueEvent(PlatformerEventType::PowerupAppeared,
                static_cast<uint16_t>(kind));
@@ -3320,7 +5332,20 @@ void PlatformerEngine::spawnEffect(PlatformerEffectKind kind, float x, float y,
     if (slot >= MAX_EFFECTS) {
         return;
     }
-    effects_[slot] = PlatformerEffect{kind, x, y, vx, vy, value, 0, true};
+    PlatformerEffect& effect = effects_[slot];
+    effect = PlatformerEffect{};
+    effect.kind = kind;
+    effect.x = x;
+    effect.y = y;
+    effect.vx = vx;
+    effect.vy = vy;
+    effect.value = value;
+    effect.bornFrame = logicFrame_;
+    effect.active = true;
+    if (kind == PlatformerEffectKind::RisingCoin) {
+        effect.animationFrame = 1U;
+        effect.animationTimer = 8U;
+    }
 }
 
 void PlatformerEngine::shootFireball() {
@@ -3341,10 +5366,14 @@ void PlatformerEngine::shootFireball() {
     projectile = PlatformerProjectile{};
     projectile.x = playerFacingLeft_ ? player_.x - 8.0F
                                      : player_.x + playerWidth();
-    projectile.y = player_.y + 10.0F;
-    projectile.vx = playerFacingLeft_ ? -185.0F : 185.0F;
+    projectile.y = player_.y + 2.0F;
+    projectile.vx = playerFacingLeft_
+                        ? -10.0F * REFERENCE_VELOCITY_SCALE
+                        : 10.0F * REFERENCE_VELOCITY_SCALE;
+    projectile.vy = 5.0F * REFERENCE_VELOCITY_SCALE;
+    projectile.bornFrame = logicFrame_;
     projectile.active = true;
-    fireCooldownMs_ = 220;
+    fireballPoseFrames_ = 6U;
     queueEvent(PlatformerEventType::FireballShot);
 }
 
@@ -3353,23 +5382,49 @@ void PlatformerEngine::defeatEnemy(EnemyActor& enemy, uint16_t points,
     if (!enemy.actor.active) {
         return;
     }
-    enemy.motion = PlatformerEnemyMotion::Defeated;
-    enemy.actor.active = false;
-    if (launch) {
-        spawnEffect(PlatformerEffectKind::BrickPiece, enemy.actor.x,
-                    enemy.actor.y, enemy.actor.vx < 0.0F ? -50.0F : 50.0F,
-                    -150.0F);
+    (void)launch;
+    if (enemy.type != PlatformerEnemyType::Bowser &&
+        enemy.type != PlatformerEnemyType::HammerBro &&
+        enemy.type != PlatformerEnemyType::Lakitu &&
+        std::fabs(enemy.actor.vx) > EPSILON) {
+        enemy.facingLeft = enemy.actor.vx < 0.0F;
     }
-    addScore(points, enemy.actor.x, enemy.actor.y);
+    enemy.bornFrame = logicFrame_;
+    enemy.verticalFlipped = enemy.type != PlatformerEnemyType::PiranhaPlant &&
+                            enemy.type != PlatformerEnemyType::BulletBill;
+    if (enemy.type == PlatformerEnemyType::PiranhaPlant) {
+        enemy.actor.vx = 0.0F;
+        enemy.actor.vy = 0.0F;
+        enemy.motion = PlatformerEnemyMotion::Defeated;
+    } else {
+        if (enemy.type != PlatformerEnemyType::BulletBill) {
+            enemy.actor.vy = -6.0F * REFERENCE_VELOCITY_SCALE;
+        }
+        enemy.motion = PlatformerEnemyMotion::FallingDefeated;
+    }
+    spawnEffect(PlatformerEffectKind::Score, enemy.actor.x,
+                enemy.actor.y - 2.0F, 0.0F, -30.0F, 100U);
+    if (points > 0U) {
+        addScore(points, enemy.actor.x, enemy.actor.y);
+    }
     queueEvent(PlatformerEventType::EnemyDefeated, points);
 }
 
 void PlatformerEngine::addScore(uint16_t points, float x, float y) {
+    (void)x;
+    (void)y;
     score_ += points;
-    spawnEffect(PlatformerEffectKind::Score, x, y, 0.0F, -30.0F, points);
 }
 
 void PlatformerEngine::queueEvent(PlatformerEventType type, uint16_t value) {
+    if (type == PlatformerEventType::TimerTick && eventCount_ > 0U) {
+        const uint8_t previous = static_cast<uint8_t>(
+            (eventWrite_ + EVENT_QUEUE_SIZE - 1U) % EVENT_QUEUE_SIZE);
+        if (events_[previous].type == PlatformerEventType::TimerTick) {
+            events_[previous] = PlatformerEvent{type, score_, value};
+            return;
+        }
+    }
     if (eventCount_ >= EVENT_QUEUE_SIZE) {
         return;
     }
@@ -3384,7 +5439,7 @@ void PlatformerEngine::updateCrouch(bool crouchHeld) {
         return;
     }
     const float heightDelta = BIG_PLAYER_HEIGHT - CROUCH_PLAYER_HEIGHT;
-    if (crouchHeld && player_.grounded) {
+    if (crouchHeld) {
         if (!playerCrouching_) {
             player_.y += heightDelta;
             playerCrouching_ = true;
@@ -3394,12 +5449,8 @@ void PlatformerEngine::updateCrouch(bool crouchHeld) {
     if (!playerCrouching_) {
         return;
     }
-    const float standingY = player_.y - heightDelta;
-    if (!rectHitsSolid(player_.x, standingY, BIG_PLAYER_WIDTH,
-                       BIG_PLAYER_HEIGHT)) {
-        player_.y = standingY;
-        playerCrouching_ = false;
-    }
+    player_.y -= heightDelta;
+    playerCrouching_ = false;
 }
 
 float PlatformerEngine::playerWidth() const {
@@ -3411,8 +5462,11 @@ float PlatformerEngine::playerHeight() const {
     if (playerCrouching_) {
         return CROUCH_PLAYER_HEIGHT;
     }
+    if (powerTransition_ != PlatformerPowerTransition::None) {
+        return BIG_PLAYER_HEIGHT;
+    }
     return playerPower_ == PlatformerPlayerPower::Small ? PLAYER_HEIGHT
-                                                        : BIG_PLAYER_HEIGHT;
+                                                         : BIG_PLAYER_HEIGHT;
 }
 
 bool PlatformerEngine::overlaps(float ax, float ay, float aw, float ah,

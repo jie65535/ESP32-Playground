@@ -117,18 +117,147 @@ constexpr const Sprite* FIREBALL_EXPLOSION_FRAMES[] = {
     &pgos::platformer_extra_assets::fireball_explode3,
 };
 
-uint16_t campaignPlayerTile(const pgos::PlatformerSnapshot& state,
-                            uint32_t animationMs) {
+uint16_t campaignEnemyAnimationTile(
+    const pgos::PlatformerEnemyState& enemy) {
+    uint16_t sourceId = enemy.sourceTileId;
+    const uint16_t reference =
+        pgos::PLATFORMER_ENEMY_REFERENCE_IDS[sourceId];
+    const bool squashed =
+        enemy.motion == pgos::PlatformerEnemyMotion::Squashed;
+    const bool shell =
+        enemy.motion == pgos::PlatformerEnemyMotion::ShellIdle ||
+        enemy.motion == pgos::PlatformerEnemyMotion::ShellSliding;
+    if (squashed && (reference == 70U || reference == 71U)) {
+        return static_cast<uint16_t>(
+            sourceId + (reference == 70U ? 2U : 1U));
+    }
+    if (shell) {
+        return enemy.type == pgos::PlatformerEnemyType::BuzzyBeetle
+                   ? 89U
+                   : reference == 455U ? 494U : 77U;
+    }
+    if (reference == 39U || reference == 71U) {
+        --sourceId;
+    }
+    if (enemy.type == pgos::PlatformerEnemyType::Lakitu &&
+        enemy.alternatePose) {
+        return static_cast<uint16_t>(sourceId + 36U);
+    }
+
+    uint8_t frameDelay = 0U;
+    uint8_t sourceStep = 1U;
+    switch (enemy.type) {
+        case pgos::PlatformerEnemyType::Goomba:
+        case pgos::PlatformerEnemyType::Koopa:
+        case pgos::PlatformerEnemyType::BuzzyBeetle:
+        case pgos::PlatformerEnemyType::CheepCheep:
+            frameDelay = 10U;
+            break;
+        case pgos::PlatformerEnemyType::KoopaParatroopa:
+        case pgos::PlatformerEnemyType::PiranhaPlant:
+        case pgos::PlatformerEnemyType::Spiny:
+        case pgos::PlatformerEnemyType::HammerBro:
+            frameDelay = 15U;
+            break;
+        case pgos::PlatformerEnemyType::Blooper:
+            frameDelay = 30U;
+            break;
+        case pgos::PlatformerEnemyType::Bowser:
+            frameDelay = 30U;
+            sourceStep = 2U;
+            break;
+        default:
+            break;
+    }
+    if (enemy.alternatePose) {
+        if (enemy.type == pgos::PlatformerEnemyType::HammerBro) {
+            sourceId = static_cast<uint16_t>(sourceId + 2U);
+        } else if (enemy.type == pgos::PlatformerEnemyType::Bowser) {
+            sourceId = static_cast<uint16_t>(sourceId + 4U);
+        }
+    }
+    if (frameDelay > 0U &&
+        enemy.animationFrame != 0U) {
+        sourceId = static_cast<uint16_t>(sourceId + sourceStep);
+    }
+    return sourceId;
+}
+
+uint16_t campaignHazardAnimationTile(
+    const pgos::PlatformerEnemyHazardState& hazard) {
+    if (hazard.kind != pgos::PlatformerEnemyHazardKind::BowserFire) {
+        return hazard.sourceTileId;
+    }
+    return hazard.animationFrame == 0U ? 470U : 505U;
+}
+
+uint16_t campaignPlayerTile(const pgos::PlatformerSnapshot& state) {
     if (state.phase == pgos::PlatformerPhase::Dying) {
         return 1U;
+    }
+    if (state.playerPowerTransition !=
+        pgos::PlatformerPowerTransition::None) {
+        const uint16_t elapsed = state.playerPowerTransitionFrame;
+        if (elapsed == 0U) {
+            return state.playerPowerTransition ==
+                           pgos::PlatformerPowerTransition::Grow
+                       ? 0U
+                       : 25U;
+        }
+        const uint8_t frame = static_cast<uint8_t>((elapsed - 1U) / 5U + 1U);
+        if (state.playerPowerTransition ==
+            pgos::PlatformerPowerTransition::Fire) {
+            static constexpr uint16_t FIRE_TRANSITION[] = {
+                350U, 351U, 352U, 353U, 350U, 351U,
+                352U, 353U, 350U, 351U, 352U, 353U,
+            };
+            return FIRE_TRANSITION[std::min<uint8_t>(frame, 11U)];
+        }
+        static constexpr uint16_t GROW_TRANSITION[] = {
+            46U, 45U, 25U, 46U, 45U, 25U, 46U, 45U, 25U,
+        };
+        static constexpr uint16_t SHRINK_TRANSITION[] = {
+            25U, 45U, 46U, 25U, 45U, 46U, 25U, 45U, 46U,
+        };
+        return state.playerPowerTransition ==
+                       pgos::PlatformerPowerTransition::Grow
+                   ? GROW_TRANSITION[std::min<uint8_t>(frame, 8U)]
+                   : SHRINK_TRANSITION[std::min<uint8_t>(frame, 8U)];
+    }
+    if (state.playerFire && state.playerFireballPose) {
+        return state.grounded ? 240U : 243U;
     }
     const uint16_t powerOffset = state.playerFire ? 225U
                                  : state.playerBig ? 25U
                                                    : 0U;
-    if (state.phase == pgos::PlatformerPhase::Flagpole ||
-        state.phase == pgos::PlatformerPhase::VineClimb) {
+    if (state.phase == pgos::PlatformerPhase::Flagpole) {
+        return static_cast<uint16_t>(powerOffset + 13U);
+    }
+    if (state.phase == pgos::PlatformerPhase::VineClimb) {
         return static_cast<uint16_t>(powerOffset + 13U +
-                                     ((animationMs / 125U) & 1U));
+            pgos::platformerReferenceAnimationFrame(
+                state.phaseFrames, 8U, 2U));
+    }
+    if (state.underwater) {
+        if (state.grounded) {
+            if (std::abs(state.playerVx) > 0.01F) {
+                return static_cast<uint16_t>(
+                    powerOffset + 2U +
+                    state.playerAnimationFrame);
+            }
+            return powerOffset;
+        }
+        if (state.swimStrokeFrame > 0U) {
+            const uint8_t frameCount = state.playerBig ? 6U : 5U;
+            const uint8_t frame = std::min<uint8_t>(
+                static_cast<uint8_t>(frameCount - 1U),
+                static_cast<uint8_t>(
+                    (state.swimStrokeFrame - 1U) / 4U + 1U));
+            return static_cast<uint16_t>(powerOffset + 7U + frame);
+        }
+        return static_cast<uint16_t>(
+            powerOffset + 7U +
+            state.playerAnimationFrame);
     }
     if (state.playerCrouching && state.playerBig) {
         return static_cast<uint16_t>(powerOffset + 1U);
@@ -136,12 +265,13 @@ uint16_t campaignPlayerTile(const pgos::PlatformerSnapshot& state,
     if (state.playerSkidding) {
         return static_cast<uint16_t>(powerOffset + 5U);
     }
-    if (!state.grounded && state.phase != pgos::PlatformerPhase::CastleWalk) {
-        return static_cast<uint16_t>(powerOffset + 6U);
-    }
-    if (std::abs(state.playerVx) > 8.0F) {
+    const bool walkingPose = state.playerWalking;
+    if (walkingPose) {
         return static_cast<uint16_t>(powerOffset + 2U +
-                                     (animationMs / 90U) % 3U);
+                                     state.playerAnimationFrame);
+    }
+    if (!state.grounded) {
+        return static_cast<uint16_t>(powerOffset + 6U);
     }
     return powerOffset;
 }
@@ -165,25 +295,18 @@ bool enemySpriteFacesMovement(pgos::PlatformerEnemyType type) {
            type == pgos::PlatformerEnemyType::Spiny;
 }
 
+bool enemySpriteFacesPlayer(pgos::PlatformerEnemyType type) {
+    return type == pgos::PlatformerEnemyType::HammerBro ||
+           type == pgos::PlatformerEnemyType::Lakitu ||
+           type == pgos::PlatformerEnemyType::Bowser;
+}
+
 float playerTileVisualY(const pgos::PlatformerSnapshot& state) {
     return state.playerY -
            (state.playerCrouching && state.playerBig
                 ? pgos::PlatformerEngine::BIG_PLAYER_HEIGHT -
                       pgos::PlatformerEngine::CROUCH_PLAYER_HEIGHT
                 : 0.0F);
-}
-
-bool playerFlickerHidden(const pgos::PlatformerSnapshot& state,
-                         uint32_t animationMs) {
-    if (state.playerDamageBlinking) {
-        // Reference EndingBlinkComponent(10, 150) at 60 FPS.
-        return ((animationMs / 167U) & 1U) != 0U;
-    }
-    if (state.playerInvincible) {
-        // Reference star blink toggles every five frames at 60 FPS.
-        return ((animationMs / 83U) & 1U) != 0U;
-    }
-    return false;
 }
 
 }  // namespace
@@ -210,7 +333,7 @@ void PlatformerApp::onEnter(AppContext& context) {
     }
     lastTickMs_ = millis();
     lastRenderMs_ = 0;
-    physicsAccumulatorMs_ = 0;
+    physicsAccumulatorUs_ = 0;
     commandMoveUntilMs_ = 0;
     commandJumpHoldUntilMs_ = 0;
     commandCrouchUntilMs_ = 0;
@@ -369,23 +492,25 @@ void PlatformerApp::onCommand(const AppCommand& command, AppContext&) {
                 break;
             }
             if (engine_.phase() == pgos::PlatformerPhase::Title) {
-                engine_.startCampaign(selectedWorld_, selectedStage_);
-                physicsAccumulatorMs_ = 0;
+                engine_.startPreparedCampaign();
+                physicsAccumulatorUs_ = 0;
                 lastTickMs_ = nowMs;
                 commandJumpHoldUntilMs_ = 0;
                 commandCrouchUntilMs_ = 0;
             } else if (engine_.phase() == pgos::PlatformerPhase::GameOver) {
                 const pgos::PlatformerSnapshot state = engine_.snapshot();
-                engine_.startCampaign(state.world, state.stage);
-                physicsAccumulatorMs_ = 0;
+                selectedWorld_ = state.world;
+                selectedStage_ = state.stage;
+                engine_.prepareCampaignTitle(selectedWorld_, selectedStage_);
+                physicsAccumulatorUs_ = 0;
                 lastTickMs_ = nowMs;
                 commandJumpHoldUntilMs_ = 0;
                 commandCrouchUntilMs_ = 0;
             } else if (engine_.phase() == pgos::PlatformerPhase::Won) {
-                if (!engine_.advanceCampaign()) {
-                    engine_.startCampaign(1, 1);
-                }
-                physicsAccumulatorMs_ = 0;
+                engine_.prepareCampaignTitle(1, 1);
+                selectedWorld_ = 1U;
+                selectedStage_ = 1U;
+                physicsAccumulatorUs_ = 0;
                 lastTickMs_ = nowMs;
             } else if (engine_.phase() == pgos::PlatformerPhase::Running) {
                 jumpPending_ = true;
@@ -393,7 +518,7 @@ void PlatformerApp::onCommand(const AppCommand& command, AppContext&) {
             } else if (engine_.phase() == pgos::PlatformerPhase::Paused) {
                 engine_.togglePause();
                 lastTickMs_ = nowMs;
-                physicsAccumulatorMs_ = 0;
+                physicsAccumulatorUs_ = 0;
                 commandJumpHoldUntilMs_ = 0;
                 commandCrouchUntilMs_ = 0;
             }
@@ -410,7 +535,7 @@ void PlatformerApp::onCommand(const AppCommand& command, AppContext&) {
                 engine_.phase() == pgos::PlatformerPhase::Paused) {
                 engine_.togglePause();
                 lastTickMs_ = nowMs;
-                physicsAccumulatorMs_ = 0;
+                physicsAccumulatorUs_ = 0;
                 jumpPending_ = false;
                 commandJumpHoldUntilMs_ = 0;
                 commandCrouchUntilMs_ = 0;
@@ -425,7 +550,7 @@ void PlatformerApp::onCommand(const AppCommand& command, AppContext&) {
             } else {
                 startCampaignMapTest();
             }
-            physicsAccumulatorMs_ = 0;
+            physicsAccumulatorUs_ = 0;
             lastTickMs_ = nowMs;
             jumpPending_ = false;
             actionHeldLast_ = false;
@@ -467,19 +592,20 @@ void PlatformerApp::onTick(uint32_t nowMs, AppContext& context) {
         phase == pgos::PlatformerPhase::CastleBridge ||
         phase == pgos::PlatformerPhase::Flagpole ||
         phase == pgos::PlatformerPhase::CastleWalk ||
-        phase == pgos::PlatformerPhase::TimeBonus;
+        phase == pgos::PlatformerPhase::TimeBonus ||
+        phase == pgos::PlatformerPhase::LevelTransition ||
+        phase == pgos::PlatformerPhase::Paused;
     bool simulationChanged = false;
     if (simulationActive && elapsedMs != 0) {
-        physicsAccumulatorMs_ = std::min<uint32_t>(
-            physicsAccumulatorMs_ + elapsedMs, MAX_FRAME_MS);
+        physicsAccumulatorUs_ = std::min<uint32_t>(
+            physicsAccumulatorUs_ + elapsedMs * 1000U, MAX_FRAME_MS * 1000U);
         const GamepadSnapshot gamepad = context.gamepad.snapshot();
         if (gamepad.connected != gamepadConnectedLast_) {
             moveAxisFilter_.reset();
             crouchAxisFilter_.reset();
             gamepadConnectedLast_ = gamepad.connected;
         }
-        while (physicsAccumulatorMs_ >= PHYSICS_STEP_MS &&
-               engine_.phase() != pgos::PlatformerPhase::Paused &&
+        while (physicsAccumulatorUs_ >= REFERENCE_STEP_US &&
                engine_.phase() != pgos::PlatformerPhase::Title &&
                engine_.phase() != pgos::PlatformerPhase::GameOver &&
                engine_.phase() != pgos::PlatformerPhase::Won) {
@@ -493,13 +619,12 @@ void PlatformerApp::onTick(uint32_t nowMs, AppContext& context) {
             input.actionHeld = actionHeld;
             jumpPending_ = false;
             actionHeldLast_ = actionHeld;
-            engine_.step(static_cast<float>(PHYSICS_STEP_MS) / 1000.0F,
-                         input);
-            physicsAccumulatorMs_ -= PHYSICS_STEP_MS;
+            engine_.step(1.0F / 60.0F, input);
+            physicsAccumulatorUs_ -= REFERENCE_STEP_US;
             simulationChanged = true;
         }
     } else if (!simulationActive) {
-        physicsAccumulatorMs_ = 0;
+        physicsAccumulatorUs_ = 0;
         actionHeldLast_ = false;
     }
 
@@ -511,7 +636,7 @@ void PlatformerApp::onTick(uint32_t nowMs, AppContext& context) {
             mapFrameBuffer_ != nullptr) {
             context.ui.pollDisplayFlush();
             if (!context.display.dmaPending()) {
-                composeCampaignFrame(state, nowMs);
+                composeCampaignFrame(state);
                 if (context.display.presentRgb565(
                         0, 22, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT,
                         mapFrameBuffer_, GAME_SURFACE_WIDTH)) {
@@ -627,6 +752,22 @@ void PlatformerApp::panCampaignMapTest(int16_t deltaX, int16_t deltaY) {
                                          maximumY);
 }
 
+void PlatformerApp::drawHeldHammer(
+    const pgos::PlatformerEnemyState& enemy,
+    const pgos::PlatformerSnapshot& state) {
+    if (!enemy.heldHammer) {
+        return;
+    }
+    pgos::PlatformerTileRenderer::drawTile(
+        enemyTileCache_, 60U,
+        static_cast<int16_t>(
+            std::lround(enemy.heldHammerX - state.cameraX)),
+        static_cast<int16_t>(
+            std::lround(enemy.heldHammerY - state.cameraY)),
+        mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT,
+        GAME_SURFACE_WIDTH, enemy.facingLeft);
+}
+
 void PlatformerApp::drawCampaignMapTest(lv_layer_t* layer,
                                         const lv_area_t& area) {
     const pgos::PlatformerCampaignLevel* level =
@@ -655,7 +796,7 @@ void PlatformerApp::drawCampaignMapTest(lv_layer_t* layer,
 }
 
 void PlatformerApp::composeCampaignFrame(
-    const pgos::PlatformerSnapshot& state, uint32_t animationMs) {
+    const pgos::PlatformerSnapshot& state) {
     if (mapFrameBuffer_ == nullptr || engine_.levelRuntime().level() == nullptr) {
         return;
     }
@@ -731,12 +872,13 @@ void PlatformerApp::composeCampaignFrame(
         }
         constexpr float FIRE_BAR_PI = 3.14159265358979323846F;
         const float radians = fireBar.angleDegrees * FIRE_BAR_PI / 180.0F;
-        const uint16_t sourceId =
-            static_cast<uint16_t>(611U + (animationMs / 100U) % 4U);
         for (uint8_t element = 0; element < fireBar.length; ++element) {
-            const float distance = static_cast<float>(element * TILE_SIZE);
+            const float distance =
+                static_cast<float>(element) * TILE_SIZE * 0.5F;
             pgos::PlatformerTileRenderer::drawTile(
-                blockTileCache_, sourceId,
+                blockTileCache_,
+                static_cast<uint16_t>(
+                    611U + fireBar.animationFrames[element]),
                 static_cast<int16_t>(std::lround(
                     fireBar.x + std::cos(radians) * distance - state.cameraX)),
                 static_cast<int16_t>(std::lround(
@@ -753,9 +895,8 @@ void PlatformerApp::composeCampaignFrame(
         }
         const pgos::PixelSprite* sprite =
             projectile.exploding
-                ? FIREBALL_EXPLOSION_FRAMES[std::min<uint8_t>(
-                      2U, static_cast<uint8_t>(projectile.ageMs / 40U))]
-                : FIREBALL_FRAMES[(animationMs / 80U) % 4U];
+                ? FIREBALL_EXPLOSION_FRAMES[0]
+                : FIREBALL_FRAMES[0];
         blitSpriteRgb565(
             mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT, *sprite,
             static_cast<int16_t>(std::lround(projectile.x - state.cameraX)),
@@ -771,9 +912,9 @@ void PlatformerApp::composeCampaignFrame(
         if (powerup.kind == pgos::PlatformerPowerupKind::OneUp) {
             sprite = &pgos::platformer_extra_assets::one_up;
         } else if (powerup.kind == pgos::PlatformerPowerupKind::FireFlower) {
-            sprite = FIRE_FLOWER_FRAMES[(animationMs / 70U) % 4U];
+            sprite = FIRE_FLOWER_FRAMES[powerup.animationFrame];
         } else if (powerup.kind == pgos::PlatformerPowerupKind::Star) {
-            sprite = STAR_FRAMES[(animationMs / 70U) % 4U];
+            sprite = STAR_FRAMES[powerup.animationFrame];
         }
         blitSpriteRgb565(
             mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT, *sprite,
@@ -787,43 +928,26 @@ void PlatformerApp::composeCampaignFrame(
             enemy.sourceTileId >= pgos::PLATFORMER_ENEMY_TILE_COUNT) {
             continue;
         }
-        uint16_t sourceId = enemy.sourceTileId;
-        const uint16_t reference =
-            pgos::PLATFORMER_ENEMY_REFERENCE_IDS[sourceId];
-        const bool squashed =
-            enemy.motion == pgos::PlatformerEnemyMotion::Squashed;
         const bool shell =
             enemy.motion == pgos::PlatformerEnemyMotion::ShellIdle ||
             enemy.motion == pgos::PlatformerEnemyMotion::ShellSliding;
-        if (squashed && (reference == 70U || reference == 71U)) {
-            sourceId = static_cast<uint16_t>(
-                sourceId + (reference == 70U ? 2U : 1U));
-        } else if (shell) {
-            sourceId = enemy.type == pgos::PlatformerEnemyType::BuzzyBeetle
-                           ? 89U
-                           : reference == 455U ? 494U : 77U;
-        } else if (reference == 39U || reference == 71U) {
-            --sourceId;
-        }
-        if (!squashed && !shell &&
-            (reference == 38U || reference == 39U || reference == 70U ||
-             reference == 71U || reference == 87U) &&
-            ((animationMs / 180U) & 1U) != 0U) {
-            ++sourceId;
-        }
+        const uint16_t sourceId = campaignEnemyAnimationTile(enemy);
         const bool tall =
             !shell && (enemy.type == pgos::PlatformerEnemyType::Koopa ||
                        enemy.type ==
                            pgos::PlatformerEnemyType::KoopaParatroopa ||
                        enemy.type == pgos::PlatformerEnemyType::PiranhaPlant ||
                        enemy.type == pgos::PlatformerEnemyType::Blooper ||
-                       enemy.type == pgos::PlatformerEnemyType::Lakitu ||
+                       (enemy.type == pgos::PlatformerEnemyType::Lakitu &&
+                        !enemy.alternatePose) ||
                        enemy.type == pgos::PlatformerEnemyType::HammerBro ||
                        enemy.type == pgos::PlatformerEnemyType::Bowser);
         const bool wide = enemy.type == pgos::PlatformerEnemyType::Bowser;
-        const bool flipX =
-            !shell && enemySpriteFacesMovement(enemy.type) &&
-            !enemy.facingLeft;
+        const bool flipX = !shell &&
+                           (enemySpriteFacesPlayer(enemy.type)
+                                ? enemy.facingLeft
+                                : enemySpriteFacesMovement(enemy.type) &&
+                                      !enemy.facingLeft);
         const int16_t x = static_cast<int16_t>(
             std::lround(enemy.x - state.cameraX));
         const int16_t y = static_cast<int16_t>(std::lround(
@@ -834,16 +958,22 @@ void PlatformerApp::composeCampaignFrame(
                  ? 8.0F
                  : 0.0F)));
         for (uint8_t tileY = 0; tileY < (tall ? 2U : 1U); ++tileY) {
+            const uint8_t sourceTileY =
+                enemy.verticalFlipped && tall ? 1U - tileY : tileY;
             for (uint8_t tileX = 0; tileX < (wide ? 2U : 1U); ++tileX) {
+                const uint8_t sourceTileX = flipX && wide ? 1U - tileX
+                                                          : tileX;
                 pgos::PlatformerTileRenderer::drawTile(
                     enemyTileCache_,
-                    static_cast<uint16_t>(sourceId + tileY * 35U + tileX),
+                    static_cast<uint16_t>(sourceId + sourceTileY * 35U +
+                                          sourceTileX),
                     static_cast<int16_t>(x + tileX * TILE_SIZE),
                     static_cast<int16_t>(y + tileY * TILE_SIZE),
                     mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT,
-                    GAME_SURFACE_WIDTH, flipX);
+                    GAME_SURFACE_WIDTH, flipX, enemy.verticalFlipped);
             }
         }
+        drawHeldHammer(enemy, state);
     }
 
     for (uint8_t index = 0; index < state.enemyHazardCount; ++index) {
@@ -852,7 +982,8 @@ void PlatformerApp::composeCampaignFrame(
         if (hazard.active &&
             hazard.sourceTileId < pgos::PLATFORMER_ENEMY_TILE_COUNT) {
             pgos::PlatformerTileRenderer::drawTile(
-                enemyTileCache_, hazard.sourceTileId,
+                enemyTileCache_,
+                campaignHazardAnimationTile(hazard),
                 static_cast<int16_t>(
                     std::lround(hazard.x - state.cameraX)),
                 static_cast<int16_t>(
@@ -876,7 +1007,8 @@ void PlatformerApp::composeCampaignFrame(
         if (effect.kind == pgos::PlatformerEffectKind::RisingCoin) {
             blitSpriteRgb565(mapFrameBuffer_, GAME_SURFACE_WIDTH,
                              GAME_SURFACE_HEIGHT,
-                             *COIN_FRAMES[(animationMs / 120U) % 4U], x, y);
+                             *COIN_FRAMES[effect.animationFrame],
+                             x, y);
         } else if (effect.kind == pgos::PlatformerEffectKind::BrickPiece) {
             blitSpriteRgb565(mapFrameBuffer_, GAME_SURFACE_WIDTH,
                              GAME_SURFACE_HEIGHT,
@@ -887,6 +1019,11 @@ void PlatformerApp::composeCampaignFrame(
             snprintf(points, sizeof(points), "%u",
                      static_cast<unsigned>(effect.value));
             canvasFont_.draw(canvas, points, x + 8, y, rgb565(245, 247, 250),
+                             BitmapFontSize::Small12,
+                             BitmapTextAlign::Center);
+        } else if (effect.kind == pgos::PlatformerEffectKind::OneUp) {
+            canvasFont_.draw(canvas, "1-UP", x + 8, y,
+                             rgb565(245, 247, 250),
                              BitmapFontSize::Small12,
                              BitmapTextAlign::Center);
         }
@@ -900,9 +1037,8 @@ void PlatformerApp::composeCampaignFrame(
             mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT,
             GAME_SURFACE_WIDTH);
     }
-    const bool flickerHidden = playerFlickerHidden(state, animationMs);
-    if (state.playerVisible && !flickerHidden) {
-        const uint16_t playerTile = campaignPlayerTile(state, animationMs);
+    if (state.playerVisible) {
+        const uint16_t playerTile = campaignPlayerTile(state);
         const int16_t x = static_cast<int16_t>(
             std::lround(state.playerX - state.cameraX));
         const int16_t y = static_cast<int16_t>(
@@ -931,7 +1067,7 @@ void PlatformerApp::composeCampaignFrame(
     snprintf(hudText, sizeof(hudText), "M%u %06lu x%02u %u-%u T%03u",
              static_cast<unsigned>(state.lives),
              static_cast<unsigned long>(state.score % 1000000UL),
-             static_cast<unsigned>(state.coinsCollected % 100U),
+             static_cast<unsigned>(state.coinsCollected),
              static_cast<unsigned>(state.world),
              static_cast<unsigned>(state.stage),
              static_cast<unsigned>(state.timeRemaining));
@@ -953,8 +1089,51 @@ void PlatformerApp::draw(lv_event_t* event) {
         return;
     }
     const pgos::PlatformerSnapshot state = engine_.snapshot();
-    const uint32_t animationMs = millis();
-    const bool flickerHidden = playerFlickerHidden(state, animationMs);
+    const uint32_t animationFrame = state.animationFrame;
+    if (state.phase == pgos::PlatformerPhase::LevelTransition) {
+        drawRect(layer, surfaceArea, lv_color_hex(0x000000));
+
+        char hudText[64];
+        lv_snprintf(hudText, sizeof(hudText),
+                    "M%u %06lu  x%02u  %u-%u  T%03u",
+                    static_cast<unsigned>(state.lives),
+                    static_cast<unsigned long>(state.score % 1000000UL),
+                    static_cast<unsigned>(state.coinsCollected),
+                    static_cast<unsigned>(state.world),
+                    static_cast<unsigned>(state.stage),
+                    static_cast<unsigned>(state.timeRemaining));
+        lv_area_t hudArea = surfaceArea;
+        hudArea.y1 += 5;
+        hudArea.y2 = hudArea.y1 + 18;
+        drawText(layer, hudText, hudArea, lv_color_hex(0xFFFFFF), hudFont_);
+
+        char worldText[24];
+        lv_snprintf(worldText, sizeof(worldText), "WORLD %u-%u",
+                    static_cast<unsigned>(state.world),
+                    static_cast<unsigned>(state.stage));
+        lv_area_t worldArea = surfaceArea;
+        worldArea.y1 += 78;
+        worldArea.y2 = worldArea.y1 + 26;
+        drawText(layer, worldText, worldArea, lv_color_hex(0xFFFFFF),
+                 overlayFont_);
+
+        pgos::PixelSpriteRenderer::draw(
+            layer, pgos::platformer_assets::mario_idle,
+            static_cast<int16_t>((surfaceArea.x1 + surfaceArea.x2) / 2 - 33),
+            static_cast<int16_t>(surfaceArea.y1 + 122));
+        char livesText[16];
+        lv_snprintf(livesText, sizeof(livesText), "x  %u",
+                    static_cast<unsigned>(state.lives));
+        lv_area_t livesArea = surfaceArea;
+        livesArea.x1 = static_cast<lv_coord_t>(
+            (surfaceArea.x1 + surfaceArea.x2) / 2 - 5);
+        livesArea.x2 = static_cast<lv_coord_t>(livesArea.x1 + 66);
+        livesArea.y1 += 120;
+        livesArea.y2 = livesArea.y1 + 22;
+        drawText(layer, livesText, livesArea, lv_color_hex(0xFFFFFF),
+                 hudFont_, LV_TEXT_ALIGN_LEFT);
+        return;
+    }
     const bool campaignRendered =
         state.campaignMode && engine_.levelRuntime().level() != nullptr &&
         mapFrameBuffer_ != nullptr;
@@ -1043,12 +1222,13 @@ void PlatformerApp::draw(lv_event_t* event) {
             constexpr float FIRE_BAR_PI = 3.14159265358979323846F;
             const float radians =
                 fireBar.angleDegrees * FIRE_BAR_PI / 180.0F;
-            const uint16_t sourceId =
-                static_cast<uint16_t>(611U + (animationMs / 100U) % 4U);
             for (uint8_t element = 0; element < fireBar.length; ++element) {
-                const float distance = static_cast<float>(element * TILE_SIZE);
+                const float distance =
+                    static_cast<float>(element) * TILE_SIZE * 0.5F;
                 pgos::PlatformerTileRenderer::drawTile(
-                    blockTileCache_, sourceId,
+                    blockTileCache_,
+                    static_cast<uint16_t>(
+                        611U + fireBar.animationFrames[element]),
                     static_cast<int16_t>(std::lround(
                         fireBar.x + std::cos(radians) * distance -
                         state.cameraX)),
@@ -1065,29 +1245,7 @@ void PlatformerApp::draw(lv_event_t* event) {
                 enemy.sourceTileId >= pgos::PLATFORMER_ENEMY_TILE_COUNT) {
                 continue;
             }
-            uint16_t sourceId = enemy.sourceTileId;
-            const uint16_t reference =
-                pgos::PLATFORMER_ENEMY_REFERENCE_IDS[sourceId];
-            if (enemy.motion == pgos::PlatformerEnemyMotion::Squashed &&
-                (reference == 70U || reference == 71U)) {
-                sourceId = static_cast<uint16_t>(
-                    sourceId + (reference == 70U ? 2U : 1U));
-            } else if (enemy.motion == pgos::PlatformerEnemyMotion::ShellIdle ||
-                enemy.motion == pgos::PlatformerEnemyMotion::ShellSliding) {
-                sourceId = enemy.type == pgos::PlatformerEnemyType::BuzzyBeetle
-                               ? 89U
-                               : reference == 455U ? 494U : 77U;
-            }
-            if (enemy.motion != pgos::PlatformerEnemyMotion::Squashed &&
-                (reference == 39U || reference == 71U)) {
-                --sourceId;
-            }
-            if (enemy.motion != pgos::PlatformerEnemyMotion::Squashed &&
-                (reference == 38U || reference == 39U || reference == 70U ||
-                 reference == 71U || reference == 87U) &&
-                ((animationMs / 180U) & 1U) != 0U) {
-                ++sourceId;
-            }
+            const uint16_t sourceId = campaignEnemyAnimationTile(enemy);
             const bool shell =
                 enemy.motion == pgos::PlatformerEnemyMotion::ShellIdle ||
                 enemy.motion == pgos::PlatformerEnemyMotion::ShellSliding;
@@ -1098,14 +1256,18 @@ void PlatformerApp::draw(lv_event_t* event) {
                               enemy.type ==
                                   pgos::PlatformerEnemyType::PiranhaPlant ||
                               enemy.type == pgos::PlatformerEnemyType::Blooper ||
-                              enemy.type == pgos::PlatformerEnemyType::Lakitu ||
+                              (enemy.type ==
+                                   pgos::PlatformerEnemyType::Lakitu &&
+                               !enemy.alternatePose) ||
                               enemy.type ==
                                   pgos::PlatformerEnemyType::HammerBro ||
                               enemy.type == pgos::PlatformerEnemyType::Bowser);
             const bool wide = enemy.type == pgos::PlatformerEnemyType::Bowser;
-            const bool flipX =
-                !shell && enemySpriteFacesMovement(enemy.type) &&
-                !enemy.facingLeft;
+            const bool flipX = !shell &&
+                               (enemySpriteFacesPlayer(enemy.type)
+                                    ? enemy.facingLeft
+                                    : enemySpriteFacesMovement(enemy.type) &&
+                                          !enemy.facingLeft);
             const int16_t screenX = static_cast<int16_t>(std::lround(
                 enemy.x - state.cameraX));
             const int16_t screenY = static_cast<int16_t>(std::lround(
@@ -1117,16 +1279,24 @@ void PlatformerApp::draw(lv_event_t* event) {
                      ? 8.0F
                      : 0.0F)));
             for (uint8_t tileY = 0; tileY < (tall ? 2U : 1U); ++tileY) {
+                const uint8_t sourceTileY =
+                    enemy.verticalFlipped && tall ? 1U - tileY : tileY;
                 for (uint8_t tileX = 0; tileX < (wide ? 2U : 1U); ++tileX) {
+                    const uint8_t sourceTileX = flipX && wide ? 1U - tileX
+                                                              : tileX;
                     pgos::PlatformerTileRenderer::drawTile(
                         enemyTileCache_,
-                        static_cast<uint16_t>(sourceId + tileY * 35U + tileX),
+                        static_cast<uint16_t>(sourceId +
+                                              sourceTileY * 35U +
+                                              sourceTileX),
                         static_cast<int16_t>(screenX + tileX * TILE_SIZE),
                         static_cast<int16_t>(screenY + tileY * TILE_SIZE),
                         mapFrameBuffer_, GAME_SURFACE_WIDTH,
-                        GAME_SURFACE_HEIGHT, GAME_SURFACE_WIDTH, flipX);
+                        GAME_SURFACE_HEIGHT, GAME_SURFACE_WIDTH, flipX,
+                        enemy.verticalFlipped);
                 }
             }
+            drawHeldHammer(enemy, state);
         }
         for (uint8_t index = 0; index < state.enemyHazardCount; ++index) {
             const pgos::PlatformerEnemyHazardState hazard =
@@ -1136,7 +1306,8 @@ void PlatformerApp::draw(lv_event_t* event) {
                 continue;
             }
             pgos::PlatformerTileRenderer::drawTile(
-                enemyTileCache_, hazard.sourceTileId,
+                enemyTileCache_,
+                campaignHazardAnimationTile(hazard),
                 static_cast<int16_t>(std::lround(hazard.x - state.cameraX)),
                 static_cast<int16_t>(std::lround(hazard.y - state.cameraY)),
                 mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT,
@@ -1152,8 +1323,8 @@ void PlatformerApp::draw(lv_event_t* event) {
                 mapFrameBuffer_, GAME_SURFACE_WIDTH, GAME_SURFACE_HEIGHT,
                 GAME_SURFACE_WIDTH);
         }
-        if (state.playerVisible && !flickerHidden) {
-            const uint16_t playerTile = campaignPlayerTile(state, animationMs);
+        if (state.playerVisible) {
+            const uint16_t playerTile = campaignPlayerTile(state);
             const int16_t screenX = static_cast<int16_t>(
                 std::lround(state.playerX - state.cameraX));
             const int16_t screenY = static_cast<int16_t>(
@@ -1223,7 +1394,10 @@ void PlatformerApp::draw(lv_event_t* event) {
         } else if (box.type == pgos::PlatformerObjectType::CoinBrick) {
             boxSprite = &pgos::platformer_assets::bricks;
         } else {
-            boxSprite = BOX_FRAMES[(animationMs / 160U) % 3U];
+            const uint8_t referenceFrame =
+                pgos::platformerReferencePausedAnimationFrame(
+                    animationFrame, 8U, 4U, 25U);
+            boxSprite = BOX_FRAMES[std::min<uint8_t>(2U, referenceFrame)];
         }
         pgos::PixelSpriteRenderer::draw(
             layer, *boxSprite, boxX, world.y1 + box.y + box.bumpOffset);
@@ -1242,11 +1416,11 @@ void PlatformerApp::draw(lv_event_t* event) {
                 sprite = &pgos::platformer_extra_assets::one_up;
                 break;
             case pgos::PlatformerPowerupKind::FireFlower: {
-                sprite = FIRE_FLOWER_FRAMES[(animationMs / 70U) % 4U];
+                sprite = FIRE_FLOWER_FRAMES[powerup.animationFrame];
                 break;
             }
             case pgos::PlatformerPowerupKind::Star: {
-                sprite = STAR_FRAMES[(animationMs / 70U) % 4U];
+                sprite = STAR_FRAMES[powerup.animationFrame];
                 break;
             }
         }
@@ -1260,9 +1434,6 @@ void PlatformerApp::draw(lv_event_t* event) {
             layer, *sprite, x,
             world.y1 + static_cast<int16_t>(std::lround(powerup.y)));
     }
-
-    const pgos::PixelSprite& coinSprite =
-        *COIN_FRAMES[(animationMs / 120U) % 4U];
 
     const int16_t goalX = world.x1 +
                           static_cast<int16_t>(std::lround(engine_.goalX())) -
@@ -1323,7 +1494,7 @@ void PlatformerApp::draw(lv_event_t* event) {
                 1, enemy.facingLeft);
         } else if (enemy.type == pgos::PlatformerEnemyType::Koopa) {
             const pgos::PixelSprite& koopaSprite =
-                ((animationMs / 180U) & 1U) == 0U
+                enemy.animationFrame == 0U
                     ? pgos::platformer_assets::koopa_1
                     : pgos::platformer_assets::koopa_2;
             // The converted Koopa frames face left by default, just like the
@@ -1345,7 +1516,7 @@ void PlatformerApp::draw(lv_event_t* event) {
             const pgos::PixelSprite& goombaSprite =
                 enemy.motion == pgos::PlatformerEnemyMotion::Squashed
                     ? pgos::platformer_assets::goomba_flat
-                    : ((animationMs / 180U) & 1U) == 0U
+                    : enemy.animationFrame == 0U
                           ? pgos::platformer_assets::goomba_1
                           : pgos::platformer_assets::goomba_2;
             pgos::PixelSpriteRenderer::draw(layer, goombaSprite, x, y,
@@ -1360,10 +1531,9 @@ void PlatformerApp::draw(lv_event_t* event) {
         }
         const pgos::PixelSprite* projectileSprite = nullptr;
         if (projectile.exploding) {
-            projectileSprite = FIREBALL_EXPLOSION_FRAMES[std::min<uint8_t>(
-                2, static_cast<uint8_t>(projectile.ageMs / 40U))];
+            projectileSprite = FIREBALL_EXPLOSION_FRAMES[0];
         } else {
-            projectileSprite = FIREBALL_FRAMES[(animationMs / 80U) % 4U];
+            projectileSprite = FIREBALL_FRAMES[0];
         }
         const int16_t x = world.x1 +
                           static_cast<int16_t>(std::lround(projectile.x)) -
@@ -1389,6 +1559,8 @@ void PlatformerApp::draw(lv_event_t* event) {
             continue;
         }
         if (effect.kind == pgos::PlatformerEffectKind::RisingCoin) {
+            const pgos::PixelSprite& coinSprite =
+                *COIN_FRAMES[effect.animationFrame];
             pgos::PixelSpriteRenderer::draw(layer, coinSprite, x, y);
         } else if (effect.kind == pgos::PlatformerEffectKind::BrickPiece) {
             pgos::PixelSpriteRenderer::draw(
@@ -1405,6 +1577,14 @@ void PlatformerApp::draw(lv_event_t* event) {
                 static_cast<lv_coord_t>(y + 12),
             };
             drawText(layer, points, scoreArea, textColor_, hudFont_);
+        } else if (effect.kind == pgos::PlatformerEffectKind::OneUp) {
+            lv_area_t scoreArea = {
+                static_cast<lv_coord_t>(x - 12),
+                static_cast<lv_coord_t>(y - 2),
+                static_cast<lv_coord_t>(x + 28),
+                static_cast<lv_coord_t>(y + 12),
+            };
+            drawText(layer, "1-UP", scoreArea, textColor_, hudFont_);
         }
     }
 
@@ -1415,15 +1595,10 @@ void PlatformerApp::draw(lv_event_t* event) {
     if (state.phase == pgos::PlatformerPhase::Dying) {
         playerSprite = &pgos::platformer_extra_assets::mario_death;
     } else if (state.phase == pgos::PlatformerPhase::Flagpole) {
-        const bool secondFrame = ((animationMs / 70U) & 1U) != 0U;
         if (state.playerBig) {
-            playerSprite = secondFrame
-                               ? &pgos::platformer_extra_assets::mario_big_flag2
-                               : &pgos::platformer_extra_assets::mario_big_flag1;
+            playerSprite = &pgos::platformer_extra_assets::mario_big_flag1;
         } else {
-            playerSprite = secondFrame
-                               ? &pgos::platformer_extra_assets::mario_flag2
-                               : &pgos::platformer_extra_assets::mario_flag1;
+            playerSprite = &pgos::platformer_extra_assets::mario_flag1;
         }
     } else if (state.playerFire) {
         if (state.playerCrouching) {
@@ -1432,8 +1607,8 @@ void PlatformerApp::draw(lv_event_t* event) {
             playerSprite = &pgos::platformer_extra_assets::mario_fire_jump;
         } else if (state.playerSkidding) {
             playerSprite = &pgos::platformer_extra_assets::mario_fire_skid;
-        } else if (std::abs(state.playerVx) > 8.0F) {
-            const uint8_t runFrame = static_cast<uint8_t>((animationMs / 90U) % 3U);
+        } else if (state.playerWalking) {
+            const uint8_t runFrame = state.playerAnimationFrame;
             playerSprite = runFrame == 0U
                                ? &pgos::platformer_extra_assets::mario_fire_run1
                                : runFrame == 1U
@@ -1449,8 +1624,8 @@ void PlatformerApp::draw(lv_event_t* event) {
             playerSprite = &pgos::platformer_extra_assets::mario_big_skid;
         } else if (!state.grounded) {
             playerSprite = &pgos::platformer_assets::mario_big_jump;
-        } else if (std::abs(state.playerVx) > 8.0F) {
-            const uint8_t runFrame = static_cast<uint8_t>((animationMs / 90U) % 3U);
+        } else if (state.playerWalking) {
+            const uint8_t runFrame = state.playerAnimationFrame;
             playerSprite = runFrame == 0U
                                ? &pgos::platformer_assets::mario_big_run1
                                : runFrame == 1U
@@ -1463,8 +1638,8 @@ void PlatformerApp::draw(lv_event_t* event) {
         playerSprite = &pgos::platformer_extra_assets::mario_skid;
     } else if (!state.grounded) {
         playerSprite = &pgos::platformer_assets::mario_jump;
-    } else if (std::abs(state.playerVx) > 8.0F) {
-        const uint8_t runFrame = static_cast<uint8_t>((animationMs / 90U) % 3U);
+    } else if (state.playerWalking) {
+        const uint8_t runFrame = state.playerAnimationFrame;
         playerSprite = runFrame == 0U
                            ? &pgos::platformer_assets::mario_run1
                            : runFrame == 1U
@@ -1473,7 +1648,7 @@ void PlatformerApp::draw(lv_event_t* event) {
     } else {
         playerSprite = &pgos::platformer_assets::mario_idle;
     }
-    if (!campaignRendered && state.playerVisible && !flickerHidden &&
+    if (!campaignRendered && state.playerVisible &&
         playerSprite != nullptr) {
         const float spriteWorldY =
             state.playerCrouching && state.playerBig
@@ -1495,7 +1670,7 @@ void PlatformerApp::draw(lv_event_t* event) {
                 "M%u %06lu  x%02u  %u-%u  T%03u",
                 static_cast<unsigned>(state.lives),
                 static_cast<unsigned long>(state.score % 1000000UL),
-                static_cast<unsigned>(state.coinsCollected % 100U),
+                static_cast<unsigned>(state.coinsCollected),
                 static_cast<unsigned>(state.world),
                 static_cast<unsigned>(state.stage),
                 static_cast<unsigned>(state.timeRemaining));
@@ -1685,7 +1860,13 @@ void PlatformerApp::consumeEvents(AppContext& context) {
     const bool gamepadConnected = context.gamepad.snapshot().connected;
     while (engine_.pollEvent(event)) {
         switch (event.type) {
-            case pgos::PlatformerEventType::CoinBoxHit:
+            case pgos::PlatformerEventType::BlockHit:
+                context.audio.playGameTone(120);
+                if (gamepadConnected) {
+                    context.gamepad.requestRumble(45, 55, 55);
+                }
+                break;
+            case pgos::PlatformerEventType::CoinCollected:
                 context.audio.playGameTone(520);
                 if (gamepadConnected) {
                     context.gamepad.requestRumble(55, 40, 60);
@@ -1701,9 +1882,14 @@ void PlatformerApp::consumeEvents(AppContext& context) {
                 context.audio.playGameTone(120);
                 break;
             case pgos::PlatformerEventType::PowerupCollected:
-                context.audio.playGameTone(680);
-                if (gamepadConnected) {
-                    context.gamepad.requestRumble(90, 70, 100);
+                if (event.value == static_cast<uint16_t>(
+                                       pgos::PlatformerPowerupKind::Mushroom) ||
+                    event.value == static_cast<uint16_t>(
+                                       pgos::PlatformerPowerupKind::FireFlower)) {
+                    context.audio.playGameTone(680);
+                    if (gamepadConnected) {
+                        context.gamepad.requestRumble(90, 70, 100);
+                    }
                 }
                 break;
             case pgos::PlatformerEventType::PlayerHurt:
@@ -1718,7 +1904,6 @@ void PlatformerApp::consumeEvents(AppContext& context) {
                     context.gamepad.requestRumble(70, 95, 90);
                 }
                 break;
-            case pgos::PlatformerEventType::ShellKicked:
             case pgos::PlatformerEventType::EnemyDefeated:
                 context.audio.playGameTone(80);
                 if (gamepadConnected) {
@@ -1728,20 +1913,43 @@ void PlatformerApp::consumeEvents(AppContext& context) {
             case pgos::PlatformerEventType::FireballShot:
                 context.audio.playGameTone(55);
                 break;
+            case pgos::PlatformerEventType::FireballHit:
+                context.audio.playGameTone(45);
+                break;
+            case pgos::PlatformerEventType::CannonFired:
+                context.audio.playGameTone(90);
+                break;
+            case pgos::PlatformerEventType::TrampolineBounced:
+                break;
+            case pgos::PlatformerEventType::BowserFire:
+                context.audio.playGameTone(120);
+                break;
+            case pgos::PlatformerEventType::BowserFell:
+                context.audio.playGameTone(180);
+                break;
+            case pgos::PlatformerEventType::CastleClear:
+                context.audio.playGameTone(325);
+                break;
+            case pgos::PlatformerEventType::TimerTick:
+                context.audio.playGameTone(25);
+                break;
+            case pgos::PlatformerEventType::Paused:
+                context.audio.playGameTone(80);
+                break;
             case pgos::PlatformerEventType::OneUp:
                 context.audio.playGameTone(420);
                 if (gamepadConnected) {
                     context.gamepad.requestRumble(120, 80, 150);
                 }
                 break;
-            case pgos::PlatformerEventType::TimeWarning:
-                context.audio.playGameTone(650);
-                break;
             case pgos::PlatformerEventType::PlayerDied:
                 context.audio.playGameTone(240);
                 if (gamepadConnected) {
                     context.gamepad.requestRumble(220, 160, 240);
                 }
+                break;
+            case pgos::PlatformerEventType::GameOver:
+                context.audio.playGameTone(600);
                 break;
             case pgos::PlatformerEventType::LifeRestarted:
                 break;
@@ -1752,22 +1960,30 @@ void PlatformerApp::consumeEvents(AppContext& context) {
                 }
                 break;
             case pgos::PlatformerEventType::CourseClear:
-                context.audio.playGameTone(700);
-                if (const pgos::PlatformerCampaignLevel* level =
-                        engine_.levelRuntime().level();
-                    level != nullptr) {
-                    progress_.recordCourseClear(
-                        level->world, level->stage, level->nextWorld,
-                        level->nextStage, engine_.snapshot().score);
+                if (const uint8_t world =
+                        static_cast<uint8_t>(event.value >> 8U);
+                    world != 0U) {
+                    const uint8_t stage =
+                        static_cast<uint8_t>(event.value & 0xFFU);
+                    const pgos::PlatformerCampaignLevel* level =
+                        pgos::platformerCampaignLevel(world, stage);
+                    if (level != nullptr) {
+                        progress_.recordCourseClear(
+                            level->world, level->stage, level->nextWorld,
+                            level->nextStage, event.score);
+                    }
                 }
                 break;
             case pgos::PlatformerEventType::WarpStarted:
                 context.audio.playGameTone(95);
                 break;
             case pgos::PlatformerEventType::WarpCompleted:
-                context.audio.playGameTone(145);
                 break;
             case pgos::PlatformerEventType::Jumped:
+                context.audio.playGameTone(90);
+                break;
+            case pgos::PlatformerEventType::SwimStroke:
+                context.audio.playGameTone(70);
                 break;
         }
     }

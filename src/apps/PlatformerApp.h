@@ -25,7 +25,7 @@ private:
     static constexpr int16_t GAME_SURFACE_WIDTH = 320;
     static constexpr int16_t GAME_SURFACE_HEIGHT = 218;
     static constexpr int16_t HUD_HEIGHT = 26;
-    static constexpr uint32_t PHYSICS_STEP_MS = 8;
+    static constexpr uint32_t REFERENCE_STEP_US = 16667;
     static constexpr uint32_t MAX_FRAME_MS = 64;
     static constexpr uint32_t FRAME_RENDER_INTERVAL_MS = 32;
     static constexpr uint32_t COMMAND_MOVE_MS = 140;
@@ -43,7 +43,7 @@ private:
     lv_color_t accentColor_{};
     uint32_t lastTickMs_ = 0;
     uint32_t lastRenderMs_ = 0;
-    uint32_t physicsAccumulatorMs_ = 0;
+    uint32_t physicsAccumulatorUs_ = 0;
     uint32_t commandMoveUntilMs_ = 0;
     uint32_t commandJumpHoldUntilMs_ = 0;
     uint32_t commandCrouchUntilMs_ = 0;
@@ -75,8 +75,9 @@ private:
     static void drawEvent(lv_event_t* event, void* context);
     void draw(lv_event_t* event);
     void drawCampaignMapTest(lv_layer_t* layer, const lv_area_t& area);
-    void composeCampaignFrame(const pgos::PlatformerSnapshot& state,
-                              uint32_t animationMs);
+    void composeCampaignFrame(const pgos::PlatformerSnapshot& state);
+    void drawHeldHammer(const pgos::PlatformerEnemyState& enemy,
+                        const pgos::PlatformerSnapshot& state);
     void startCampaignMapTest(uint8_t world = 1, uint8_t stage = 1);
     void advanceCampaignMapTest();
     void panCampaignMapTest(int16_t deltaX, int16_t deltaY);
