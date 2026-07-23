@@ -2,6 +2,8 @@
 
 #include <driver/i2s.h>
 
+#include <algorithm>
+
 #include "services/I2cBusService.h"
 
 namespace {
@@ -193,13 +195,21 @@ void AudioService::setFeedbackEnabled(bool enabled) {
 }
 
 void AudioService::playFeedback() {
-    if (feedbackEnabled_) {
+    const uint32_t nowMs = millis();
+    const uint32_t gameUntilMs =
+        gameToneUntilMs_.load(std::memory_order_relaxed);
+    if (feedbackEnabled_ &&
+        static_cast<int32_t>(gameUntilMs - nowMs) <= 0) {
         requestTone(45U);
     }
 }
 
 void AudioService::playGameTone(uint32_t durationMs) {
-    requestTone(durationMs);
+    requestGameTone(TONE_FREQUENCY, durationMs);
+}
+
+void AudioService::playGameTone(uint16_t frequencyHz, uint32_t durationMs) {
+    requestGameTone(frequencyHz, durationMs);
 }
 
 void AudioService::playTestTone() {
@@ -351,14 +361,44 @@ bool AudioService::applyCodecVolume() {
 }
 
 void AudioService::requestTone(uint32_t durationMs) {
+    requestTone(TONE_FREQUENCY, durationMs);
+}
+
+void AudioService::requestTone(uint16_t frequencyHz, uint32_t durationMs) {
     if (!ready_ || volumePercent_ == 0) {
         return;
     }
+    frequencyHz = constrain(frequencyHz, static_cast<uint16_t>(80),
+                            static_cast<uint16_t>(2000));
+    toneFrequencyHz_.store(frequencyHz, std::memory_order_relaxed);
     const uint32_t requestedUntil = millis() + durationMs;
     const uint32_t currentUntil = toneUntilMs_.load(std::memory_order_relaxed);
     if (static_cast<int32_t>(requestedUntil - currentUntil) > 0) {
         toneUntilMs_.store(requestedUntil, std::memory_order_relaxed);
     }
+}
+
+void AudioService::requestGameTone(uint16_t frequencyHz,
+                                   uint32_t durationMs) {
+    if (!ready_ || volumePercent_ == 0) {
+        return;
+    }
+    frequencyHz = constrain(frequencyHz, static_cast<uint16_t>(80),
+                            static_cast<uint16_t>(2000));
+    toneFrequencyHz_.store(frequencyHz, std::memory_order_relaxed);
+
+    const uint32_t nowMs = millis();
+    const uint32_t requestedUntil = nowMs + durationMs;
+    uint32_t gameUntilMs =
+        gameToneUntilMs_.load(std::memory_order_relaxed);
+    if (static_cast<int32_t>(gameUntilMs - nowMs) <= 0 ||
+        static_cast<int32_t>(requestedUntil - gameUntilMs) > 0) {
+        gameUntilMs = requestedUntil;
+        gameToneUntilMs_.store(gameUntilMs, std::memory_order_relaxed);
+    }
+    // A game cue must replace any lower-priority shell feedback already in
+    // flight, rather than only changing its pitch and inheriting its tail.
+    toneUntilMs_.store(gameUntilMs, std::memory_order_relaxed);
 }
 
 void AudioService::saveSettings() {
@@ -376,13 +416,21 @@ void AudioService::saveSettings() {
 void AudioService::run() {
     int16_t samples[DMA_FRAMES * 2U];
     uint32_t phase = 0;
-    constexpr uint32_t samplesPerPeriod = SAMPLE_RATE / TONE_FREQUENCY;
-    constexpr uint32_t halfPeriod = samplesPerPeriod / 2U;
+    uint16_t previousFrequency = 0;
 
     while (true) {
         const uint32_t nowMs = millis();
         const uint32_t untilMs = toneUntilMs_.load(std::memory_order_relaxed);
         const bool toneOn = static_cast<int32_t>(untilMs - nowMs) > 0;
+        const uint16_t frequency =
+            toneFrequencyHz_.load(std::memory_order_relaxed);
+        if (frequency != previousFrequency) {
+            phase = 0;
+            previousFrequency = frequency;
+        }
+        const uint32_t samplesPerPeriod =
+            std::max<uint32_t>(2U, SAMPLE_RATE / frequency);
+        const uint32_t halfPeriod = samplesPerPeriod / 2U;
         for (size_t frame = 0; frame < DMA_FRAMES; ++frame) {
             const int16_t sample = toneOn
                                        ? (phase < halfPeriod ? TONE_AMPLITUDE

@@ -23,6 +23,7 @@ const MenuItemDefinition GAME_ITEMS[] = {
     {UiIcon::Breakout, "打砖块", nullptr, AppId::Breakout},
     {UiIcon::Gamepad, "Super Mario", nullptr, AppId::Platformer},
     {UiIcon::Blackjack, "二十一点", nullptr, AppId::Blackjack},
+    {UiIcon::Minesweeper, "扫雷", nullptr, AppId::Minesweeper},
 };
 
 const MenuItemDefinition SETTINGS_ITEMS[] = {
@@ -97,6 +98,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::Previous:
         case AppCommandType::Next:
         case AppCommandType::QuickDrop:
+        case AppCommandType::Pause:
         case AppCommandType::Left:
         case AppCommandType::Right:
         case AppCommandType::Activate:
@@ -116,6 +118,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageBreakout:
         case AppCommandType::PagePlatformer:
         case AppCommandType::PageBlackjack:
+        case AppCommandType::PageMinesweeper:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
@@ -142,6 +145,8 @@ bool isWakeOnlyCommand(AppCommandType type) {
         case AppCommandType::Left:
         case AppCommandType::Right:
         case AppCommandType::Activate:
+        case AppCommandType::QuickDrop:
+        case AppCommandType::Pause:
         case AppCommandType::Back:
         case AppCommandType::Home:
             return true;
@@ -179,7 +184,7 @@ SystemKernel::SystemKernel()
       breakoutScore_("pgos_breakout", 1, "breakout"),
       context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
                snakeScore_, tetrisScore_, breakoutScore_, blackjackProfile_,
-               Serial, ui_, runtime_},
+               minesweeperProfile_, Serial, ui_, runtime_},
       appManager_(context_),
       gamesMenuApp_(GAMES_MENU),
       settingsMenuApp_(SETTINGS_MENU),
@@ -212,6 +217,7 @@ void SystemKernel::setup() {
     tetrisScore_.begin(Serial);
     breakoutScore_.begin(Serial);
     blackjackProfile_.begin(Serial);
+    minesweeperProfile_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -232,6 +238,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(breakoutApp_);
         appManager_.registerApp(platformerApp_);
         appManager_.registerApp(blackjackApp_);
+        appManager_.registerApp(minesweeperApp_);
         appManager_.registerApp(gamesMenuApp_);
         appManager_.registerApp(settingsMenuApp_);
         appManager_.registerApp(toolsMenuApp_);
@@ -300,6 +307,8 @@ void SystemKernel::loop() {
                     gamepadCommand.type = AppCommandType::Home;
                 } else if (gamepadEvent.code == GamepadMiscSelect) {
                     gamepadCommand.type = AppCommandType::Back;
+                } else if (gamepadEvent.code == GamepadMiscStart) {
+                    gamepadCommand.type = AppCommandType::Pause;
                 }
                 break;
             default:
@@ -482,6 +491,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageBlackjack:
             appManager_.activate(AppId::Blackjack);
+            break;
+        case AppCommandType::PageMinesweeper:
+            appManager_.activate(AppId::Minesweeper);
             break;
         case AppCommandType::ColorTest:
             appManager_.activate(AppId::DisplayTest);

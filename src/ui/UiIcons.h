@@ -19,6 +19,7 @@ enum class UiIcon : uint8_t {
     Tetris,
     Breakout,
     Blackjack,
+    Minesweeper,
 };
 
 namespace PgosUiIcons {

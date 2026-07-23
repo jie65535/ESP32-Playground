@@ -65,6 +65,10 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::Right;
     } else if (lower == "ok") {
         command.type = AppCommandType::Activate;
+    } else if (lower == "flag" || lower == "x") {
+        command.type = AppCommandType::QuickDrop;
+    } else if (lower == "pause") {
+        command.type = AppCommandType::Pause;
     } else if (lower == "back") {
         command.type = AppCommandType::Back;
     } else if (lower == "home") {
@@ -128,6 +132,9 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PlatformerMapTestNext;
     } else if (lower == "page blackjack" || lower == "game blackjack") {
         command.type = AppCommandType::PageBlackjack;
+    } else if (lower == "page minesweeper" || lower == "game minesweeper" ||
+               lower == "page mines") {
+        command.type = AppCommandType::PageMinesweeper;
     } else if (lower == "color_test") {
         command.type = AppCommandType::ColorTest;
     } else if (lower == "screenshot") {
@@ -273,7 +280,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
 }
 
 void ConsoleService::printHelp(Print& output) {
-    output.println(F("Commands: up | down | left | right | ok | back | home"));
+    output.println(F("Commands: up | down | left | right | ok | flag | pause"));
+    output.println(F("          back | home"));
     output.println(F("         page system | page time | page display | page settings"));
     output.println(F("         page sound | page rgb | page controller | page console"));
     output.println(F("         page network"));
@@ -284,6 +292,7 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("         platformer maptest [world-stage]"));
     output.println(F("         platformer mapnext"));
     output.println(F("         page blackjack"));
+    output.println(F("         page minesweeper"));
     output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));

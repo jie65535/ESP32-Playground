@@ -22,6 +22,7 @@ const lv_image_dsc_t* image(UiIcon icon) {
         case UiIcon::Tetris: return &ICON_BLOCKS;
         case UiIcon::Breakout: return &ICON_BRICK_WALL;
         case UiIcon::Blackjack: return &ICON_SPADE;
+        case UiIcon::Minesweeper: return &ICON_BOMB;
         default: return &ICON_SETTINGS_2;
     }
 }

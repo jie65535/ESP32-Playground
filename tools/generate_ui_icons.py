@@ -30,6 +30,7 @@ ICONS = (
     "blocks",
     "brick-wall",
     "spade",
+    "bomb",
 )
 
 

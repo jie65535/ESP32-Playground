@@ -43,7 +43,7 @@ class BitmapFontDataTests(unittest.TestCase):
         self.assertEqual([item[0] for item in self.glyphs[count:]], self.expected)
 
     def test_representative_chinese_glyphs_are_not_blank(self) -> None:
-        for character in "开发板屏幕网络连接控制台截图音频麦克风":
+        for character in "开发板屏幕网络连接控制台截图音频麦克风再来一局":
             with self.subTest(character=character):
                 matching = [
                     bitmap

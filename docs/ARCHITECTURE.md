@@ -55,7 +55,7 @@ public:
 - `SystemInfoApp`：当前板卡、内存和运行时间页面。
 - `DisplayTestApp`：颜色、字体和截图实验。
 - `NetworkConsoleApp`：服务器发现、连接状态和吞吐测试。
-- `MazeApp`、`PacmanApp`：独立小游戏，不直接操作系统服务。
+- `SnakeApp`、`TetrisApp`、`BreakoutApp`、`BlackjackApp` 和 `MinesweeperApp`：独立小游戏，不直接操作系统服务。
 - `PlatformerApp`：使用纯 C++ `PlatformerEngine`、32 关压缩数据、固定实体池和单一 `RenderSurface` 实现完整战役；CSV/属性文件及 PNG 图块只参与主机端生成，设备端只链接 C++ RLE 数据与调色板索引图块。`PlatformerProgressService` 仅保存继续关卡、通关状态和最高分；USB maptest 是独立巡检入口。
 
 无触摸屏更适合按键机式列表、分页或轮播桌面，不必复制手机图标网格。
@@ -75,7 +75,10 @@ public:
    `BlackjackEngine`，筹码和统计由 `BlackjackProfileService` 持久化，App
    只负责输入、事件动画和绘制。规则事件在播放期间锁定牌桌操作，但系统级
    Back/Home 始终由 `AppManager` 处理。
-5. Shell 正文明确使用 Fusion Pixel 16px 行盒；24/28px 标题和依赖既有
+6. Minesweeper 同样不复用通用 Top 5：`MinesweeperEngine` 和逻辑求解器保持
+   纯 C++，`MinesweeperProfileService` 独立拥有标准难度成绩、统计和自定义
+   设置；候选棋盘逐 tick 生成，App 只管理输入、动画和系统反馈。
+7. Shell 正文明确使用 Fusion Pixel 16px 行盒；24/28px 标题和依赖既有
    大字号度量的游戏 HUD 暂保留英文。卡片统一为 44px 高、8px 间距，
    副标题仅用于标题和当前值无法表达的状态、限制或特殊逻辑。
 

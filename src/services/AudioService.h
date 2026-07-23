@@ -20,6 +20,7 @@ public:
     void setFeedbackEnabled(bool enabled);
     void playFeedback();
     void playGameTone(uint32_t durationMs);
+    void playGameTone(uint16_t frequencyHz, uint32_t durationMs);
     void playTestTone();
     void printStatus(Print& output) const;
 
@@ -42,6 +43,8 @@ private:
     Preferences preferences_;
     TaskHandle_t taskHandle_ = nullptr;
     std::atomic<uint32_t> toneUntilMs_{0};
+    std::atomic<uint32_t> gameToneUntilMs_{0};
+    std::atomic<uint16_t> toneFrequencyHz_{TONE_FREQUENCY};
     bool ready_ = false;
     bool preferencesReady_ = false;
     bool settingsDirty_ = false;
@@ -59,6 +62,8 @@ private:
     bool setCodecMuted(bool muted);
     bool applyCodecVolume();
     void requestTone(uint32_t durationMs);
+    void requestTone(uint16_t frequencyHz, uint32_t durationMs);
+    void requestGameTone(uint16_t frequencyHz, uint32_t durationMs);
     void saveSettings();
     void run();
     static void taskEntry(void* context);

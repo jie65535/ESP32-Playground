@@ -42,7 +42,7 @@ PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16
 
 ## 当前：小游戏、固定步进与回合制事件动画
 
-- Snake、Tetris、Breakout 和 Blackjack 均作为独立前台 App 使用 LVGL 单一自绘面，不直接访问显示硬件，也不创建游戏元素子对象。
+- Snake、Tetris、Breakout、Blackjack 和 Minesweeper 均作为独立前台 App 使用 LVGL 单一自绘面，不直接访问显示硬件，也不创建游戏元素子对象。
 - Platformer 已从 1-1 扩展到 1-1 至 8-4 共 32 关：主机端严格转换 192 个 CSV 图层和 32 份属性文件，固件端使用按行 RLE、调色板索引图块、稀疏修改表及固定敌人/平台/投射物池。战役已接入跨区域/跨关水管、8-4 循环点、水下、藤蔓奖励区、弹簧、动态平台/滑轮、火焰棒、旗杆、Bowser 桥战、敌人差异化状态机和 NVS 继续进度；App 仍只拥有一个 `RenderSurface` 和一块按需 PSRAM framebuffer。USB `platformer maptest [world-stage]` 可直达任意关，`platformer mapnext` 再逐段巡检。
 - Xbox 手柄连续状态由游戏按帧采样，A/B/Home 和 D-pad 事件仍经过统一输入路由；USB/TCP 保留低频语义命令用于调试。
 - 前三款游戏通过同一个可配置 `GameScoreService` 保存 Top 5，继续沿用各自独立
@@ -51,6 +51,7 @@ PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16
 - Blackjack 使用纯 C++ `BlackjackEngine` 产生洗牌、发牌、翻牌和结算事件，
   `BlackjackApp` 顺序消费事件并锁定牌桌输入；筹码与胜负统计由独立
   `BlackjackProfileService` 保存，不把资金模型硬塞进 Top 5 抽象。
+- Minesweeper 使用纯 C++ `MinesweeperEngine` 和逻辑推导求解器生成首击安全且无猜测可解的候选棋盘；App 每 tick 只验证一个候选，提供 18/11/10px 分级棋盘、插旗/chord、暂停、结果动画、音频/震动/RGB 反馈。`MinesweeperProfileService` 以独立 `pgos_mines` schema 保存三档 Top 5、局数、胜率和连胜；标准难度与自定义参数不混用记录。
 
 ## 随后：PGOS Studio 媒体与工具能力
 

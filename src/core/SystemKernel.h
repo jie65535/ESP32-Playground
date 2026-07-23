@@ -15,6 +15,7 @@
 #include "apps/BreakoutApp.h"
 #include "apps/PlatformerApp.h"
 #include "apps/BlackjackApp.h"
+#include "apps/MinesweeperApp.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
@@ -27,6 +28,7 @@
 #include "services/ServerService.h"
 #include "services/GameScoreService.h"
 #include "services/BlackjackProfileService.h"
+#include "services/MinesweeperProfileService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
 #include "services/TimeService.h"
@@ -53,6 +55,7 @@ private:
     GameScoreService tetrisScore_;
     GameScoreService breakoutScore_;
     BlackjackProfileService blackjackProfile_;
+    MinesweeperProfileService minesweeperProfile_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -74,6 +77,7 @@ private:
     BreakoutApp breakoutApp_;
     PlatformerApp platformerApp_;
     BlackjackApp blackjackApp_;
+    MinesweeperApp minesweeperApp_;
     MenuApp gamesMenuApp_;
     MenuApp settingsMenuApp_;
     MenuApp toolsMenuApp_;
