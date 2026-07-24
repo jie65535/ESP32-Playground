@@ -21,6 +21,8 @@ struct MenuDefinition {
 
 class MenuApp final : public IApp {
 public:
+    static constexpr uint8_t MAX_ITEMS = 8;
+
     explicit MenuApp(const MenuDefinition& definition);
 
     AppId id() const override;
@@ -34,12 +36,12 @@ public:
     AppId requestedApp() const override;
 
 private:
-    static constexpr uint8_t MAX_ITEMS = 6;
-
     const MenuDefinition& definition_;
     uint8_t selected_ = 0;
     int8_t renderedSelection_ = -1;
     AppId requested_ = AppId::Count;
     lv_obj_t* root_ = nullptr;
     UiCard cards_[MAX_ITEMS];
+
+    uint8_t itemCount() const;
 };

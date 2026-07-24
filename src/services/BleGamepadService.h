@@ -23,6 +23,11 @@ public:
 
     const GamepadSnapshot& snapshot() const;
     bool pollEvent(GamepadEvent& event);
+    // Games sample the controller snapshot directly every frame.  Expose the
+    // debounced physical-activity signal (and connection wake event) so
+    // SystemKernel can refresh shared services such as the display idle timer
+    // without app-side reporting.
+    bool pollActivity(uint32_t& activityMs);
     bool requestRumble(uint16_t durationMs, uint8_t weakMagnitude,
                        uint8_t strongMagnitude);
     bool startPairingScan();
@@ -52,6 +57,7 @@ private:
     uint32_t disconnectCount_ = 0;
     uint32_t scanStartCount_ = 0;
     bool disconnectPending_ = false;
+    bool activityPending_ = false;
     pgos::GamepadActivityTracker activityTracker_;
     pgos::GamepadReconnectScheduler reconnectScheduler_;
 

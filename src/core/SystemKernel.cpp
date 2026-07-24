@@ -42,6 +42,19 @@ const MenuItemDefinition TOOL_ITEMS[] = {
     {UiIcon::Palette, "颜色实验", nullptr, AppId::DisplayTest},
 };
 
+static_assert(sizeof(HOME_ITEMS) / sizeof(HOME_ITEMS[0]) <=
+                  MenuApp::MAX_ITEMS,
+              "Home menu exceeds MenuApp card capacity");
+static_assert(sizeof(GAME_ITEMS) / sizeof(GAME_ITEMS[0]) <=
+                  MenuApp::MAX_ITEMS,
+              "Games menu exceeds MenuApp card capacity");
+static_assert(sizeof(SETTINGS_ITEMS) / sizeof(SETTINGS_ITEMS[0]) <=
+                  MenuApp::MAX_ITEMS,
+              "Settings menu exceeds MenuApp card capacity");
+static_assert(sizeof(TOOL_ITEMS) / sizeof(TOOL_ITEMS[0]) <=
+                  MenuApp::MAX_ITEMS,
+              "Tools menu exceeds MenuApp card capacity");
+
 const MenuDefinition GAMES_MENU = {
     AppId::GamesMenu, "Games", "Games", nullptr,
     GAME_ITEMS, static_cast<uint8_t>(sizeof(GAME_ITEMS) / sizeof(GAME_ITEMS[0]))};
@@ -358,11 +371,6 @@ void SystemKernel::loop() {
         RuntimeMonitorService::Stage::Audio,
         static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
     rgb_.tick(nowMs);
-    stageStartedUs = esp_timer_get_time();
-    display_.tick(nowMs);
-    runtime_.recordStage(
-        RuntimeMonitorService::Stage::Display,
-        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
     ui_.updateStatus(wifi_.snapshot(), server_.snapshot(),
                      gamepad_.snapshot(), time_.snapshot(), nowMs);
 
@@ -393,6 +401,29 @@ void SystemKernel::loop() {
             audio_.playFeedback();
         }
     }
+
+    // Continuous controller input is consumed directly from snapshot() by
+    // games and therefore does not necessarily create an AppCommand.  Bridge
+    // the input service's debounced activity signal here so held buttons,
+    // sticks and triggers keep the shared display idle timer alive.
+    uint32_t gamepadActivityMs = 0;
+    while (gamepad_.pollActivity(gamepadActivityMs)) {
+        // Use this loop's clock for wake/timer bookkeeping.  A Bluepad32
+        // connection callback can run a few milliseconds after nowMs was
+        // captured, so its event timestamp may otherwise appear to be in the
+        // future and look like a huge unsigned idle age.
+        (void)gamepadActivityMs;
+        display_.noteActivity(nowMs);
+    }
+
+    // Evaluate the idle deadline only after all input sources for this loop
+    // have refreshed activity.  This avoids an off/on race at the timeout
+    // boundary when an input arrives in the same iteration.
+    stageStartedUs = esp_timer_get_time();
+    display_.tick(nowMs);
+    runtime_.recordStage(
+        RuntimeMonitorService::Stage::Display,
+        static_cast<uint32_t>(esp_timer_get_time() - stageStartedUs));
 
     appManager_.tick(nowMs);
     if (redrawRequested_ || nowMs - lastRenderMs_ >= RENDER_INTERVAL_MS) {

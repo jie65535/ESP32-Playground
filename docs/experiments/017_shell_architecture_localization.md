@@ -58,6 +58,13 @@
 本地截图保存在被 Git 忽略的 `captures/017_shell_localization/`，不把批量 PNG
 加入普通仓库历史。
 
+2026-07-25，COM3 复测发现 Games 菜单新增 2048 后已有 7 项，但 `MenuApp`
+仍只分配 6 张 `UiCard`。创建第 7 项会越界 36 字节，覆盖紧邻的 Settings
+菜单对象 vtable；随后按 B 调用虚函数时出现 `InstructionFetchError`，并非栈溢出。
+现将容量提升到 8，所有菜单循环使用夹紧后的项目数，并加入四个菜单的编译期容量
+断言。干净构建、50 项主机测试和 COM3 烧录通过；USB 连续执行 Games → 游戏 →
+Back → Games → Back → Desktop，以及 Platformer → Back → Desktop，设备均未复位。
+
 ## 后续
 
 1. 在真机实体屏上继续确认像素字体的远距离可读性和卡片密度。

@@ -233,7 +233,11 @@ void DisplayService::tick(uint32_t nowMs) {
         nowMs - lastActivityMs_ >= screenTimeoutSeconds_ * 1000UL) {
         screenOff_ = true;
         applyBacklight();
-        Serial.println(F("[display] screen backlight off (idle timeout)"));
+        Serial.printf(
+            "[display] screen backlight off (idle timeout) age_ms=%lu "
+            "timeout_ms=%lu\n",
+            static_cast<unsigned long>(nowMs - lastActivityMs_),
+            static_cast<unsigned long>(screenTimeoutSeconds_ * 1000UL));
     }
 }
 
@@ -446,6 +450,8 @@ void DisplayService::printStatus(Print& output) const {
     }
     output.print(F(" backlight="));
     output.print(screenOff_ ? F("off") : F("on"));
+    output.print(F(" idle_age_ms="));
+    output.print(millis() - lastActivityMs_);
     output.print(F(" backend=esp_lcd"));
     output.print(F(" dma="));
     output.print(dmaEnabled_ ? F("on") : F("off"));

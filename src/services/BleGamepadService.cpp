@@ -81,7 +81,11 @@ void BleGamepadService::tick(uint32_t nowMs) {
         static_cast<int32_t>(nowMs - lastActivityMs_) >=
             static_cast<int32_t>(autoDisconnectMs_)) {
         if (log_ != nullptr) {
-            log_->println(F("[gamepad] idle timeout; disconnecting controller"));
+            log_->printf(
+                "[gamepad] idle timeout; age_ms=%lu timeout_ms=%lu "
+                "disconnecting controller\n",
+                static_cast<unsigned long>(nowMs - lastActivityMs_),
+                static_cast<unsigned long>(autoDisconnectMs_));
         }
         disconnectController(DisconnectReason::Idle);
     }
@@ -102,6 +106,15 @@ bool BleGamepadService::pollEvent(GamepadEvent& event) {
     event = eventQueue_[eventHead_];
     eventHead_ = static_cast<uint8_t>((eventHead_ + 1U) % EVENT_QUEUE_SIZE);
     eventCount_--;
+    return true;
+}
+
+bool BleGamepadService::pollActivity(uint32_t& activityMs) {
+    if (!activityPending_) {
+        return false;
+    }
+    activityPending_ = false;
+    activityMs = lastActivityMs_;
     return true;
 }
 
@@ -227,7 +240,17 @@ void BleGamepadService::printStatus(Print& output) const {
         output.print(F(" timeout_ms="));
         output.print(snapshot_.autoDisconnectMs);
         output.print(F(" input_age_ms="));
-        output.print(millis() - lastActivityMs_);
+        const uint32_t inputAgeMs =
+            lastActivityMs_ == 0 ? 0 : millis() - lastActivityMs_;
+        output.print(inputAgeMs);
+        output.print(F(" idle_remaining_ms="));
+        if (autoDisconnectMs_ == 0 || inputAgeMs >= autoDisconnectMs_) {
+            output.print(0);
+        } else {
+            output.print(autoDisconnectMs_ - inputAgeMs);
+        }
+        output.print(F(" disconnect_pending="));
+        output.print(disconnectPending_ ? F("yes") : F("no"));
         output.print(F(" axes="));
         output.print(snapshot_.axisX);
         output.print(',');
@@ -377,6 +400,9 @@ void BleGamepadService::handleConnected(ControllerPtr controller) {
         disconnectReason_ = DisconnectReason::None;
         connectedSinceMs_ = millis();
         lastActivityMs_ = connectedSinceMs_;
+        // A newly connected controller is an explicit user-facing event.  It
+        // should wake the display even before the first HID input report.
+        activityPending_ = true;
         pushEvent(GamepadEventType::Connected, slot, 0);
         if (log_ != nullptr) {
             log_->printf("[gamepad] connected slot=%u model=%s vid=%04x pid=%04x\n",
@@ -426,6 +452,7 @@ void BleGamepadService::clearSnapshot() {
     previousMiscButtons_ = 0;
     activityTracker_.reset();
     lastActivityMs_ = 0;
+    activityPending_ = false;
     connectedSinceMs_ = 0;
 }
 
@@ -459,6 +486,7 @@ void BleGamepadService::updateController(uint32_t nowMs) {
         activitySample.triggers[1] = throttle;
         if (activityTracker_.update(activitySample)) {
             lastActivityMs_ = nowMs;
+            activityPending_ = true;
         }
         const uint16_t buttonChanges = buttons ^ previousButtons_;
         for (uint16_t bit = 1; bit != 0; bit <<= 1U) {

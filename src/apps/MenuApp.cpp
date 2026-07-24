@@ -13,7 +13,7 @@ const char* MenuApp::name() const {
 void MenuApp::onEnter(AppContext&) {
     requested_ = AppId::Count;
     renderedSelection_ = -1;
-    if (selected_ >= definition_.itemCount) {
+    if (selected_ >= itemCount()) {
         selected_ = 0;
     }
 }
@@ -26,17 +26,16 @@ void MenuApp::onExit(AppContext&) {
 }
 
 void MenuApp::onCommand(const AppCommand& command, AppContext&) {
-    if (definition_.itemCount == 0) {
+    const uint8_t count = itemCount();
+    if (count == 0) {
         return;
     }
     if (command.type == AppCommandType::Previous ||
         command.type == AppCommandType::Left) {
-        selected_ = selected_ == 0 ? definition_.itemCount - 1U
-                                   : selected_ - 1U;
+        selected_ = selected_ == 0 ? count - 1U : selected_ - 1U;
     } else if (command.type == AppCommandType::Next ||
                command.type == AppCommandType::Right) {
-        selected_ = static_cast<uint8_t>(
-            (selected_ + 1U) % definition_.itemCount);
+        selected_ = static_cast<uint8_t>((selected_ + 1U) % count);
     } else if (command.type == AppCommandType::Activate) {
         requested_ = definition_.items[selected_].target;
     }
@@ -50,7 +49,7 @@ lv_obj_t* MenuApp::onCreateView(AppContext& context) {
     const int16_t startY =
         definition_.subtitle == nullptr ? UiRuntime::CARD_START_Y
                                         : UiRuntime::CARD_START_WITH_SUBTITLE_Y;
-    for (uint8_t index = 0; index < definition_.itemCount; ++index) {
+    for (uint8_t index = 0; index < itemCount(); ++index) {
         const MenuItemDefinition& item = definition_.items[index];
         cards_[index] = context.ui.createCard(
             root_, startY + static_cast<int16_t>(index) * UiRuntime::CARD_STEP_Y,
@@ -60,11 +59,12 @@ lv_obj_t* MenuApp::onCreateView(AppContext& context) {
 }
 
 void MenuApp::onUpdateView(AppContext& context) {
-    if (root_ == nullptr || definition_.itemCount == 0 ||
+    const uint8_t count = itemCount();
+    if (root_ == nullptr || count == 0 ||
         renderedSelection_ == static_cast<int8_t>(selected_)) {
         return;
     }
-    for (uint8_t index = 0; index < definition_.itemCount; ++index) {
+    for (uint8_t index = 0; index < count; ++index) {
         context.ui.setCardFocused(cards_[index], index == selected_);
     }
     context.ui.centerFocused(root_, cards_[selected_].root);
@@ -73,4 +73,9 @@ void MenuApp::onUpdateView(AppContext& context) {
 
 AppId MenuApp::requestedApp() const {
     return requested_;
+}
+
+uint8_t MenuApp::itemCount() const {
+    return definition_.itemCount > MAX_ITEMS ? MAX_ITEMS
+                                              : definition_.itemCount;
 }

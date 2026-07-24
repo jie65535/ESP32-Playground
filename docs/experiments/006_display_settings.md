@@ -14,6 +14,9 @@
 - 写入策略：设置变化后延迟 750 ms 合并写入，避免焦点刷新或连续按键反复写 Flash。
 - 息屏语义：只把背光 PWM duty 设为 0，LVGL 渲染、shadow framebuffer、USB、Wi-Fi 和网络服务继续运行。
 - 唤醒语义：第一次方向/确认/返回输入只点亮背光，不继续执行页面操作；状态、帮助和截图等只读命令不会强制唤醒。
+- 活跃时间归属：USB/TCP 的有效交互命令由 `InputRouter` 统一记活跃；Xbox
+  手柄的按键、方向、摇杆和扳机由 `BleGamepadService` 的活动检测器记活跃，
+  再由 `SystemKernel` 转给 `DisplayService`。游戏不需要、也不应该自行上报。
 
 ## 应用交互
 
@@ -41,6 +44,12 @@ python tools/playground_console.py --port COM3 --command "page settings"
 - 第一枚方向键仅唤醒，设置值保持不变；第二枚方向键才修改设置。
 - 设置为 80% / 15 秒并重新烧录复位后，NVS 正确恢复相同值。
 - 验证结束后已恢复为 100% / Never。
+
+2026-07-25 代码复核发现：此前只有进入 `InputRouter` 的离散命令会刷新
+`DisplayService::lastActivityMs_`。Platformer、Breakout、扫雷等游戏按帧直接
+读取手柄快照，连续摇杆/扳机/按住输入没有经过该路径，因此可能在游戏中途误息屏。
+现已将手柄服务的物理活动信号接入系统输入层；显示息屏检查也移到本轮输入处理
+之后，避免同一轮出现“先息屏、再被输入唤醒”的竞态。修复后的真机验证待记录。
 
 截图：
 
