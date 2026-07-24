@@ -49,11 +49,11 @@ def tile(draw: ImageDraw.ImageDraw, index: int, value: int, scale: float = 1.0,
     color = TILES.get(value, (168, 85, 247))
     draw.rounded_rectangle(box, radius=7, fill=color)
     text_color = GAP if value <= 4 else (255, 255, 255)
-    text_size = 24 if value < 100 else 20 if value < 1000 else 16
+    text_size = 24 if value < 100 else 20 if value < 1000 else 14 if value < 10000 else 10
     centered(draw, box, str(value), text_size, text_color)
 
 
-def frame(board, score=0, best=0, overlay=None, banner=False, merge=False):
+def frame(board, score=0, best=0, overlay=None, target=False, merge=False):
     image = Image.new("RGB", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(image)
     draw.rectangle((0, 0, 319, 21), fill=STATUS)
@@ -79,10 +79,23 @@ def frame(board, score=0, best=0, overlay=None, banner=False, merge=False):
         tile(draw, 1, 128, offset=(13, 0))
         tile(draw, 2, 128, offset=(-13, 0))
         tile(draw, 1, 256, scale=1.12, offset=(23, 0))
-    if banner:
-        draw.rounded_rectangle((83, 108, 237, 156), radius=10,
-                               fill=(124, 58, 237))
-        centered(draw, (83, 108, 237, 156), "2048!", 20, TEXT)
+    if target:
+        draw.rectangle((0, 22, 319, 239), fill=(17, 24, 39))
+        particles = ((18, 53, (244, 197, 66)), (42, 157, (34, 211, 238)),
+                     (77, 36, (251, 113, 133)), (239, 42, (167, 139, 250)),
+                     (277, 162, (244, 197, 66)), (302, 76, (34, 211, 238)))
+        for x, y, color in particles:
+            draw.rounded_rectangle((x - 2, y - 4, x + 2, y + 4), radius=1,
+                                   fill=color)
+        draw.rounded_rectangle((40, 61, 280, 197), radius=12,
+                               fill=(244, 197, 66))
+        draw.rounded_rectangle((42, 63, 278, 195), radius=10, fill=(23, 27, 38))
+        centered(draw, (60, 69, 260, 86), "TILE UNLOCKED", 11, (244, 197, 66))
+        centered(draw, (60, 87, 260, 122), "2048", 28, TEXT)
+        draw.rounded_rectangle((114, 126, 206, 128), radius=1,
+                               fill=(244, 197, 66))
+        centered(draw, (60, 133, 260, 158), "YOU MADE IT", 20, TEXT)
+        centered(draw, (60, 163, 260, 180), "KEEP BUILDING", 10, MUTED)
     if overlay:
         title, subtitle = overlay
         draw.rounded_rectangle((30, 97, 290, 165), radius=12, fill=BG)
@@ -101,7 +114,7 @@ def main():
                             4, 8, 16, 0, 2, 4, 0, 0], 1612, 8840, merge=True),
         "target.png": frame([2048, 512, 128, 32, 256, 64, 16, 8,
                              32, 8, 4, 2, 4, 2, 0, 0], 20148, 20148,
-                            banner=True),
+                            target=True),
         "game_over.png": frame([2, 4, 2, 4, 4, 2, 4, 2,
                                 2, 4, 8, 16, 4, 2, 16, 8], 16840, 20148,
                                overlay=("NO MOVES", "SCORE 16840   A RESTART")),

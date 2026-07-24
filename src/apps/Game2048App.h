@@ -30,8 +30,7 @@ private:
     static constexpr int16_t BOARD_SIZE = BOARD_PADDING * 2 +
                                           TILE_SIZE * 4 + TILE_GAP * 3;
     static constexpr uint32_t MOVE_ANIMATION_MS = 145;
-    static constexpr uint32_t BANNER_MS = 900;
-    static constexpr uint32_t AI_MOVE_INTERVAL_MS = 220;
+    static constexpr uint32_t TARGET_CELEBRATION_MS = 1800;
     pgos::Game2048Ai ai_;
     pgos::Game2048AiHoldPolicy aiHoldPolicy_;
     pgos::Game2048Engine engine_;
@@ -41,6 +40,8 @@ private:
     uint32_t bestScore_ = 0;
     uint32_t animationStartMs_ = 0;
     uint32_t animationUntilMs_ = 0;
+    uint32_t activeAnimationMs_ = MOVE_ANIMATION_MS;
+    uint32_t bannerStartMs_ = 0;
     uint32_t bannerUntilMs_ = 0;
     uint32_t nextAiMoveMs_ = 0;
     uint32_t randomSeed_ = 0x2048C0DEU;
@@ -56,6 +57,7 @@ private:
     const lv_font_t* tileFont_ = nullptr;
     const lv_font_t* tileMediumFont_ = nullptr;
     const lv_font_t* tileSmallFont_ = nullptr;
+    const lv_font_t* tileCompactFont_ = nullptr;
     const lv_font_t* overlayFont_ = nullptr;
     lv_color_t backgroundColor_{};
     lv_color_t boardColor_{};
@@ -70,17 +72,22 @@ private:
                   uint16_t scale = 100, bool moving = false) const;
     void drawTileAt(lv_layer_t* layer, int16_t x, int16_t y, uint32_t value,
                     uint16_t scale = 100) const;
+    void drawTargetCelebration(lv_layer_t* layer, const lv_area_t& surface,
+                               uint32_t nowMs) const;
     void drawOverlay(lv_layer_t* layer, const lv_area_t& surface,
                      const char* title, const char* subtitle) const;
     void startGame(uint32_t nowMs);
     void applyMove(pgos::Game2048Direction direction, AppContext& context,
-                   uint32_t nowMs);
+                   uint32_t nowMs,
+                   uint32_t animationMs = MOVE_ANIMATION_MS);
     void finishGame(AppContext& context);
     void sampleAi(const GamepadSnapshot& gamepad, uint32_t nowMs,
                   AppContext& context);
     void sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs,
                       AppContext& context);
     void invalidate();
+    const lv_font_t* tileNumberFont(const char* text,
+                                    int16_t availableSize) const;
     static lv_color_t tileColor(uint32_t value);
     static lv_color_t tileTextColor(uint32_t value);
     static uint32_t easeOut(uint32_t progress);

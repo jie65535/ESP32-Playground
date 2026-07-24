@@ -14,4 +14,8 @@ void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
               lv_color_t color, const lv_font_t* font,
               lv_text_align_t align = LV_TEXT_ALIGN_CENTER);
 
+void drawTextSingleLine(lv_layer_t* layer, const char* text, lv_area_t area,
+                        lv_color_t color, const lv_font_t* font,
+                        lv_text_align_t align = LV_TEXT_ALIGN_CENTER);
+
 }  // namespace pgos

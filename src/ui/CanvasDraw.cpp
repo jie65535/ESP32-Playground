@@ -2,22 +2,11 @@
 
 namespace pgos {
 
-void drawRect(lv_layer_t* layer, const lv_area_t& area, lv_color_t color,
-              int32_t radius, lv_opa_t opacity) {
-    if (layer == nullptr) {
-        return;
-    }
-    lv_draw_rect_dsc_t descriptor;
-    lv_draw_rect_dsc_init(&descriptor);
-    descriptor.bg_color = color;
-    descriptor.bg_opa = opacity;
-    descriptor.radius = radius;
-    lv_draw_rect(layer, &descriptor, &area);
-}
+namespace {
 
-void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
-              lv_color_t color, const lv_font_t* font,
-              lv_text_align_t align) {
+void drawTextInternal(lv_layer_t* layer, const char* text, lv_area_t area,
+                      lv_color_t color, const lv_font_t* font,
+                      lv_text_align_t align, bool singleLine) {
     if (layer == nullptr || text == nullptr || font == nullptr) {
         return;
     }
@@ -36,7 +25,37 @@ void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
     descriptor.text_local = true;
     descriptor.align = align;
     descriptor.opa = LV_OPA_COVER;
+    if (singleLine) {
+        descriptor.flag = LV_TEXT_FLAG_EXPAND;
+    }
     lv_draw_label(layer, &descriptor, &area);
+}
+
+}  // namespace
+
+void drawRect(lv_layer_t* layer, const lv_area_t& area, lv_color_t color,
+              int32_t radius, lv_opa_t opacity) {
+    if (layer == nullptr) {
+        return;
+    }
+    lv_draw_rect_dsc_t descriptor;
+    lv_draw_rect_dsc_init(&descriptor);
+    descriptor.bg_color = color;
+    descriptor.bg_opa = opacity;
+    descriptor.radius = radius;
+    lv_draw_rect(layer, &descriptor, &area);
+}
+
+void drawText(lv_layer_t* layer, const char* text, lv_area_t area,
+              lv_color_t color, const lv_font_t* font,
+              lv_text_align_t align) {
+    drawTextInternal(layer, text, area, color, font, align, false);
+}
+
+void drawTextSingleLine(lv_layer_t* layer, const char* text, lv_area_t area,
+                        lv_color_t color, const lv_font_t* font,
+                        lv_text_align_t align) {
+    drawTextInternal(layer, text, area, color, font, align, true);
 }
 
 }  // namespace pgos

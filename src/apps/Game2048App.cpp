@@ -12,6 +12,7 @@
 
 using pgos::drawRect;
 using pgos::drawText;
+using pgos::drawTextSingleLine;
 
 AppId Game2048App::id() const { return AppId::Game2048; }
 
@@ -27,6 +28,8 @@ void Game2048App::onEnter(AppContext& context) {
     engine_.reset(randomSeed_);
     activeMove_ = {};
     animationUntilMs_ = 0;
+    activeAnimationMs_ = MOVE_ANIMATION_MS;
+    bannerStartMs_ = 0;
     bannerUntilMs_ = 0;
     nextAiMoveMs_ = 0;
     pendingGameOver_ = false;
@@ -54,6 +57,7 @@ void Game2048App::onExit(AppContext& context) {
     tileFont_ = nullptr;
     tileMediumFont_ = nullptr;
     tileSmallFont_ = nullptr;
+    tileCompactFont_ = nullptr;
     overlayFont_ = nullptr;
     aiHoldPolicy_.reset();
     aiActive_ = false;
@@ -161,6 +165,7 @@ lv_obj_t* Game2048App::onCreateView(AppContext& context) {
     tileFont_ = context.ui.font(24);
     tileMediumFont_ = context.ui.font(20);
     tileSmallFont_ = context.ui.font(16);
+    tileCompactFont_ = context.ui.font(14);
     overlayFont_ = context.ui.font(20);
     backgroundColor_ = lv_color_hex(0x111827);
     boardColor_ = lv_color_hex(0x1E293B);
@@ -262,9 +267,9 @@ void Game2048App::draw(lv_event_t* event) {
         drawTile(layer, index, engine_.tileAt(index));
     }
     if (animating) {
-        const uint32_t elapsed = std::min<uint32_t>(MOVE_ANIMATION_MS,
+        const uint32_t elapsed = std::min<uint32_t>(activeAnimationMs_,
                                                      nowMs - animationStartMs_);
-        const uint32_t progress = (elapsed * 1000U) / MOVE_ANIMATION_MS;
+        const uint32_t progress = (elapsed * 1000U) / activeAnimationMs_;
         const uint32_t eased = easeOut(progress);
         bool drawnMerged[pgos::Game2048Engine::CELL_COUNT] = {};
         for (uint8_t i = 0; i < activeMove_.motionCount; ++i) {
@@ -310,13 +315,7 @@ void Game2048App::draw(lv_event_t* event) {
     }
 
     if (bannerUntilMs_ != 0 && phase_ == Phase::Running) {
-        lv_area_t banner = surface;
-        banner.x1 += 83;
-        banner.x2 -= 83;
-        banner.y1 += 86;
-        banner.y2 = banner.y1 + 48;
-        drawRect(layer, banner, lv_color_hex(0x7C3AED), 10, LV_OPA_90);
-        drawText(layer, "2048!", banner, textColor_, overlayFont_);
+        drawTargetCelebration(layer, surface, nowMs);
     }
     if (phase_ == Phase::Title) {
         drawOverlay(layer, surface, "BUILD 2048", "PRESS A TO START");
@@ -356,10 +355,108 @@ void Game2048App::drawTileAt(lv_layer_t* layer, int16_t x, int16_t y,
     drawRect(layer, tile, tileColor(value), 7);
     char text[16];
     lv_snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(value));
-    const lv_font_t* font = value >= 10000U ? tinyFont_
-                             : value >= 1000U ? tileSmallFont_
-                             : value >= 100U ? tileMediumFont_ : tileFont_;
-    drawText(layer, text, tile, tileTextColor(value), font);
+    const lv_font_t* font = tileNumberFont(text, size - 4);
+    if (font != nullptr) {
+        drawTextSingleLine(layer, text, tile, tileTextColor(value), font);
+    }
+}
+
+void Game2048App::drawTargetCelebration(lv_layer_t* layer,
+                                         const lv_area_t& surface,
+                                         uint32_t nowMs) const {
+    const uint32_t elapsed = nowMs - bannerStartMs_;
+    const uint32_t revealProgress = std::min<uint32_t>(
+        1000U, (elapsed * 1000U) / 280U);
+    const uint32_t reveal = easeOut(revealProgress);
+    const int16_t centerX = static_cast<int16_t>(surface.x1 + 160);
+    const int16_t centerY = static_cast<int16_t>(surface.y1 + 109);
+
+    drawRect(layer, surface, backgroundColor_, 0, LV_OPA_70);
+
+    struct Particle {
+        int16_t dx;
+        int16_t dy;
+    };
+    constexpr Particle PARTICLES[] = {
+        {-142, -75}, {-119, 65}, {-88, -92}, {-64, 87},
+        {66, -88}, {91, 91}, {120, -61}, {142, 69},
+        {-150, 3}, {-105, -22}, {108, 19}, {151, -4},
+    };
+    const uint32_t burst = easeOut(std::min<uint32_t>(
+        1000U, (elapsed * 1000U) / 720U));
+    for (uint8_t i = 0; i < sizeof(PARTICLES) / sizeof(PARTICLES[0]); ++i) {
+        if (((elapsed / 110U) + i) % 4U == 0U) {
+            continue;
+        }
+        const int16_t x = static_cast<int16_t>(
+            centerX + (PARTICLES[i].dx * static_cast<int32_t>(burst)) / 1000);
+        const int16_t y = static_cast<int16_t>(
+            centerY + (PARTICLES[i].dy * static_cast<int32_t>(burst)) / 1000);
+        const lv_color_t color = i % 4U == 0U ? lv_color_hex(0xF4C542)
+                               : i % 4U == 1U ? lv_color_hex(0x22D3EE)
+                               : i % 4U == 2U ? lv_color_hex(0xFB7185)
+                                              : lv_color_hex(0xA78BFA);
+        const lv_area_t particle = {
+            static_cast<lv_coord_t>(x - 2),
+            static_cast<lv_coord_t>(y - 4),
+            static_cast<lv_coord_t>(x + 2),
+            static_cast<lv_coord_t>(y + 4),
+        };
+        drawRect(layer, particle, color, 1, LV_OPA_90);
+    }
+
+    const int16_t halfWidth = static_cast<int16_t>(72 + (48 * reveal) / 1000U);
+    const int16_t halfHeight = static_cast<int16_t>(38 + (30 * reveal) / 1000U);
+    const uint32_t pulsePhase = elapsed % 480U;
+    const int16_t pulse = static_cast<int16_t>(
+        (pulsePhase <= 240U ? pulsePhase : 480U - pulsePhase) / 80U);
+    lv_area_t halo = {
+        static_cast<lv_coord_t>(centerX - halfWidth - pulse),
+        static_cast<lv_coord_t>(centerY - halfHeight - pulse),
+        static_cast<lv_coord_t>(centerX + halfWidth + pulse),
+        static_cast<lv_coord_t>(centerY + halfHeight + pulse),
+    };
+    drawRect(layer, halo, lv_color_hex(0xF4C542), 14, LV_OPA_30);
+    lv_area_t panel = {
+        static_cast<lv_coord_t>(centerX - halfWidth),
+        static_cast<lv_coord_t>(centerY - halfHeight),
+        static_cast<lv_coord_t>(centerX + halfWidth),
+        static_cast<lv_coord_t>(centerY + halfHeight),
+    };
+    drawRect(layer, panel, lv_color_hex(0xF4C542), 12);
+    panel.x1 += 2;
+    panel.y1 += 2;
+    panel.x2 -= 2;
+    panel.y2 -= 2;
+    drawRect(layer, panel, lv_color_hex(0x171B26), 10, LV_OPA_COVER);
+
+    if (revealProgress < 650U) {
+        return;
+    }
+    lv_area_t line = {static_cast<lv_coord_t>(centerX - 46),
+                      static_cast<lv_coord_t>(surface.y1 + 104),
+                      static_cast<lv_coord_t>(centerX + 46),
+                      static_cast<lv_coord_t>(surface.y1 + 106)};
+    drawRect(layer, line, lv_color_hex(0xF4C542), 1);
+    lv_area_t textArea = {
+        static_cast<lv_coord_t>(surface.x1 + 60),
+        static_cast<lv_coord_t>(surface.y1 + 48),
+        static_cast<lv_coord_t>(surface.x2 - 60),
+        static_cast<lv_coord_t>(surface.y1 + 65),
+    };
+    drawTextSingleLine(layer, "TILE UNLOCKED", textArea,
+                       lv_color_hex(0xF4C542), hudFont_);
+    textArea.y1 = surface.y1 + 66;
+    textArea.y2 = surface.y1 + 101;
+    drawTextSingleLine(layer, "2048", textArea, textColor_, titleFont_);
+    textArea.y1 = surface.y1 + 109;
+    textArea.y2 = surface.y1 + 135;
+    drawTextSingleLine(layer, "YOU MADE IT", textArea, textColor_,
+                       overlayFont_);
+    textArea.y1 = surface.y1 + 140;
+    textArea.y2 = surface.y1 + 157;
+    drawTextSingleLine(layer, "KEEP BUILDING", textArea, mutedColor_,
+                       tinyFont_);
 }
 
 void Game2048App::drawOverlay(lv_layer_t* layer, const lv_area_t& surface,
@@ -388,6 +485,8 @@ void Game2048App::startGame(uint32_t nowMs) {
     gameRecorded_ = false;
     activeMove_ = {};
     animationUntilMs_ = 0;
+    activeAnimationMs_ = MOVE_ANIMATION_MS;
+    bannerStartMs_ = 0;
     bannerUntilMs_ = 0;
     nextAiMoveMs_ = 0;
     pendingGameOver_ = false;
@@ -395,8 +494,10 @@ void Game2048App::startGame(uint32_t nowMs) {
 }
 
 void Game2048App::applyMove(pgos::Game2048Direction direction,
-                            AppContext& context, uint32_t nowMs) {
-    if (phase_ != Phase::Running || animationUntilMs_ != 0) {
+                            AppContext& context, uint32_t nowMs,
+                            uint32_t animationMs) {
+    if (phase_ != Phase::Running || animationUntilMs_ != 0 ||
+        bannerUntilMs_ != 0) {
         return;
     }
     const pgos::Game2048MoveResult result = engine_.move(direction);
@@ -408,7 +509,8 @@ void Game2048App::applyMove(pgos::Game2048Direction direction,
     }
     activeMove_ = result;
     animationStartMs_ = nowMs;
-    animationUntilMs_ = nowMs + MOVE_ANIMATION_MS;
+    activeAnimationMs_ = std::max<uint32_t>(1U, animationMs);
+    animationUntilMs_ = nowMs + activeAnimationMs_;
     bestScore_ = std::max(bestScore_, engine_.score());
     if (result.reachedTarget) {
         context.audio.playGameTone(1120U, 150U);
@@ -426,7 +528,8 @@ void Game2048App::applyMove(pgos::Game2048Direction direction,
                                       result.reachedTarget ? 255U : 150U);
     }
     if (result.reachedTarget) {
-        bannerUntilMs_ = nowMs + BANNER_MS;
+        bannerStartMs_ = nowMs;
+        bannerUntilMs_ = nowMs + TARGET_CELEBRATION_MS;
     }
     if (result.gameOver) {
         pendingGameOver_ = true;
@@ -469,16 +572,20 @@ void Game2048App::sampleAi(const GamepadSnapshot& gamepad, uint32_t nowMs,
         nextAiMoveMs_ = aiActive_ ? nowMs : 0;
         invalidate();
     }
-    if (!aiActive_ || animationUntilMs_ != 0 ||
+    if (!aiActive_ || animationUntilMs_ != 0 || bannerUntilMs_ != 0 ||
         static_cast<int32_t>(nowMs - nextAiMoveMs_) < 0) {
         return;
     }
 
     const pgos::Game2048AiDecision decision = ai_.chooseMove(engine_.board());
     const uint32_t decisionMs = millis();
-    nextAiMoveMs_ = decisionMs + AI_MOVE_INTERVAL_MS;
+    const uint32_t activeDurationMs =
+        aiHoldPolicy_.activeDurationMs(decisionMs);
+    nextAiMoveMs_ = decisionMs +
+        pgos::Game2048AiPacing::moveIntervalMs(activeDurationMs);
     if (decision.valid) {
-        applyMove(decision.direction, context, decisionMs);
+        applyMove(decision.direction, context, decisionMs,
+                  pgos::Game2048AiPacing::animationMs(activeDurationMs));
     } else if (engine_.isGameOver()) {
         finishGame(context);
     }
@@ -501,6 +608,28 @@ void Game2048App::invalidate() {
     if (surface_ != nullptr) {
         lv_obj_invalidate(surface_);
     }
+}
+
+const lv_font_t* Game2048App::tileNumberFont(
+    const char* text, int16_t availableSize) const {
+    if (text == nullptr || availableSize <= 0) {
+        return nullptr;
+    }
+    const lv_font_t* candidates[] = {
+        tileFont_, tileMediumFont_, tileSmallFont_, tileCompactFont_, tinyFont_,
+    };
+    for (const lv_font_t* font : candidates) {
+        if (font == nullptr) {
+            continue;
+        }
+        lv_point_t size{};
+        lv_text_get_size(&size, text, font, 0, 0, LV_COORD_MAX,
+                         LV_TEXT_FLAG_EXPAND);
+        if (size.x <= availableSize && size.y <= availableSize) {
+            return font;
+        }
+    }
+    return nullptr;
 }
 
 lv_color_t Game2048App::tileColor(uint32_t value) {
