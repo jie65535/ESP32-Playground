@@ -1,7 +1,10 @@
 #pragma once
 
 #include "core/App.h"
+#include "games/Game2048Ai.h"
+#include "games/Game2048AiHoldPolicy.h"
 #include "games/Game2048Engine.h"
+#include "games/Game2048InputPolicy.h"
 
 class Game2048App final : public IApp {
 public:
@@ -28,22 +31,22 @@ private:
                                           TILE_SIZE * 4 + TILE_GAP * 3;
     static constexpr uint32_t MOVE_ANIMATION_MS = 145;
     static constexpr uint32_t BANNER_MS = 900;
-    static constexpr int16_t ANALOG_THRESHOLD = 180;
-    static constexpr uint32_t ANALOG_REPEAT_MS = 145;
-
+    static constexpr uint32_t AI_MOVE_INTERVAL_MS = 220;
+    pgos::Game2048Ai ai_;
+    pgos::Game2048AiHoldPolicy aiHoldPolicy_;
     pgos::Game2048Engine engine_;
+    pgos::Game2048InputPolicy inputPolicy_;
     pgos::Game2048MoveResult activeMove_{};
     Phase phase_ = Phase::Title;
     uint32_t bestScore_ = 0;
     uint32_t animationStartMs_ = 0;
     uint32_t animationUntilMs_ = 0;
     uint32_t bannerUntilMs_ = 0;
+    uint32_t nextAiMoveMs_ = 0;
     uint32_t randomSeed_ = 0x2048C0DEU;
     bool gameRecorded_ = false;
     bool pendingGameOver_ = false;
-    int8_t analogX_ = 0;
-    int8_t analogY_ = 0;
-    uint32_t nextAnalogMs_ = 0;
+    bool aiActive_ = false;
 
     lv_obj_t* root_ = nullptr;
     lv_obj_t* surface_ = nullptr;
@@ -73,6 +76,8 @@ private:
     void applyMove(pgos::Game2048Direction direction, AppContext& context,
                    uint32_t nowMs);
     void finishGame(AppContext& context);
+    void sampleAi(const GamepadSnapshot& gamepad, uint32_t nowMs,
+                  AppContext& context);
     void sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs,
                       AppContext& context);
     void invalidate();

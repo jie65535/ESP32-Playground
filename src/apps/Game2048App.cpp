@@ -8,7 +8,6 @@
 #include "ui/UiRuntime.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdio>
 
 using pgos::drawRect;
@@ -29,9 +28,14 @@ void Game2048App::onEnter(AppContext& context) {
     activeMove_ = {};
     animationUntilMs_ = 0;
     bannerUntilMs_ = 0;
+    nextAiMoveMs_ = 0;
     pendingGameOver_ = false;
-    analogX_ = analogY_ = 0;
-    nextAnalogMs_ = 0;
+    inputPolicy_.reset();
+    const GamepadSnapshot& gamepad = context.gamepad.snapshot();
+    const bool yHeld = gamepad.connected &&
+                       (gamepad.buttons & GamepadButtonY) != 0;
+    aiHoldPolicy_.reset(yHeld);
+    aiActive_ = false;
 }
 
 void Game2048App::onExit(AppContext& context) {
@@ -51,22 +55,33 @@ void Game2048App::onExit(AppContext& context) {
     tileMediumFont_ = nullptr;
     tileSmallFont_ = nullptr;
     overlayFont_ = nullptr;
+    aiHoldPolicy_.reset();
+    aiActive_ = false;
+    nextAiMoveMs_ = 0;
 }
 
 void Game2048App::onCommand(const AppCommand& command, AppContext& context) {
     const uint32_t nowMs = millis();
     switch (command.type) {
         case AppCommandType::Previous:
-            applyMove(pgos::Game2048Direction::Up, context, nowMs);
+            if (!aiActive_) {
+                applyMove(pgos::Game2048Direction::Up, context, nowMs);
+            }
             break;
         case AppCommandType::Next:
-            applyMove(pgos::Game2048Direction::Down, context, nowMs);
+            if (!aiActive_) {
+                applyMove(pgos::Game2048Direction::Down, context, nowMs);
+            }
             break;
         case AppCommandType::Left:
-            applyMove(pgos::Game2048Direction::Left, context, nowMs);
+            if (!aiActive_) {
+                applyMove(pgos::Game2048Direction::Left, context, nowMs);
+            }
             break;
         case AppCommandType::Right:
-            applyMove(pgos::Game2048Direction::Right, context, nowMs);
+            if (!aiActive_) {
+                applyMove(pgos::Game2048Direction::Right, context, nowMs);
+            }
             break;
         case AppCommandType::Activate:
             if (phase_ == Phase::Title || phase_ == Phase::GameOver) {
@@ -96,7 +111,8 @@ void Game2048App::onTick(uint32_t nowMs, AppContext& context) {
     if (surface_ == nullptr) {
         return;
     }
-    sampleAnalog(context.gamepad.snapshot(), nowMs, context);
+    const GamepadSnapshot& gamepad = context.gamepad.snapshot();
+    sampleAi(gamepad, nowMs, context);
     if (animationUntilMs_ != 0 &&
         static_cast<int32_t>(nowMs - animationUntilMs_) >= 0) {
         animationUntilMs_ = 0;
@@ -111,6 +127,9 @@ void Game2048App::onTick(uint32_t nowMs, AppContext& context) {
         static_cast<int32_t>(nowMs - bannerUntilMs_) >= 0) {
         bannerUntilMs_ = 0;
         invalidate();
+    }
+    if (!aiActive_) {
+        sampleAnalog(gamepad, nowMs, context);
     }
     if (animationUntilMs_ != 0 || bannerUntilMs_ != 0) {
         invalidate();
@@ -370,6 +389,7 @@ void Game2048App::startGame(uint32_t nowMs) {
     activeMove_ = {};
     animationUntilMs_ = 0;
     bannerUntilMs_ = 0;
+    nextAiMoveMs_ = 0;
     pendingGameOver_ = false;
     invalidate();
 }
@@ -419,6 +439,11 @@ void Game2048App::finishGame(AppContext& context) {
         return;
     }
     phase_ = Phase::GameOver;
+    const GamepadSnapshot& gamepad = context.gamepad.snapshot();
+    aiHoldPolicy_.reset(gamepad.connected &&
+                        (gamepad.buttons & GamepadButtonY) != 0);
+    aiActive_ = false;
+    nextAiMoveMs_ = 0;
     if (!gameRecorded_) {
         context.game2048Profile.recordGame(engine_.score(), engine_.bestTile(),
                                            engine_.hasReachedTarget());
@@ -432,36 +457,43 @@ void Game2048App::finishGame(AppContext& context) {
     invalidate();
 }
 
+void Game2048App::sampleAi(const GamepadSnapshot& gamepad, uint32_t nowMs,
+                           AppContext& context) {
+    const bool yHeld = gamepad.connected &&
+                       (gamepad.buttons & GamepadButtonY) != 0;
+    const bool wasActive = aiActive_;
+    aiActive_ = aiHoldPolicy_.sample(yHeld, nowMs,
+                                     phase_ == Phase::Running);
+    if (aiActive_ != wasActive) {
+        inputPolicy_.reset();
+        nextAiMoveMs_ = aiActive_ ? nowMs : 0;
+        invalidate();
+    }
+    if (!aiActive_ || animationUntilMs_ != 0 ||
+        static_cast<int32_t>(nowMs - nextAiMoveMs_) < 0) {
+        return;
+    }
+
+    const pgos::Game2048AiDecision decision = ai_.chooseMove(engine_.board());
+    const uint32_t decisionMs = millis();
+    nextAiMoveMs_ = decisionMs + AI_MOVE_INTERVAL_MS;
+    if (decision.valid) {
+        applyMove(decision.direction, context, decisionMs);
+    } else if (engine_.isGameOver()) {
+        finishGame(context);
+    }
+}
+
 void Game2048App::sampleAnalog(const GamepadSnapshot& gamepad, uint32_t nowMs,
                                AppContext& context) {
-    if (!gamepad.connected || phase_ != Phase::Running || animationUntilMs_ != 0) {
-        analogX_ = analogY_ = 0;
-        nextAnalogMs_ = 0;
+    if (!gamepad.connected || phase_ != Phase::Running) {
+        inputPolicy_.reset();
         return;
     }
-    const int8_t x = std::abs(static_cast<int32_t>(gamepad.axisX)) >= ANALOG_THRESHOLD
-                         ? (gamepad.axisX < 0 ? -1 : 1) : 0;
-    const int8_t y = std::abs(static_cast<int32_t>(gamepad.axisY)) >= ANALOG_THRESHOLD
-                         ? (gamepad.axisY < 0 ? -1 : 1) : 0;
-    if (x != analogX_ || y != analogY_) {
-        analogX_ = x;
-        analogY_ = y;
-        nextAnalogMs_ = nowMs;
-    }
-    if (x == 0 && y == 0) {
-        return;
-    }
-    if (static_cast<int32_t>(nowMs - nextAnalogMs_) < 0) {
-        return;
-    }
-    nextAnalogMs_ = nowMs + ANALOG_REPEAT_MS;
-    if (std::abs(static_cast<int32_t>(gamepad.axisX)) >=
-        std::abs(static_cast<int32_t>(gamepad.axisY))) {
-        applyMove(x < 0 ? pgos::Game2048Direction::Left
-                        : pgos::Game2048Direction::Right, context, nowMs);
-    } else {
-        applyMove(y < 0 ? pgos::Game2048Direction::Up
-                        : pgos::Game2048Direction::Down, context, nowMs);
+    const pgos::Game2048AnalogDecision decision = inputPolicy_.sample(
+        gamepad.axisX, gamepad.axisY, nowMs, animationUntilMs_ == 0);
+    if (decision.triggered) {
+        applyMove(decision.direction, context, nowMs);
     }
 }
 
