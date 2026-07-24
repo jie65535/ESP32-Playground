@@ -27,9 +27,9 @@ class Game2048AiPacing final {
 public:
     static constexpr uint32_t RAMP_MS = 12000;
     static constexpr uint32_t START_INTERVAL_MS = 240;
-    static constexpr uint32_t MIN_INTERVAL_MS = 95;
+    static constexpr uint32_t MIN_INTERVAL_MS = 55;
     static constexpr uint32_t START_ANIMATION_MS = 145;
-    static constexpr uint32_t MIN_ANIMATION_MS = 80;
+    static constexpr uint32_t MIN_ANIMATION_MS = 45;
 
     static uint32_t moveIntervalMs(uint32_t activeDurationMs);
     static uint32_t animationMs(uint32_t activeDurationMs);

@@ -28,7 +28,6 @@ private:
 
     uint32_t evaluatedNodes_ = 0;
     uint32_t directionNodes_ = 0;
-
     static constexpr uint32_t DIRECTION_NODE_BUDGET = NODE_BUDGET / 4U;
 
     bool consumeNode();
