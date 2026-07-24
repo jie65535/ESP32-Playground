@@ -24,6 +24,7 @@ const MenuItemDefinition GAME_ITEMS[] = {
     {UiIcon::Gamepad, "Super Mario", nullptr, AppId::Platformer},
     {UiIcon::Blackjack, "二十一点", nullptr, AppId::Blackjack},
     {UiIcon::Minesweeper, "扫雷", nullptr, AppId::Minesweeper},
+    {UiIcon::Tetris, "2048", nullptr, AppId::Game2048},
 };
 
 const MenuItemDefinition SETTINGS_ITEMS[] = {
@@ -119,6 +120,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PagePlatformer:
         case AppCommandType::PageBlackjack:
         case AppCommandType::PageMinesweeper:
+        case AppCommandType::PageGame2048:
         case AppCommandType::ColorTest:
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
@@ -184,7 +186,7 @@ SystemKernel::SystemKernel()
       breakoutScore_("pgos_breakout", 1, "breakout"),
       context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
                snakeScore_, tetrisScore_, breakoutScore_, blackjackProfile_,
-               minesweeperProfile_, Serial, ui_, runtime_},
+               minesweeperProfile_, game2048Profile_, Serial, ui_, runtime_},
       appManager_(context_),
       gamesMenuApp_(GAMES_MENU),
       settingsMenuApp_(SETTINGS_MENU),
@@ -218,6 +220,7 @@ void SystemKernel::setup() {
     breakoutScore_.begin(Serial);
     blackjackProfile_.begin(Serial);
     minesweeperProfile_.begin(Serial);
+    game2048Profile_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -239,6 +242,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(platformerApp_);
         appManager_.registerApp(blackjackApp_);
         appManager_.registerApp(minesweeperApp_);
+        appManager_.registerApp(game2048App_);
         appManager_.registerApp(gamesMenuApp_);
         appManager_.registerApp(settingsMenuApp_);
         appManager_.registerApp(toolsMenuApp_);
@@ -494,6 +498,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::PageMinesweeper:
             appManager_.activate(AppId::Minesweeper);
+            break;
+        case AppCommandType::PageGame2048:
+            appManager_.activate(AppId::Game2048);
             break;
         case AppCommandType::ColorTest:
             appManager_.activate(AppId::DisplayTest);

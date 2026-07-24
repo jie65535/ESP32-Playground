@@ -135,6 +135,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
     } else if (lower == "page minesweeper" || lower == "game minesweeper" ||
                lower == "page mines") {
         command.type = AppCommandType::PageMinesweeper;
+    } else if (lower == "page 2048" || lower == "game 2048") {
+        command.type = AppCommandType::PageGame2048;
     } else if (lower == "color_test") {
         command.type = AppCommandType::ColorTest;
     } else if (lower == "screenshot") {
@@ -293,6 +295,7 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("         platformer mapnext"));
     output.println(F("         page blackjack"));
     output.println(F("         page minesweeper"));
+    output.println(F("         page 2048"));
     output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));

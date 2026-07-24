@@ -57,6 +57,7 @@ VALID_COMMANDS = (
     "platformer mapnext",
     "page blackjack",
     "page minesweeper",
+    "page 2048",
     "time status",
     "i2c scan",
     "wifi scan",
@@ -104,6 +105,7 @@ SHORTCUTS = {
     "p": "page platformer",
     "j": "page blackjack",
     "m": "page minesweeper",
+    "e": "page 2048",
     "f": "flag",
     "z": "pause",
     "c": "color_test",
@@ -313,7 +315,7 @@ def print_controls() -> None:
     print("ESP32 Playground USB console")
     print("  1/0 system   2 display   3 network   4 settings   5 sound   6 console")
     print("  7 RGB light  8 time")
-    print("  T Tetris   B Breakout   P Platformer   J Blackjack")
+    print("  T Tetris   B Breakout   P Platformer   J Blackjack   E 2048")
     print("  Backspace back   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")
     print("  Desktop: arrows move, Enter opens; apps keep their own controls")

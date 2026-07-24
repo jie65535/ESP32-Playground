@@ -73,6 +73,10 @@ class ConsoleMappingTests(unittest.TestCase):
             "page minesweeper",
         )
         self.assertEqual(
+            CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "e")),
+            "page 2048",
+        )
+        self.assertEqual(
             CONSOLE.command_for_key(CONSOLE.KeyEvent("character", "f")),
             "flag",
         )
@@ -110,6 +114,7 @@ class ConsoleMappingTests(unittest.TestCase):
                     "platformer mapnext",
                     "page blackjack",
                     "page minesweeper",
+                    "page 2048",
                     "flag",
                     "pause",
                     "status",
@@ -125,6 +130,7 @@ class ConsoleMappingTests(unittest.TestCase):
                 "platformer mapnext",
                 "page blackjack",
                 "page minesweeper",
+                "page 2048",
                 "flag",
                 "pause",
                 "status",

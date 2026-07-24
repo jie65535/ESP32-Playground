@@ -15,6 +15,7 @@ class BleGamepadService;
 class GameScoreService;
 class BlackjackProfileService;
 class MinesweeperProfileService;
+class Game2048ProfileService;
 class RuntimeMonitorService;
 class UiRuntime;
 
@@ -31,6 +32,7 @@ struct AppContext {
     GameScoreService& breakoutScore;
     BlackjackProfileService& blackjackProfile;
     MinesweeperProfileService& minesweeperProfile;
+    Game2048ProfileService& game2048Profile;
     Stream& console;
     UiRuntime& ui;
     RuntimeMonitorService& runtime;

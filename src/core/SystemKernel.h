@@ -16,6 +16,7 @@
 #include "apps/PlatformerApp.h"
 #include "apps/BlackjackApp.h"
 #include "apps/MinesweeperApp.h"
+#include "apps/Game2048App.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
@@ -29,6 +30,7 @@
 #include "services/GameScoreService.h"
 #include "services/BlackjackProfileService.h"
 #include "services/MinesweeperProfileService.h"
+#include "services/Game2048ProfileService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
 #include "services/TimeService.h"
@@ -56,6 +58,7 @@ private:
     GameScoreService breakoutScore_;
     BlackjackProfileService blackjackProfile_;
     MinesweeperProfileService minesweeperProfile_;
+    Game2048ProfileService game2048Profile_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -78,6 +81,7 @@ private:
     PlatformerApp platformerApp_;
     BlackjackApp blackjackApp_;
     MinesweeperApp minesweeperApp_;
+    Game2048App game2048App_;
     MenuApp gamesMenuApp_;
     MenuApp settingsMenuApp_;
     MenuApp toolsMenuApp_;
