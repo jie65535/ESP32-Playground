@@ -192,6 +192,15 @@ bool AudioService::begin(Stream& log, I2cBusService& i2c) {
             preferences_.getBool("mic_denoise",
                                  DEFAULT_MIC_DENOISE_ENABLED),
             std::memory_order_relaxed);
+        micVoiceEnhanceEnabled_.store(
+            preferences_.getBool("mic_voice",
+                                 DEFAULT_MIC_VOICE_ENHANCE_ENABLED),
+            std::memory_order_relaxed);
+    } else {
+        micDenoiseEnabled_.store(DEFAULT_MIC_DENOISE_ENABLED,
+                                 std::memory_order_relaxed);
+        micVoiceEnhanceEnabled_.store(
+            DEFAULT_MIC_VOICE_ENHANCE_ENABLED, std::memory_order_relaxed);
     }
 
     if (!i2c.ready()) {
@@ -222,10 +231,25 @@ bool AudioService::begin(Stream& log, I2cBusService& i2c) {
         log.println(F("[audio] microphone ring buffer allocation failed"));
     }
 
-    const bool voiceDetectorReady = micVoiceDetector_.begin();
+    const bool denoiserRequested = microphoneDenoiseEnabled();
+    const bool denoiserAllocated = micDenoiser_.begin();
+    const bool denoiserReady = denoiserRequested && denoiserAllocated;
+    micDenoiseActive_ = denoiserRequested;
+    micDenoiserReady_.store(denoiserReady, std::memory_order_relaxed);
+    if (denoiserRequested) {
+        log.println(denoiserReady
+                        ? F("[mic] SpeexDSP denoiser ready in PSRAM")
+                        : F("[mic] SpeexDSP denoiser unavailable"));
+    }
+
+    const bool voiceRequested = microphoneVoiceEnhanceEnabled();
+    const bool voiceDetectorAllocated = micVoiceDetector_.begin();
+    const bool voiceDetectorReady =
+        denoiserReady && voiceRequested && voiceDetectorAllocated;
+    micVoiceEnhanceActive_ = voiceRequested;
     micVoiceDetectorReady_.store(voiceDetectorReady,
                                  std::memory_order_relaxed);
-    if (!voiceDetectorReady) {
+    if (voiceRequested && !voiceDetectorReady) {
         log.println(F("[mic] WebRTC VAD unavailable; voice AGC bypassed"));
     }
 
@@ -424,11 +448,15 @@ void AudioService::setMicrophoneVoiceEnhanceEnabled(bool enabled) {
     }
     const bool previous =
         micVoiceEnhanceEnabled_.exchange(enabled, std::memory_order_relaxed);
-    if (previous == enabled || log_ == nullptr) {
+    if (previous == enabled) {
         return;
     }
-    log_->print(F("[mic] voice_enhance="));
-    log_->println(enabled ? F("on") : F("off"));
+    settingsDirty_ = true;
+    settingsSaveDueMs_ = millis() + 750U;
+    if (log_ != nullptr) {
+        log_->print(F("[mic] voice_enhance="));
+        log_->println(enabled ? F("on") : F("off"));
+    }
 }
 
 void AudioService::toggleMicrophoneVoiceEnhance() {
@@ -487,6 +515,8 @@ MicrophoneSnapshot AudioService::microphoneSnapshot() const {
     value.captureActive = microphoneCaptureActive();
     value.gain = microphoneGain();
     value.denoiseEnabled = microphoneDenoiseEnabled();
+    value.denoiserReady =
+        micDenoiserReady_.load(std::memory_order_relaxed);
     value.captureSuppressed =
         micCaptureSuppressed_.load(std::memory_order_relaxed);
     value.voiceDetectorReady =
@@ -503,7 +533,8 @@ MicrophoneSnapshot AudioService::microphoneSnapshot() const {
     value.lastReadMs = micLastReadMs_.load(std::memory_order_relaxed);
     value.rms = micRms_.load(std::memory_order_relaxed);
     value.peak = micPeak_.load(std::memory_order_relaxed);
-    value.noiseRms = micNoiseRms_.load(std::memory_order_relaxed);
+    value.backgroundInputRms =
+        micBackgroundInputRms_.load(std::memory_order_relaxed);
     value.denoiseGainPercent =
         micDenoiseGainPercent_.load(std::memory_order_relaxed);
     value.voiceGainPercent =
@@ -719,12 +750,24 @@ void AudioService::printStatus(Print& output) const {
     output.print(mic.monitorEnabled ? F("on") : F("off"));
     output.print(F(" denoise="));
     output.print(mic.denoiseEnabled ? F("on") : F("off"));
-    output.print(F(" noise_rms="));
-    output.print(mic.noiseRms);
+    output.print(F(" ns="));
+    output.print(!mic.denoiseEnabled
+                     ? F("bypass")
+                     : (!mic.captureActive
+                            ? F("idle")
+                            : (mic.denoiserReady ? F("speex")
+                                                 : F("unavailable"))));
+    output.print(F(" background_input_rms="));
+    output.print(mic.backgroundInputRms);
     output.print(F(" denoise_gain="));
     output.print(mic.denoiseGainPercent);
     output.print(F("% vad="));
-    output.print(mic.voiceDetectorReady ? F("webrtc3") : F("unavailable"));
+    output.print(!mic.voiceEnhanceEnabled
+                     ? F("bypass")
+                     : (!mic.captureActive
+                            ? F("idle")
+                            : (mic.voiceDetectorReady ? F("webrtc3")
+                                                      : F("unavailable"))));
     output.print(F(" voice="));
     output.print(mic.voiceActive ? F("yes") : F("no"));
     output.print(F(" voice_enhance="));
@@ -936,6 +979,7 @@ void AudioService::saveSettings() {
     preferences_.putUChar("volume", volumePercent_);
     preferences_.putBool("feedback", feedbackEnabled_);
     preferences_.putBool("mic_denoise", microphoneDenoiseEnabled());
+    preferences_.putBool("mic_voice", microphoneVoiceEnhanceEnabled());
     if (log_ != nullptr) {
         log_->println(F("[audio] settings saved"));
     }
@@ -971,7 +1015,7 @@ void AudioService::resetMicrophoneCaptureMetrics() {
     micLastReadMs_.store(0, std::memory_order_relaxed);
     micRms_.store(0, std::memory_order_relaxed);
     micPeak_.store(0, std::memory_order_relaxed);
-    micNoiseRms_.store(0, std::memory_order_relaxed);
+    micBackgroundInputRms_.store(0, std::memory_order_relaxed);
     micDenoiseGainPercent_.store(100, std::memory_order_relaxed);
     micVoiceActive_.store(false, std::memory_order_relaxed);
     micVoiceGainPercent_.store(100, std::memory_order_relaxed);
@@ -979,6 +1023,21 @@ void AudioService::resetMicrophoneCaptureMetrics() {
     micLevelPercent_.store(0, std::memory_order_relaxed);
     micCaptureSuppressed_.store(false, std::memory_order_relaxed);
     micCaptureSuppressUntilMs_.store(0, std::memory_order_relaxed);
+}
+
+void AudioService::resetMicrophoneProcessors() {
+    micDenoiser_.reset();
+    (void)micVoiceDetector_.reset();
+    micVoiceEnhancer_.reset();
+    micDenoiseActive_ = false;
+    micVoiceEnhanceActive_ = false;
+    micDenoiserReady_.store(false, std::memory_order_relaxed);
+    micVoiceDetectorReady_.store(false, std::memory_order_relaxed);
+    micBackgroundInputRms_.store(0, std::memory_order_relaxed);
+    micDenoiseGainPercent_.store(100, std::memory_order_relaxed);
+    micVoiceActive_.store(false, std::memory_order_relaxed);
+    micVoiceGainPercent_.store(100, std::memory_order_relaxed);
+    micVoiceLimiting_.store(false, std::memory_order_relaxed);
 }
 
 size_t AudioService::processMicrophoneSamples(const int16_t* samples,
@@ -995,27 +1054,61 @@ size_t AudioService::processMicrophoneSamples(const int16_t* samples,
         output[frame] = loudestMono(samples, frame);
     }
 
+    const uint32_t nowMs = millis();
+    const uint32_t suppressUntilMs =
+        micCaptureSuppressUntilMs_.load(std::memory_order_relaxed);
+    const bool suppressCapture =
+        static_cast<int32_t>(suppressUntilMs - nowMs) > 0;
+    micCaptureSuppressed_.store(suppressCapture, std::memory_order_relaxed);
+
     const bool denoiseEnabled = microphoneDenoiseEnabled();
-    if (denoiseEnabled != micDenoiseActive_) {
-        micDenoiser_.reset();
-        const bool voiceDetectorReady = micVoiceDetector_.reset();
-        micVoiceDetectorReady_.store(voiceDetectorReady,
-                                     std::memory_order_relaxed);
+    if (suppressCapture) {
+        if (micDenoiseActive_ || micVoiceEnhanceActive_ ||
+            micVoiceDetectorReady_.load(std::memory_order_relaxed)) {
+            resetMicrophoneProcessors();
+        }
+    } else if (denoiseEnabled != micDenoiseActive_) {
+        bool denoiserReady = micDenoiser_.ready();
+        if (denoiseEnabled) {
+            if (!denoiserReady) {
+                denoiserReady = micDenoiser_.begin();
+            }
+            if (log_ != nullptr) {
+                log_->println(denoiserReady
+                                  ? F("[mic] SpeexDSP denoiser ready")
+                                  : F("[mic] SpeexDSP denoiser unavailable"));
+            }
+        }
+        micDenoiserReady_.store(denoiseEnabled && denoiserReady,
+                                std::memory_order_relaxed);
+        (void)micVoiceDetector_.reset();
+        micVoiceDetectorReady_.store(false, std::memory_order_relaxed);
+        micVoiceEnhancer_.reset();
+        micVoiceEnhanceActive_ = false;
         micDenoiseActive_ = denoiseEnabled;
     }
-    if (denoiseEnabled) {
+    const bool denoiserReady =
+        !suppressCapture && denoiseEnabled && micDenoiser_.ready();
+    if (denoiserReady) {
         micDenoiser_.process(output, frames);
         const MicrophoneDenoiseMetrics metrics = micDenoiser_.metrics();
-        micNoiseRms_.store(metrics.noiseRms, std::memory_order_relaxed);
+        micBackgroundInputRms_.store(metrics.backgroundInputRms,
+                                     std::memory_order_relaxed);
         micDenoiseGainPercent_.store(metrics.gainPercent,
                                      std::memory_order_relaxed);
 
         const bool voiceEnhanceEnabled = microphoneVoiceEnhanceEnabled();
         if (voiceEnhanceEnabled != micVoiceEnhanceActive_) {
             micVoiceEnhancer_.reset();
-            const bool voiceDetectorReady = micVoiceDetector_.reset();
+            const bool voiceDetectorAllocated = micVoiceDetector_.reset();
+            const bool voiceDetectorReady =
+                voiceEnhanceEnabled && voiceDetectorAllocated;
             micVoiceDetectorReady_.store(voiceDetectorReady,
                                          std::memory_order_relaxed);
+            if (voiceEnhanceEnabled && !voiceDetectorReady && log_ != nullptr) {
+                log_->println(
+                    F("[mic] WebRTC VAD unavailable; voice AGC bypassed"));
+            }
             micVoiceEnhanceActive_ = voiceEnhanceEnabled;
         }
         bool voiceActive = false;
@@ -1041,7 +1134,7 @@ size_t AudioService::processMicrophoneSamples(const int16_t* samples,
             micVoiceLimiting_.store(false, std::memory_order_relaxed);
         }
     } else {
-        micNoiseRms_.store(0, std::memory_order_relaxed);
+        micBackgroundInputRms_.store(0, std::memory_order_relaxed);
         micDenoiseGainPercent_.store(100, std::memory_order_relaxed);
         micVoiceActive_.store(false, std::memory_order_relaxed);
         micVoiceGainPercent_.store(100, std::memory_order_relaxed);
@@ -1052,12 +1145,6 @@ size_t AudioService::processMicrophoneSamples(const int16_t* samples,
     uint64_t squareSum = 0;
     uint16_t peak = 0;
     uint32_t writeIndex = micWriteIndex_.load(std::memory_order_relaxed);
-    const uint32_t nowMs = millis();
-    const uint32_t suppressUntilMs =
-        micCaptureSuppressUntilMs_.load(std::memory_order_relaxed);
-    const bool suppressCapture =
-        static_cast<int32_t>(suppressUntilMs - nowMs) > 0;
-    micCaptureSuppressed_.store(suppressCapture, std::memory_order_relaxed);
 
     for (size_t frame = 0; frame < frames; ++frame) {
         const int16_t mono = output[frame];
@@ -1101,23 +1188,32 @@ void AudioService::run() {
     int16_t microphoneMono[DMA_FRAMES];
     uint32_t phase = 0;
     uint16_t previousFrequency = 0;
+    bool captureWasActive = false;
 
     while (true) {
         size_t microphoneFrameCount = 0;
-        if (microphoneConfigured_ && microphoneCaptureActive()) {
+        const bool captureActive =
+            microphoneConfigured_ && microphoneCaptureActive();
+        if (captureActive) {
             size_t bytesRead = 0;
             const esp_err_t readResult =
                 i2s_read(I2S_NUM_1, microphoneSamples,
                          sizeof(microphoneSamples), &bytesRead,
-                         pdMS_TO_TICKS(5));
-            if (readResult == ESP_OK && bytesRead >= sizeof(int16_t) * 2U) {
+                         pdMS_TO_TICKS(25));
+            if (readResult == ESP_OK &&
+                bytesRead == sizeof(microphoneSamples)) {
                 microphoneFrameCount = processMicrophoneSamples(
                     microphoneSamples, bytesRead / sizeof(int16_t),
                     microphoneMono, DMA_FRAMES);
+            } else if (readResult == ESP_OK && bytesRead > 0) {
+                micReadErrors_.fetch_add(1, std::memory_order_relaxed);
             } else if (readResult != ESP_ERR_TIMEOUT) {
                 micReadErrors_.fetch_add(1, std::memory_order_relaxed);
             }
+        } else if (captureWasActive) {
+            resetMicrophoneProcessors();
         }
+        captureWasActive = captureActive;
 
         const uint32_t nowMs = millis();
         const uint32_t untilMs = toneUntilMs_.load(std::memory_order_relaxed);

@@ -36,7 +36,7 @@ System Tools 三个父菜单，`AppManager` 保存父页面历史，Back 逐级�
 
 声音基座已加入最小实验：ES8311/I²S 播放固定 1 kHz 反馈音，声音页支持音量、交互反馈音开关和试听；默认音量 60%、反馈音关闭，初始化失败时页面仍可显示并报告 unavailable。
 
-麦克风基座已接入 ES8311 ADC / GPIO6：音频任务在麦克风页、显式耳返或 USB 录音期间按需采集 8 kHz mono PCM16，计算 RMS/Peak/Level，并在 PSRAM 保留最近 6 秒；麦克风页提供三档输入增益、持久化的可旁路固定点轻量降噪、WebRTC VAD 驱动的人声 AGC/限幅、默认关闭的衰减耳返和最近缓存回放。USB `mic record` 使用带 request/sequence/CRC32 的二进制帧导出，`tools/capture_microphone.py` 自动管理临时采集并保存 WAV。COM3 已验证 `normal` 增益、低音量背景音乐降噪 A/B，以及 VAD 在约 27 秒背景采样中保持 100%、正常说话时触发 222%～400% 增益；轻声开头、音乐歌声、AEC/耳返反馈和长期稳定性仍待人工验收。
+麦克风基座已接入 ES8311 ADC / GPIO6：音频任务在麦克风页、显式耳返或 USB 录音期间按需采集 8 kHz mono PCM16，计算 RMS/Peak/Level，并在 PSRAM 保留最近 6 秒；麦克风页提供三档输入增益、持久化且默认开启的 SpeexDSP 固定点频域降噪、WebRTC VAD 驱动的人声 AGC/限幅、默认关闭的衰减耳返和最近缓存回放。Speex 工作区在启动阶段一次性放入 PSRAM，本机播放期间暂停 DSP 并丢弃采集，退出页面后停止 RX/DSP。USB `mic record` 使用带 request/sequence/CRC32 的二进制帧导出，`tools/capture_microphone.py` 自动管理临时采集并保存 WAV。COM3 已验证 `normal` 增益、低音量背景音乐降噪、VAD 人声增益、8 次页面进出稳定性及录音协议；最终人声主观试听和更长时间稳定性仍待验收。
 
 RGB 基座已加入最小实验：`RgbService` 通过 GPIO42/RMT 驱动板载 WS2812；Power 默认关闭且不持久化，灯效、基色、亮度和速度保存到独立 NVS namespace。RGB Light App 的静态、呼吸、彩虹、心跳和闪烁均由非阻塞状态机运行，离开页面后仍可继续作为后台灯光服务。
 

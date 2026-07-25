@@ -6,9 +6,20 @@
 #include "third_party/libfvad/include/fvad.h"
 
 MicrophoneVoiceDetector::~MicrophoneVoiceDetector() {
+    end();
+}
+
+void MicrophoneVoiceDetector::end() {
     if (vad_ != nullptr) {
         fvad_free(vad_);
+        vad_ = nullptr;
     }
+    frameSamples_ = 0;
+    speechRunFrames_ = 0;
+    hangoverFrames_ = 0;
+    rawVoice_ = false;
+    voiceActive_ = false;
+    ready_ = false;
 }
 
 bool MicrophoneVoiceDetector::begin() {
@@ -63,7 +74,7 @@ MicrophoneVoiceDetectionMetrics MicrophoneVoiceDetector::process(
             voiceActive_ = false;
             break;
         }
-        updateDecision(result > 0);
+        updateDecision(result > 0, calculateRms(frame_, FRAME_SAMPLES));
     }
 
     return metrics();
@@ -79,9 +90,9 @@ MicrophoneVoiceDetectionMetrics MicrophoneVoiceDetector::metrics() const {
     return value;
 }
 
-void MicrophoneVoiceDetector::updateDecision(bool rawVoice) {
+void MicrophoneVoiceDetector::updateDecision(bool rawVoice, uint16_t rms) {
     rawVoice_ = rawVoice;
-    if (rawVoice) {
+    if (rawVoice && rms >= MIN_VOICE_RMS) {
         if (speechRunFrames_ < START_SPEECH_FRAMES) {
             ++speechRunFrames_;
         }
@@ -98,4 +109,30 @@ void MicrophoneVoiceDetector::updateDecision(bool rawVoice) {
     } else {
         voiceActive_ = false;
     }
+}
+
+uint16_t MicrophoneVoiceDetector::calculateRms(const int16_t* samples,
+                                                size_t sampleCount) {
+    uint64_t squareSum = 0;
+    for (size_t index = 0; index < sampleCount; ++index) {
+        const int32_t sample = samples[index];
+        squareSum += static_cast<uint64_t>(sample * sample);
+    }
+    uint64_t value = squareSum / sampleCount;
+    uint64_t result = 0;
+    uint64_t bit = uint64_t{1} << 62;
+    while (bit > value) {
+        bit >>= 2;
+    }
+    while (bit != 0) {
+        if (value >= result + bit) {
+            value -= result + bit;
+            result = (result >> 1) + bit;
+        } else {
+            result >>= 1;
+        }
+        bit >>= 2;
+    }
+    return static_cast<uint16_t>(
+        std::min<uint64_t>(UINT16_MAX, result));
 }

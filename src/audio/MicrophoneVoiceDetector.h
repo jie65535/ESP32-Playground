@@ -23,6 +23,7 @@ public:
         delete;
 
     bool begin();
+    void end();
     bool reset();
     MicrophoneVoiceDetectionMetrics process(const int16_t* samples,
                                             size_t sampleCount);
@@ -32,8 +33,9 @@ private:
     static constexpr uint32_t SAMPLE_RATE = 8000;
     static constexpr size_t FRAME_SAMPLES = 160;
     static constexpr int AGGRESSIVENESS_MODE = 3;
-    static constexpr uint8_t START_SPEECH_FRAMES = 2;
+    static constexpr uint8_t START_SPEECH_FRAMES = 3;
     static constexpr uint8_t HANGOVER_FRAMES = 6;
+    static constexpr uint16_t MIN_VOICE_RMS = 650;
 
     Fvad* vad_ = nullptr;
     int16_t frame_[FRAME_SAMPLES] = {};
@@ -44,5 +46,7 @@ private:
     bool voiceActive_ = false;
     bool ready_ = false;
 
-    void updateDecision(bool rawVoice);
+    void updateDecision(bool rawVoice, uint16_t rms);
+    static uint16_t calculateRms(const int16_t* samples,
+                                 size_t sampleCount);
 };

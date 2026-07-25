@@ -132,7 +132,7 @@ lv_obj_t* MicrophoneSettingsApp::onCreateView(AppContext& context) {
         UiIcon::Sliders, "输入增益", "low / normal / high");
     rows_[3] = context.ui.createCard(
         root_, UiRuntime::CARD_START_Y + 3 * UiRuntime::CARD_STEP_Y,
-        UiIcon::AudioWaveform, "轻量降噪", "高通 / 自适应扩展器");
+        UiIcon::AudioWaveform, "频域降噪", "SpeexDSP / -22 dB");
     rows_[4] = context.ui.createCard(
         root_, UiRuntime::CARD_START_Y + 4 * UiRuntime::CARD_STEP_Y,
         UiIcon::Sparkles, "人声增强", "语音 AGC / 峰值限幅");
@@ -223,17 +223,32 @@ void MicrophoneSettingsApp::onUpdateView(AppContext& context) {
     lv_label_set_text(rows_[1].subtitle, levelSubtitle.c_str());
 
     const String denoiseSubtitle =
-        mic.denoiseEnabled
-            ? String("noise ") + mic.noiseRms + " / gain " +
-                  mic.denoiseGainPercent + "%"
-            : String("高通 / 自适应扩展器");
+        !mic.denoiseEnabled
+            ? String("Speex 频域降噪")
+            : (!mic.captureActive
+                   ? String("等待采集")
+                   : (mic.captureSuppressed
+                          ? String("本机播放时暂停")
+                          : (mic.denoiserReady
+                                 ? String("降噪前背景 ") +
+                                       mic.backgroundInputRms +
+                                       " / gain " +
+                                       mic.denoiseGainPercent + "%"
+                                 : String("Speex 初始化失败"))));
     lv_label_set_text(rows_[3].subtitle, denoiseSubtitle.c_str());
 
     const String voiceSubtitle =
         mic.voiceEnhanceEnabled
-            ? String(mic.voiceDetectorReady
-                         ? (mic.voiceActive ? "vad voice" : "vad wait")
-                         : "vad error") +
+            ? String(!mic.captureActive
+                         ? "等待采集"
+                         : (mic.captureSuppressed
+                                ? "本机播放时暂停"
+                                : (!mic.denoiserReady
+                                       ? "等待降噪"
+                                       : (mic.voiceDetectorReady
+                                              ? (mic.voiceActive ? "vad voice"
+                                                                 : "vad wait")
+                                              : "vad error")))) +
                   " / gain " + mic.voiceGainPercent + "%" +
                   (mic.voiceLimiting ? " / limit" : "")
             : String("语音 AGC / 峰值限幅");
@@ -286,6 +301,8 @@ String MicrophoneSettingsApp::statusSignature(
     value += '|';
     value += mic.denoiseEnabled ? '1' : '0';
     value += '|';
+    value += mic.denoiserReady ? '1' : '0';
+    value += '|';
     value += mic.voiceDetectorReady ? '1' : '0';
     value += '|';
     value += mic.voiceActive ? '1' : '0';
@@ -304,7 +321,7 @@ String MicrophoneSettingsApp::statusSignature(
     value += '|';
     value += mic.peak;
     value += '|';
-    value += mic.noiseRms;
+    value += mic.backgroundInputRms;
     value += '|';
     value += mic.denoiseGainPercent;
     value += '|';

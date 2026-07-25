@@ -45,6 +45,9 @@ void MicrophoneVoiceEnhancer::process(int16_t* samples, size_t sampleCount,
         limiting_ = peakLimitGainQ12 < rmsGainQ12;
     }
 
+    if (!voiceActive) {
+        gainQ12_ = GAIN_ONE_Q12;
+    }
     int32_t startGainQ12 = std::min(gainQ12_, peakLimitGainQ12);
     if (voiceActive) {
         if (targetGainQ12 > gainQ12_) {
@@ -52,8 +55,6 @@ void MicrophoneVoiceEnhancer::process(int16_t* samples, size_t sampleCount,
         } else {
             gainQ12_ = targetGainQ12;
         }
-    } else if (gainQ12_ > GAIN_ONE_Q12) {
-        gainQ12_ -= (gainQ12_ - GAIN_ONE_Q12 + 1) / 2;
     }
     gainQ12_ = std::min(gainQ12_, peakLimitGainQ12);
     const int32_t gainDelta = gainQ12_ - startGainQ12;

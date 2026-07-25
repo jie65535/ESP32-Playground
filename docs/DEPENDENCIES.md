@@ -19,6 +19,11 @@ Expectimax 节点划分和启发式评估思路；该项目按 MIT License 发�
 vendoring 上游源码、65536 项行表、转置缓存或平台适配代码，固件中是独立的
 固定内存实现。
 
+麦克风频域降噪固定导入 `xiph/speexdsp` commit
+`7a158783df74efe7c2d1c6ee8363c1e695c71226` 的 BSD 源码子集。仓库只保留
+preprocessor、固定点 KISS FFT 及其可选 echo-state 接口所需文件，并保留上游
+`LICENSE`、`AUTHORS` 和来源说明；ESP32 适配只把 Speex 工作区分配到 PSRAM。
+
 ## 已落地的锁定方式
 
 `main/idf_component.yml` 声明官方 ILI9341 驱动 `espressif/esp_lcd_ili9341 == 2.0.2`；根目录 `dependencies.lock` 锁定该组件及其 `cmake_utilities` 传递依赖。第一次构建时，组件管理器把源码恢复到被忽略的 `managed_components/`。

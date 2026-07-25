@@ -28,6 +28,7 @@ struct MicrophoneSnapshot {
     bool monitorEnabled = false;
     bool playbackActive = false;
     bool denoiseEnabled = false;
+    bool denoiserReady = false;
     bool captureSuppressed = false;
     bool voiceDetectorReady = false;
     bool voiceActive = false;
@@ -39,7 +40,7 @@ struct MicrophoneSnapshot {
     uint32_t lastReadMs = 0;
     uint16_t rms = 0;
     uint16_t peak = 0;
-    uint16_t noiseRms = 0;
+    uint16_t backgroundInputRms = 0;
     uint8_t denoiseGainPercent = 100;
     uint16_t voiceGainPercent = 100;
     uint8_t levelPercent = 0;
@@ -99,16 +100,17 @@ private:
     static constexpr uint32_t SAMPLE_RATE = 8000;
     static constexpr uint16_t TONE_FREQUENCY = 1000;
     static constexpr int16_t TONE_AMPLITUDE = 3500;
-    static constexpr size_t DMA_FRAMES = 128;
+    static constexpr size_t DMA_FRAMES = 160;
     static constexpr uint16_t MIC_RMS_FULL_SCALE = 4096;
     static constexpr uint32_t MIC_RECORD_MAX_MS = 5000;
     static constexpr uint32_t MIC_RING_SECONDS = 6;
     static constexpr uint8_t MIC_MONITOR_GAIN_PERCENT = 35;
     static constexpr uint32_t MIC_OUTPUT_SUPPRESS_TAIL_MS = 300;
-    static constexpr uint32_t AUDIO_TASK_STACK_BYTES = 5120;
+    static constexpr uint32_t AUDIO_TASK_STACK_BYTES = 8192;
     static constexpr uint8_t DEFAULT_VOLUME_PERCENT = 60;
     static constexpr bool DEFAULT_FEEDBACK_ENABLED = false;
-    static constexpr bool DEFAULT_MIC_DENOISE_ENABLED = false;
+    static constexpr bool DEFAULT_MIC_DENOISE_ENABLED = true;
+    static constexpr bool DEFAULT_MIC_VOICE_ENHANCE_ENABLED = true;
 
     Stream* log_ = nullptr;
     I2cBusService* i2c_ = nullptr;
@@ -121,8 +123,9 @@ private:
     std::atomic<uint32_t> micLastReadMs_{0};
     std::atomic<uint16_t> micRms_{0};
     std::atomic<uint16_t> micPeak_{0};
-    std::atomic<uint16_t> micNoiseRms_{0};
+    std::atomic<uint16_t> micBackgroundInputRms_{0};
     std::atomic<uint8_t> micDenoiseGainPercent_{100};
+    std::atomic<bool> micDenoiserReady_{false};
     std::atomic<bool> micVoiceDetectorReady_{false};
     std::atomic<bool> micVoiceActive_{false};
     std::atomic<uint16_t> micVoiceGainPercent_{100};
@@ -176,6 +179,7 @@ private:
     void saveSettings();
     void updateMicrophoneCaptureState();
     void resetMicrophoneCaptureMetrics();
+    void resetMicrophoneProcessors();
     size_t processMicrophoneSamples(const int16_t* samples,
                                     size_t sampleCount, int16_t* output,
                                     size_t outputCapacity);
