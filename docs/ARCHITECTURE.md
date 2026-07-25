@@ -57,6 +57,7 @@ public:
 - `NetworkConsoleApp`：服务器发现、连接状态和吞吐测试。
 - `SnakeApp`、`TetrisApp`、`BreakoutApp`、`BlackjackApp` 和 `MinesweeperApp`：独立小游戏，不直接操作系统服务。
 - `PlatformerApp`：使用纯 C++ `PlatformerEngine`、32 关压缩数据、固定实体池和单一 `RenderSurface` 实现完整战役；CSV/属性文件及 PNG 图块只参与主机端生成，设备端只链接 C++ RLE 数据与调色板索引图块。`PlatformerProgressService` 仅保存继续关卡、通关状态和最高分；USB maptest 是独立巡检入口。
+- `TinyLmApp`：使用预设 token 提示启动本地中文故事生成；App 只消费有界 token 事件、增量解码 UTF-8 并更新 LVGL，不直接 mmap Flash 或运行模型算子。
 
 无触摸屏更适合按键机式列表、分页或轮播桌面，不必复制手机图标网格。
 
@@ -103,6 +104,7 @@ public:
 - `TimeService`：PCF8563 日历时钟快照、SNTP 校时和本地时区；未来再把时区做成设置项。
 - `AudioService`：独立任务拥有 ES8311/I²S 双向 DMA、播放音量/提示音，以及 GPIO6 麦克风电平、SpeexDSP 固定点频域降噪、20 ms WebRTC VAD、人声 AGC/限幅、6 秒 PSRAM 环形缓冲、衰减耳返和有界 USB PCM 导出；Speex 工作区常驻 PSRAM，麦克风 RX/DSP 只在前台页面、显式耳返或 USB 录音期间运行，页面只读快照或提交请求。
 - `RgbService`：GPIO42 板载 WS2812 的电源、颜色和非阻塞灯效状态机；应用只修改参数，不直接发送 RMT 波形。
+- `TinyLmService`：校验并 mmap 独立 `model` 分区，在进入生成页后按需把 int8 输出头和 KV/scratch 分配到 PSRAM；推理任务与双核输出头只通过有界控制/token 队列向前台 App 交付结果，支持 token 边界取消并在退出应用后释放大块内存。
 
 Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备只需要保存目标服务器主机/IP + 控制端口，并在网络恢复后自动重连；镜像、画面推送、音频流和录制属于上位机能力，不在设备设置中复制一套开关。
 
@@ -276,4 +278,4 @@ src/
 - 没有最大帧长、队列上限、超时和取消路径。
 - 为每个小模块创建 FreeRTOS 任务，最后无法判断谁拥有状态。
 
-当前 16 MB Flash 的 `default_16MB.csv` 已包含双 OTA app 分区、NVS、SPIFFS 和 coredump；后续可继续沿用，但应用资源和 OTA 包大小必须纳入 Flash 预算，不能等功能堆满后再调整分区。
+当前 16 MB Flash 的 `partitions_16MB.csv` 使用两个 4MB OTA app 分区、4MB TinyLM `model` 数据分区、3.875MB SPIFFS、NVS/otadata 和 coredump。模型不进入 OTA 应用镜像，升级应用时默认保留；更换模型需要单独校验大小并写入 `0x810000`。应用与模型预算必须分别检查，不能只看总 Flash 空间。

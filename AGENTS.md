@@ -1,8 +1,8 @@
 # ESP32 Playground 新对话交接说明
 
-> 最后更新：2026-07-25
+> 最后更新：2026-07-26
 > 工作目录：`G:\MCU\ESP32Playground`
-> 当前阶段：PGOS 应用基座、LCD DMA、PGOS Studio、板载 RGB、PCF8563 RTC 和小游戏真机验收
+> 当前阶段：PGOS 应用基座、中文 TinyLM、LCD DMA、PGOS Studio、板载 RGB、PCF8563 RTC 和小游戏真机验收
 
 ## 1. 项目定位
 
@@ -54,6 +54,7 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 - Games 包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 的 1-1 至 8-4 数据由主机工具转换为固件内 C++ 资源，设备端不解析 CSV/XML/PNG。
 - USB 控制台和 PGOS Studio 支持统一导航、状态查询、吞吐实验和 TCP 19002 屏幕镜像；当前镜像仍是完整 RGB565 帧，脏矩形/关键帧属于后续工作。
 - shadow framebuffer 只在无线镜像连接或 USB 明确请求截图时更新；关闭镜像时不要把它重新放回高频渲染路径。
+- System Tools 已集成中文 TinyLM：当前 5.69M 参数模型从独立 Flash 分区 mmap，进入生成页后按需占用约 4.08 MiB PSRAM，页面提供预设开头、流式输出、A 重新生成和 B 返回列表。
 
 实现细节、资源预算和真机证据以项目路线和实验记录为准，不在本文件复制完整验收报告。
 
@@ -73,14 +74,15 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 
 优先顺序如下；完成后更新对应实验记录和本节：
 
-1. RGB Breathe/Heartbeat 的 10ms 渐变、颜色顺序、白色满亮度和长期稳定性。
-2. Platformer 的 Xbox 手感、碰撞、区域机制、城堡/Bowser、反馈和 32 关长测。
-3. Breakout 三关、挡板与角落碰撞、Top 5、碎片、音效、震动和长期稳定性。
-4. Blackjack 破产补助、牌靴重洗、实体手柄、震动/RGB 反馈和筹码持久化。
-5. Minesweeper 修正版固件烧录后的入口、四档棋盘、首击安全、插旗/chord、暂停、成绩、连续移动、反馈和息屏唤醒。
-6. 麦克风的人声清晰度、增益/削波、耳返反馈、连续采集和 WAV 长测。
-7. PGOS Studio 的 keyframe + dirty rectangles、UDP/mDNS 发现、PCF8563 电池保持与 SNTP 回写。
-8. 统一输入扩展到实体按键/编码器，再逐项探索 ADC、TF/扩展接口和 OTA。
+1. TinyLM 的实体交互已通过；继续观察连续多轮生成、Wi-Fi/BT 共存和长期稳定性，后续再评估模型质量与性能优化。
+2. RGB Breathe/Heartbeat 的 10ms 渐变、颜色顺序、白色满亮度和长期稳定性。
+3. Platformer 的 Xbox 手感、碰撞、区域机制、城堡/Bowser、反馈和 32 关长测。
+4. Breakout 三关、挡板与角落碰撞、Top 5、碎片、音效、震动和长期稳定性。
+5. Blackjack 破产补助、牌靴重洗、实体手柄、震动/RGB 反馈和筹码持久化。
+6. Minesweeper 修正版固件烧录后的入口、四档棋盘、首击安全、插旗/chord、暂停、成绩、连续移动、反馈和息屏唤醒。
+7. 麦克风的人声清晰度、增益/削波、耳返反馈、连续采集和 WAV 长测。
+8. PGOS Studio 的 keyframe + dirty rectangles、UDP/mDNS 发现、PCF8563 电池保持与 SNTP 回写。
+9. 统一输入扩展到实体按键/编码器，再逐项探索 ADC、TF/扩展接口和 OTA。
 
 ## 7. 通用资产和验证入口
 

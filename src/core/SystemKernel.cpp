@@ -68,6 +68,7 @@ const MenuItemDefinition TOOL_ITEMS[] = {
     {UiIcon::System, "系统监视", nullptr, AppId::SystemInfo},
     {UiIcon::Clock, "时钟", nullptr, AppId::Time},
     {UiIcon::Palette, "颜色实验", nullptr, AppId::DisplayTest},
+    {UiIcon::Sparkles, "TinyLM", "5.69M 参数 · 本地中文故事", AppId::TinyLm},
 };
 
 static_assert(sizeof(HOME_ITEMS) / sizeof(HOME_ITEMS[0]) <=
@@ -239,7 +240,8 @@ SystemKernel::SystemKernel()
       breakoutScore_("pgos_breakout", 1, "breakout"),
       context_{display_, audio_, time_, rgb_, wifi_, server_, gamepad_,
                snakeScore_, tetrisScore_, breakoutScore_, blackjackProfile_,
-               minesweeperProfile_, game2048Profile_, Serial, ui_, runtime_},
+               minesweeperProfile_, game2048Profile_, tinyLm_, Serial, ui_,
+               runtime_},
       appManager_(context_),
       gamesMenuApp_(GAMES_MENU),
       settingsMenuApp_(SETTINGS_MENU),
@@ -274,6 +276,7 @@ void SystemKernel::setup() {
     blackjackProfile_.begin(Serial);
     minesweeperProfile_.begin(Serial);
     game2048Profile_.begin(Serial);
+    tinyLm_.begin(Serial);
     mirror_.begin(Serial);
     benchmark_.begin(Serial);
     console_.begin(Serial);
@@ -297,6 +300,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(blackjackApp_);
         appManager_.registerApp(minesweeperApp_);
         appManager_.registerApp(game2048App_);
+        appManager_.registerApp(tinyLmApp_);
         appManager_.registerApp(gamesMenuApp_);
         appManager_.registerApp(settingsMenuApp_);
         appManager_.registerApp(toolsMenuApp_);

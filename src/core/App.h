@@ -16,6 +16,7 @@ class GameScoreService;
 class BlackjackProfileService;
 class MinesweeperProfileService;
 class Game2048ProfileService;
+class TinyLmService;
 class RuntimeMonitorService;
 class UiRuntime;
 
@@ -33,6 +34,7 @@ struct AppContext {
     BlackjackProfileService& blackjackProfile;
     MinesweeperProfileService& minesweeperProfile;
     Game2048ProfileService& game2048Profile;
+    TinyLmService& tinyLm;
     Stream& console;
     UiRuntime& ui;
     RuntimeMonitorService& runtime;

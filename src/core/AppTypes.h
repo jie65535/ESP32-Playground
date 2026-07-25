@@ -20,6 +20,7 @@ enum class AppId : uint8_t {
     Blackjack,
     Minesweeper,
     Game2048,
+    TinyLm,
     GamesMenu,
     SettingsMenu,
     ToolsMenu,

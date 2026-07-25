@@ -5,7 +5,7 @@
 # including the generated Platformer campaign pack, sparse level runtime and
 # tile renderer, the complete Minesweeper app/engine/solver/records/layout and
 # the Microphone settings app, SpeexDSP denoiser, WebRTC VAD and voice
-# enhancer.
+# enhancer, plus the TinyLM app, inference service and corpus-derived font.
 file(GLOB_RECURSE PGOS_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
 file(GLOB_RECURSE LIBFVAD_SOURCES
      "${CMAKE_SOURCE_DIR}/src/third_party/libfvad/src/*.c")
@@ -23,5 +23,8 @@ idf_component_register(
 target_compile_definitions(${COMPONENT_LIB} PRIVATE PGOS_BLE_GAMEPAD_BACKEND=1)
 set_source_files_properties(${SPEEXDSP_SOURCES} PROPERTIES
                             COMPILE_DEFINITIONS HAVE_CONFIG_H=1)
+set_source_files_properties(
+    "${CMAKE_SOURCE_DIR}/src/services/TinyLmService.cpp"
+    PROPERTIES COMPILE_OPTIONS "-O3")
 target_include_directories(${COMPONENT_LIB} PRIVATE
                            "${CMAKE_SOURCE_DIR}/src")

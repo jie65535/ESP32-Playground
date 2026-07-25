@@ -18,6 +18,7 @@
 #include "apps/BlackjackApp.h"
 #include "apps/MinesweeperApp.h"
 #include "apps/Game2048App.h"
+#include "apps/TinyLmApp.h"
 #include "core/AppManager.h"
 #include "core/InputRouter.h"
 #include "services/ConsoleService.h"
@@ -32,6 +33,7 @@
 #include "services/BlackjackProfileService.h"
 #include "services/MinesweeperProfileService.h"
 #include "services/Game2048ProfileService.h"
+#include "services/TinyLmService.h"
 #include "services/MirrorService.h"
 #include "services/RuntimeMonitorService.h"
 #include "services/TimeService.h"
@@ -60,6 +62,7 @@ private:
     BlackjackProfileService blackjackProfile_;
     MinesweeperProfileService minesweeperProfile_;
     Game2048ProfileService game2048Profile_;
+    TinyLmService tinyLm_;
     MirrorService mirror_;
     BenchmarkService benchmark_;
     ConsoleService console_;
@@ -84,6 +87,7 @@ private:
     BlackjackApp blackjackApp_;
     MinesweeperApp minesweeperApp_;
     Game2048App game2048App_;
+    TinyLmApp tinyLmApp_;
     MenuApp gamesMenuApp_;
     MenuApp settingsMenuApp_;
     MenuApp toolsMenuApp_;
