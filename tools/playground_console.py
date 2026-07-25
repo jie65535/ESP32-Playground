@@ -63,6 +63,8 @@ VALID_COMMANDS = (
     "time status",
     "i2c scan",
     "mic status",
+    "mic capture on",
+    "mic capture off",
     "mic gain",
     "mic denoise on",
     "mic denoise off",

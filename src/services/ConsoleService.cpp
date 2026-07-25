@@ -166,6 +166,10 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::I2cScan;
     } else if (lower == "mic status") {
         command.type = AppCommandType::MicStatus;
+    } else if (lower == "mic capture on") {
+        command.type = AppCommandType::MicCaptureOn;
+    } else if (lower == "mic capture off") {
+        command.type = AppCommandType::MicCaptureOff;
     } else if (lower == "mic gain") {
         command.type = AppCommandType::MicGain;
     } else if (lower.startsWith("mic gain ")) {
@@ -370,7 +374,8 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));
-    output.println(F("Mic:      mic status | mic gain low|normal|high"));
+    output.println(F("Mic:      mic status | mic capture on|off"));
+    output.println(F("          mic gain low|normal|high"));
     output.println(F("          mic denoise on|off|toggle"));
     output.println(F("          mic voice on|off|toggle"));
     output.println(F("          mic record [250-5000 ms]"));

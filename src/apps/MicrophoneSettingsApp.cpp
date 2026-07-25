@@ -25,14 +25,19 @@ const char* MicrophoneSettingsApp::name() const {
     return "Microphone";
 }
 
-void MicrophoneSettingsApp::onEnter(AppContext&) {
+void MicrophoneSettingsApp::onEnter(AppContext& context) {
+    context.audio.setMicrophoneCaptureRequested(
+        MicrophoneCaptureSource::Foreground, true);
     selected_ = 0;
     renderedSelected_ = -1;
     renderedSignature_ = "";
     lastRefreshMs_ = 0;
 }
 
-void MicrophoneSettingsApp::onExit(AppContext&) {
+void MicrophoneSettingsApp::onExit(AppContext& context) {
+    context.audio.setMicrophoneMonitorEnabled(false);
+    context.audio.setMicrophoneCaptureRequested(
+        MicrophoneCaptureSource::Foreground, false);
     root_ = nullptr;
     memset(rows_, 0, sizeof(rows_));
     memset(valueLabels_, 0, sizeof(valueLabels_));
@@ -274,6 +279,8 @@ String MicrophoneSettingsApp::statusSignature(
     String value;
     value.reserve(96);
     value += mic.available ? '1' : '0';
+    value += '|';
+    value += mic.captureActive ? '1' : '0';
     value += '|';
     value += mic.monitorEnabled ? '1' : '0';
     value += '|';

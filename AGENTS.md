@@ -50,7 +50,7 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 - DisplayService 使用原生 `esp_lcd_ili9341`、SPI2/40MHz 和 DMA；LVGL 9.5 使用内部 DMA 缓冲。80MHz 方案曾导致花屏，未经单变量实验不得恢复。
 - UiRuntime 统一拥有 LVGL、主题、状态栏、菜单历史和页面转场；桌面为 Games / Settings / System Tools 三级菜单，Back 逐级返回，Home 回桌面。
 - 当前服务包括 Display、Input、Wi-Fi、BLE Gamepad、Audio、RGB、Time/RTC、Console、Server、Mirror 和 Runtime Monitor。应用不得直接访问 TFT、SPI、WiFi、Preferences 或硬件单例。
-- AudioService 已持续采集 ES8311 ADC / GPIO6 的 8 kHz mono PCM16，在 PSRAM 保留最近 6 秒，并向麦克风页、衰减耳返、缓存回放和 USB WAV 工具提供有界接口；语音清晰度和长期采集仍待人工验收。
+- AudioService 在麦克风页、显式耳返或 USB 录音期间按需采集 ES8311 ADC / GPIO6 的 8 kHz mono PCM16，在 PSRAM 保留最近 6 秒，并向页面、缓存回放和 USB WAV 工具提供有界接口；语音清晰度和长期采集仍待人工验收。
 - Games 包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 的 1-1 至 8-4 数据由主机工具转换为固件内 C++ 资源，设备端不解析 CSV/XML/PNG。
 - USB 控制台和 PGOS Studio 支持统一导航、状态查询、吞吐实验和 TCP 19002 屏幕镜像；当前镜像仍是完整 RGB565 帧，脏矩形/关键帧属于后续工作。
 - shadow framebuffer 只在无线镜像连接或 USB 明确请求截图时更新；关闭镜像时不要把它重新放回高频渲染路径。

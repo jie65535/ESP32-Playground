@@ -204,6 +204,8 @@ bool countsAsDisplayActivity(AppCommandType type) {
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
         case AppCommandType::MicStatus:
+        case AppCommandType::MicCaptureOn:
+        case AppCommandType::MicCaptureOff:
         case AppCommandType::MicRecord:
         case AppCommandType::MicGain:
         case AppCommandType::MicDenoiseOn:
@@ -615,6 +617,14 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::MicStatus:
             audio_.printStatus(Serial);
+            break;
+        case AppCommandType::MicCaptureOn:
+            audio_.setMicrophoneCaptureRequested(
+                MicrophoneCaptureSource::Usb, true);
+            break;
+        case AppCommandType::MicCaptureOff:
+            audio_.setMicrophoneCaptureRequested(
+                MicrophoneCaptureSource::Usb, false);
             break;
         case AppCommandType::MicGain: {
             MicrophoneGain gain = MicrophoneGain::Normal;

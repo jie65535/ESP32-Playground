@@ -35,14 +35,17 @@ class _RespondingSerial(_FakeSerial):
         super().__init__(b"")
         self.pcm = pcm
         self.corrupt_crc = corrupt_crc
-        self.command = ""
+        self.commands = []
 
     def reset_input_buffer(self) -> None:
         self._payload.clear()
 
     def write(self, data: bytes) -> int:
-        self.command = data.decode("ascii").strip()
-        _, _, duration, request_id = self.command.split()
+        command = data.decode("ascii").strip()
+        self.commands.append(command)
+        if not command.startswith("mic record "):
+            return len(data)
+        _, _, duration, request_id = command.split()
         request = int(request_id)
         sequence = 7
         header = CAPTURE.FRAME_HEADER_STRUCT.pack(
@@ -88,17 +91,24 @@ def _header(
 class MicrophoneProtocolTests(unittest.TestCase):
     def test_capture_sends_correlation_id_and_validates_complete_frame(self) -> None:
         device = _RespondingSerial(b"\x01\x00\xff\xff")
-        with mock.patch.object(CAPTURE.time, "monotonic_ns", return_value=1234):
+        with mock.patch.object(CAPTURE.time, "monotonic_ns", return_value=1234), \
+             mock.patch.object(CAPTURE.time, "sleep") as sleep:
             sample_rate, pcm = CAPTURE.capture_microphone(device, 1000, timeout=0.1)
-        self.assertEqual(device.command, "mic record 1000 1234")
+        self.assertEqual(
+            device.commands,
+            ["mic capture on", "mic record 1000 1234", "mic capture off"],
+        )
+        sleep.assert_called_once_with(1.1)
         self.assertEqual(sample_rate, 8000)
         self.assertEqual(pcm, b"\x01\x00\xff\xff")
 
     def test_capture_rejects_crc_mismatch(self) -> None:
         device = _RespondingSerial(b"\x01\x00", corrupt_crc=True)
-        with mock.patch.object(CAPTURE.time, "monotonic_ns", return_value=1234):
+        with mock.patch.object(CAPTURE.time, "monotonic_ns", return_value=1234), \
+             mock.patch.object(CAPTURE.time, "sleep"):
             with self.assertRaisesRegex(ValueError, "CRC mismatch"):
                 CAPTURE.capture_microphone(device, 1000, timeout=0.1)
+        self.assertEqual(device.commands[-1], "mic capture off")
 
     def test_header_resynchronizes_after_log_and_stale_frame(self) -> None:
         stale = _header(100, 1, 32) + b"\x12\x34" * 16

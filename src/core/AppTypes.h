@@ -66,6 +66,8 @@ enum class AppCommandType : uint8_t {
     TimeSet,
     I2cScan,
     MicStatus,
+    MicCaptureOn,
+    MicCaptureOff,
     MicRecord,
     MicGain,
     MicDenoiseOn,

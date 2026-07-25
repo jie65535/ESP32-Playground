@@ -17,8 +17,14 @@ enum class MicrophoneGain : uint8_t {
     High,
 };
 
+enum class MicrophoneCaptureSource : uint8_t {
+    Foreground = 1U << 0U,
+    Usb = 1U << 1U,
+};
+
 struct MicrophoneSnapshot {
     bool available = false;
+    bool captureActive = false;
     bool monitorEnabled = false;
     bool playbackActive = false;
     bool denoiseEnabled = false;
@@ -59,6 +65,9 @@ public:
     void playGameTone(uint16_t frequencyHz, uint32_t durationMs);
     void playTestTone();
     MicrophoneSnapshot microphoneSnapshot() const;
+    bool microphoneCaptureActive() const;
+    void setMicrophoneCaptureRequested(MicrophoneCaptureSource source,
+                                       bool requested);
     MicrophoneGain microphoneGain() const;
     bool setMicrophoneGain(MicrophoneGain gain);
     void cycleMicrophoneGain();
@@ -99,6 +108,7 @@ private:
     static constexpr uint32_t AUDIO_TASK_STACK_BYTES = 5120;
     static constexpr uint8_t DEFAULT_VOLUME_PERCENT = 60;
     static constexpr bool DEFAULT_FEEDBACK_ENABLED = false;
+    static constexpr bool DEFAULT_MIC_DENOISE_ENABLED = false;
 
     Stream* log_ = nullptr;
     I2cBusService* i2c_ = nullptr;
@@ -124,6 +134,8 @@ private:
     std::atomic<uint32_t> micCaptureSuppressUntilMs_{0};
     std::atomic<bool> micCaptureSuppressed_{false};
     std::atomic<uint32_t> micTaskStackFree_{0};
+    std::atomic<uint8_t> micCaptureRequests_{0};
+    std::atomic<bool> micCaptureEnabled_{false};
     std::atomic<uint8_t> micGain_{
         static_cast<uint8_t>(MicrophoneGain::Normal)};
     std::atomic<bool> micDenoiseEnabled_{false};
@@ -162,6 +174,8 @@ private:
     void requestTone(uint16_t frequencyHz, uint32_t durationMs);
     void requestGameTone(uint16_t frequencyHz, uint32_t durationMs);
     void saveSettings();
+    void updateMicrophoneCaptureState();
+    void resetMicrophoneCaptureMetrics();
     size_t processMicrophoneSamples(const int16_t* samples,
                                     size_t sampleCount, int16_t* output,
                                     size_t outputCapacity);

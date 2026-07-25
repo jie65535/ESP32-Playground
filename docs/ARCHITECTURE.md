@@ -101,7 +101,7 @@ public:
 - `RuntimeMonitorService`：采样主循环 duty、Heap/PSRAM、Flash/OTA 和任务数；不读取或修改具体 App 状态。
 - `I2cBusService`：拥有 GPIO15/16 的共享 `Wire` 总线，统一初始化和诊断。
 - `TimeService`：PCF8563 日历时钟快照、SNTP 校时和本地时区；未来再把时区做成设置项。
-- `AudioService`：独立任务拥有 ES8311/I²S 双向 DMA、播放音量/提示音，以及 GPIO6 麦克风电平、可旁路的固定点轻量降噪、20 ms WebRTC VAD、人声 AGC/限幅、6 秒 PSRAM 环形缓冲、衰减耳返和有界 USB PCM 导出；页面只读快照或提交请求。
+- `AudioService`：独立任务拥有 ES8311/I²S 双向 DMA、播放音量/提示音，以及 GPIO6 麦克风电平、可旁路的固定点轻量降噪、20 ms WebRTC VAD、人声 AGC/限幅、6 秒 PSRAM 环形缓冲、衰减耳返和有界 USB PCM 导出；麦克风 RX/DSP 只在前台页面、显式耳返或 USB 录音期间运行，页面只读快照或提交请求。
 - `RgbService`：GPIO42 板载 WS2812 的电源、颜色和非阻塞灯效状态机；应用只修改参数，不直接发送 RMT 波形。
 
 Wi-Fi、BLE 和服务器地址都作为设置项保存。Wi-Fi 模式下设备只需要保存目标服务器主机/IP + 控制端口，并在网络恢复后自动重连；镜像、画面推送、音频流和录制属于上位机能力，不在设备设置中复制一套开关。

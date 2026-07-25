@@ -21,6 +21,7 @@ FRAME_HEADER_STRUCT = struct.Struct("<4sBBHIIIII")
 FRAME_TRAILER_STRUCT = struct.Struct("<4sIII")
 MIN_DURATION_MS = 250
 MAX_DURATION_MS = 5000
+CAPTURE_WARMUP_SECONDS = 0.1
 
 
 def open_serial(port: str, baud: int):
@@ -156,24 +157,33 @@ def capture_microphone(
             f"duration must be between {MIN_DURATION_MS} and {MAX_DURATION_MS} ms"
         )
 
-    device.reset_input_buffer()
     request_id = int(time.monotonic_ns() & 0x7FFFFFFF) or 1
-    send_command(device, f"mic record {duration_ms} {request_id}")
-    reader = _BufferedSerialReader(device)
-    sample_rate, _, payload_size, frame_request_id, sequence = reader.read_header(
-        request_id, timeout
-    )
-    payload = reader.read_exact(payload_size, timeout)
-    received_crc = reader.read_trailer(frame_request_id, sequence, timeout)
-    actual_crc = zlib.crc32(payload) & 0xFFFFFFFF
-    if received_crc != actual_crc:
-        raise ValueError(
-            f"microphone CRC mismatch: received {received_crc:08X}, "
-            f"calculated {actual_crc:08X}"
+    capture_started = False
+    device.reset_input_buffer()
+    send_command(device, "mic capture on")
+    capture_started = True
+    try:
+        time.sleep(duration_ms / 1000.0 + CAPTURE_WARMUP_SECONDS)
+        device.reset_input_buffer()
+        send_command(device, f"mic record {duration_ms} {request_id}")
+        reader = _BufferedSerialReader(device)
+        sample_rate, _, payload_size, frame_request_id, sequence = (
+            reader.read_header(request_id, timeout)
         )
-    if not payload:
-        raise ValueError("device returned no microphone samples")
-    return sample_rate, payload
+        payload = reader.read_exact(payload_size, timeout)
+        received_crc = reader.read_trailer(frame_request_id, sequence, timeout)
+        actual_crc = zlib.crc32(payload) & 0xFFFFFFFF
+        if received_crc != actual_crc:
+            raise ValueError(
+                f"microphone CRC mismatch: received {received_crc:08X}, "
+                f"calculated {actual_crc:08X}"
+            )
+        if not payload:
+            raise ValueError("device returned no microphone samples")
+        return sample_rate, payload
+    finally:
+        if capture_started:
+            send_command(device, "mic capture off")
 
 
 def write_wav(path: pathlib.Path, sample_rate: int, pcm16le: bytes) -> None:

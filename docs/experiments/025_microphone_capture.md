@@ -10,8 +10,8 @@
 - I²S MCLK/BCLK/WS 为 GPIO4/5/7，ADC DATA 为 GPIO6，DAC DATA 为 GPIO8。
 - 编解码器模拟 MIC/ADC 使用 `SYSTEM 0x14 = 0x1A`（模拟输入、30 dB PGA）、`ADC EQ 0x1C = 0x6A`。默认 `normal` 档写入 `ADC 0x16 = 0x26`（ADC_SYNC、36 dB scale）和 `ADC 0x17 = 0xD7`（+12 dB）；另提供 `low`（`0x24/0xC8`）与 `high`（`0x27/0xD7`）档。
 - I²S 为 8 kHz、16-bit、双声道总线；采集端从有效声道归一为 mono PCM16。
-- 音频任务每批计算 RMS/Peak/Level，并把最近 6 秒、约 96 KB PCM 放在 PSRAM 环形缓冲。
-- 可选轻量降噪在写入环形缓冲前执行：约 100 Hz Q15 高通去直流/低频，按每批 RMS 自适应估计背景，再用 20%～100% 平滑 downward expander 压低弱背景。实现无 FFT、无模型、无第三方源码，关闭时完全旁路；它主要清理停顿和较弱背景，不承诺从强噪声中重建人声。
+- 音频任务只在麦克风页前台、显式耳返或 USB 抓取期间读取 RX、计算 RMS/Peak/Level，并把最近 6 秒、约 96 KB PCM 放在 PSRAM 环形缓冲；离开页面会关闭耳返并停止 RX/DSP/环形缓冲更新。I²S 播放链和 codec 仍保持初始化，ADC 寄存器级断电需另做真机单变量实验。
+- 可选轻量降噪在写入环形缓冲前执行：约 100 Hz Q15 高通去直流/低频，按每批 RMS 自适应估计背景，再用 20%～100% 平滑 downward expander 压低弱背景。开关保存在 `pgos_audio/mic_denoise`，沿用 750 ms 合并写；实现无 FFT、无模型、无第三方源码，关闭时完全旁路。它主要清理停顿和较弱背景，不承诺从强噪声中重建人声。
 - 可选人声增强位于降噪之后：BSD-3-Clause `libfvad`（WebRTC VAD）以 8 kHz / 20 ms 帧、mode 3 判断语音，连续 2 帧命中后才打开，并增加 6 帧（120 ms）退出 hangover；随后 AGC 把语音目标 RMS 拉到 3000，最大 4 倍（约 +12 dB），峰值限制为 30000。`mic voice on` 会自动开启降噪，VAD 未就绪时不放大。该功能只是“语音段增益”，不是人声分离；语音和音乐/噪声同时存在时，仍会放大同一时间窗里的混合信号。
 - 缓存回放和耳返复用现有 DAC；耳返默认关闭并衰减到 35%，避免启动即形成反馈。
 - USB 最长导出最近 5 秒；导出前复制到最多约 80 KB 的临时缓冲，避免慢速 CDC 发送期间被实时写指针覆盖。
@@ -27,6 +27,7 @@
 ```text
 page mic
 mic status
+mic capture on|off
 mic gain low|normal|high
 mic denoise on|off|toggle
 mic voice on|off|toggle
@@ -35,7 +36,7 @@ mic monitor on|off|toggle
 mic playback [ms]
 ```
 
-`capture_microphone.py` 使用内部可选 correlation ID，并接收以下原始帧：
+`capture_microphone.py` 先以 `mic capture on` 开启 USB 临时采集，等待目标时长后导出，最后用 `mic capture off` 释放请求；固件仍会在直接调用 `mic record` 且当前空闲时做一次有界临时采集。工具使用内部可选 correlation ID，并接收以下原始帧：
 
 ```text
 PGM1 header (28 bytes: version/format/rate/requested_ms/size/request_id/sequence)
@@ -73,6 +74,9 @@ python tools/capture_microphone.py --port COM3 --duration 3000 --output captures
 - 独立 AGC 主机合成测试中，背景保持 100%，低幅语音达到 400%，语音结束后恢复 100%；25000 峰值输入被限制到 29999，限幅状态正确。
 - 旧能量判据在低音量背景音乐下偶尔会把音乐瞬态当成人声；用户实测说话时增益约 200%，但音乐也有偶发增强。改用 WebRTC VAD 后，同一背景音乐下连续约 27 秒的 20 次状态采样均为 `voice=no / voice_gain=100%`；正常说话时 15 次采样中 5 次命中，增益为 222%～400%，停顿后恢复 100%。这证明本轮误触发显著收敛，但无喇叭参考的 VAD 仍不能区分近场真人、录制人声或音乐中的歌声。
 - 麦克风页在 320×240 真机截图中显示降噪与 `vad wait / gain 100%` 动态值，七项滚动布局无重叠。设备保持输入增益 `normal`、降噪 `on`、人声增强 `on`、耳返 `off`。
+- 按需采集版本启动时为 `capture=idle / frames=0`；进入麦克风页后约 0.8 秒达到 `capture=active / frames=6656`，Home 退出后恢复 `idle`，间隔 0.6 秒复查 `frames` 保持 10752 不再增长，RMS/Peak/Level 归零。
+- `mic denoise on` 后等待合并写，日志出现 `[audio] settings saved`；使用 RTS 硬复位后仍报告 `denoise=on`，证明 `pgos_audio/mic_denoise` 持久化通过，同时启动采集仍为 `idle`。
+- 从 idle 状态运行 `capture_microphone.py --duration 1000` 成功得到 8000 Hz mono PCM16LE 的 1000 ms WAV；工具结束后连续两次状态均为 `capture=idle / frames=10752`，证明 USB 临时采集已释放。
 
 证据：
 
