@@ -11,6 +11,33 @@ constexpr uint32_t SERIAL_BAUD = 115200;
 constexpr uint32_t RENDER_INTERVAL_MS = 1000;
 constexpr uint32_t SERIAL_STATUS_INTERVAL_MS = 10000;
 
+const __FlashStringHelper* resetReasonName(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_POWERON:
+            return F("poweron");
+        case ESP_RST_EXT:
+            return F("external");
+        case ESP_RST_SW:
+            return F("software");
+        case ESP_RST_PANIC:
+            return F("panic");
+        case ESP_RST_INT_WDT:
+            return F("int_wdt");
+        case ESP_RST_TASK_WDT:
+            return F("task_wdt");
+        case ESP_RST_WDT:
+            return F("wdt");
+        case ESP_RST_DEEPSLEEP:
+            return F("deepsleep");
+        case ESP_RST_BROWNOUT:
+            return F("brownout");
+        case ESP_RST_SDIO:
+            return F("sdio");
+        default:
+            return F("unknown");
+    }
+}
+
 const MenuItemDefinition HOME_ITEMS[] = {
     {UiIcon::Gamepad, "游戏", nullptr, AppId::GamesMenu},
     {UiIcon::Settings, "设置", nullptr, AppId::SettingsMenu},
@@ -30,6 +57,7 @@ const MenuItemDefinition GAME_ITEMS[] = {
 const MenuItemDefinition SETTINGS_ITEMS[] = {
     {UiIcon::Display, "显示", nullptr, AppId::DisplaySettings},
     {UiIcon::Sound, "声音", nullptr, AppId::SoundSettings},
+    {UiIcon::Mic, "麦克风", nullptr, AppId::MicrophoneSettings},
     {UiIcon::Light, "RGB 灯光", nullptr, AppId::RgbSettings},
     {UiIcon::Gamepad, "手柄", nullptr, AppId::ControllerSettings},
     {UiIcon::Wifi, "无线网络", nullptr, AppId::NetworkSettings},
@@ -123,6 +151,7 @@ bool isRemoteAllowed(AppCommandType type) {
         case AppCommandType::PageDisplay:
         case AppCommandType::PageDisplaySettings:
         case AppCommandType::PageSound:
+        case AppCommandType::PageMicrophone:
         case AppCommandType::PageRgb:
         case AppCommandType::PageGamepad:
         case AppCommandType::PageConsole:
@@ -174,6 +203,15 @@ bool countsAsDisplayActivity(AppCommandType type) {
     switch (type) {
         case AppCommandType::Status:
         case AppCommandType::TimeStatus:
+        case AppCommandType::MicStatus:
+        case AppCommandType::MicRecord:
+        case AppCommandType::MicGain:
+        case AppCommandType::MicDenoiseOn:
+        case AppCommandType::MicDenoiseOff:
+        case AppCommandType::MicDenoiseToggle:
+        case AppCommandType::MicVoiceOn:
+        case AppCommandType::MicVoiceOff:
+        case AppCommandType::MicVoiceToggle:
         case AppCommandType::I2cScan:
         case AppCommandType::Help:
         case AppCommandType::Screenshot:
@@ -245,6 +283,7 @@ void SystemKernel::setup() {
         appManager_.registerApp(displayTestApp_);
         appManager_.registerApp(displaySettingsApp_);
         appManager_.registerApp(soundSettingsApp_);
+        appManager_.registerApp(microphoneSettingsApp_);
         appManager_.registerApp(rgbSettingsApp_);
         appManager_.registerApp(controllerSettingsApp_);
         appManager_.registerApp(consoleSettingsApp_);
@@ -496,6 +535,9 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
         case AppCommandType::PageSound:
             appManager_.activate(AppId::SoundSettings);
             break;
+        case AppCommandType::PageMicrophone:
+            appManager_.activate(AppId::MicrophoneSettings);
+            break;
         case AppCommandType::PageRgb:
             appManager_.activate(AppId::RgbSettings);
             break;
@@ -570,6 +612,70 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             break;
         case AppCommandType::I2cScan:
             i2c_.scan(Serial);
+            break;
+        case AppCommandType::MicStatus:
+            audio_.printStatus(Serial);
+            break;
+        case AppCommandType::MicGain: {
+            MicrophoneGain gain = MicrophoneGain::Normal;
+            handled = AudioService::parseMicrophoneGain(command.value, gain) &&
+                      audio_.setMicrophoneGain(gain);
+            if (!handled) {
+                Serial.println(F("[mic] usage: mic gain low|normal|high"));
+            } else {
+                audio_.printStatus(Serial);
+            }
+            break;
+        }
+        case AppCommandType::MicDenoiseOn:
+            audio_.setMicrophoneDenoiseEnabled(true);
+            break;
+        case AppCommandType::MicDenoiseOff:
+            audio_.setMicrophoneDenoiseEnabled(false);
+            break;
+        case AppCommandType::MicDenoiseToggle:
+            audio_.toggleMicrophoneDenoise();
+            break;
+        case AppCommandType::MicVoiceOn:
+            audio_.setMicrophoneVoiceEnhanceEnabled(true);
+            break;
+        case AppCommandType::MicVoiceOff:
+            audio_.setMicrophoneVoiceEnhanceEnabled(false);
+            break;
+        case AppCommandType::MicVoiceToggle:
+            audio_.toggleMicrophoneVoiceEnhance();
+            break;
+        case AppCommandType::MicRecord: {
+            constexpr uint32_t defaultDurationMs = 3000U;
+            const uint32_t durationMs =
+                command.number > 0 ? static_cast<uint32_t>(command.number)
+                                   : defaultDurationMs;
+            const uint32_t correlationId =
+                command.value.isEmpty()
+                    ? 0U
+                    : static_cast<uint32_t>(command.value.toInt());
+            Serial.setTxTimeoutMs(100);
+            audio_.writeMicrophoneRecording(Serial, durationMs,
+                                             correlationId);
+            Serial.setTxTimeoutMs(0);
+            break;
+        }
+        case AppCommandType::MicMonitorOn:
+            audio_.setMicrophoneMonitorEnabled(true);
+            break;
+        case AppCommandType::MicMonitorOff:
+            audio_.setMicrophoneMonitorEnabled(false);
+            break;
+        case AppCommandType::MicMonitorToggle:
+            audio_.toggleMicrophoneMonitor();
+            break;
+        case AppCommandType::MicPlayback:
+            handled = audio_.playMicrophoneBuffer(
+                command.number > 0 ? static_cast<uint32_t>(command.number)
+                                   : 3000U);
+            if (!handled) {
+                Serial.println(F("[mic] playback unavailable"));
+            }
             break;
         case AppCommandType::GamepadStatus:
             gamepad_.printStatus(Serial);
@@ -670,7 +776,11 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
 }
 
 void SystemKernel::printStatus() {
-    Serial.print(F("[status] app="));
+    Serial.print(F("[status] uptime="));
+    Serial.print(millis() / 1000U);
+    Serial.print(F("s reset="));
+    Serial.print(resetReasonName(esp_reset_reason()));
+    Serial.print(F(" app="));
     Serial.print(appManager_.currentName());
     Serial.print(F(" heap="));
     Serial.print(ESP.getFreeHeap());

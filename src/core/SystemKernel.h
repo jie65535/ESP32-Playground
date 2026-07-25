@@ -3,6 +3,7 @@
 #include "apps/DisplayTestApp.h"
 #include "apps/DisplaySettingsApp.h"
 #include "apps/SoundSettingsApp.h"
+#include "apps/MicrophoneSettingsApp.h"
 #include "apps/RgbSettingsApp.h"
 #include "apps/ControllerSettingsApp.h"
 #include "apps/ConsoleSettingsApp.h"
@@ -71,6 +72,7 @@ private:
     DisplayTestApp displayTestApp_;
     DisplaySettingsApp displaySettingsApp_;
     SoundSettingsApp soundSettingsApp_;
+    MicrophoneSettingsApp microphoneSettingsApp_;
     RgbSettingsApp rgbSettingsApp_;
     ControllerSettingsApp controllerSettingsApp_;
     ConsoleSettingsApp consoleSettingsApp_;

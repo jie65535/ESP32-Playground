@@ -40,7 +40,7 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 | USB / RGB | 原生 USB CDC：19/20；WS2812：42 |
 | 音频 | ES8311；I²C 15/16；I²S MCLK/BCLK/WS/DAC：4/5/7/8；功放 EN：1，低电平使能 |
 | RTC | PCF8563，7-bit 地址 `0x51`，与 ES8311 共用 GPIO15/16 |
-| 保留脚 | BOOT GPIO0 仅用于下载/启动；麦克风 GPIO6 待单独验证 |
+| 保留脚 | BOOT GPIO0 仅用于下载/启动；麦克风 ADC DATA 使用 GPIO6 |
 
 完整引脚、电气边界和扩展脚见 [`docs/HARDWARE.md`](docs/HARDWARE.md)。外接电源、串口电平、扬声器、麦克风和 RTC 模块都必须先确认 3.3V 兼容、共地和电池安全。
 
@@ -50,6 +50,7 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 - DisplayService 使用原生 `esp_lcd_ili9341`、SPI2/40MHz 和 DMA；LVGL 9.5 使用内部 DMA 缓冲。80MHz 方案曾导致花屏，未经单变量实验不得恢复。
 - UiRuntime 统一拥有 LVGL、主题、状态栏、菜单历史和页面转场；桌面为 Games / Settings / System Tools 三级菜单，Back 逐级返回，Home 回桌面。
 - 当前服务包括 Display、Input、Wi-Fi、BLE Gamepad、Audio、RGB、Time/RTC、Console、Server、Mirror 和 Runtime Monitor。应用不得直接访问 TFT、SPI、WiFi、Preferences 或硬件单例。
+- AudioService 已持续采集 ES8311 ADC / GPIO6 的 8 kHz mono PCM16，在 PSRAM 保留最近 6 秒，并向麦克风页、衰减耳返、缓存回放和 USB WAV 工具提供有界接口；语音清晰度和长期采集仍待人工验收。
 - Games 包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 的 1-1 至 8-4 数据由主机工具转换为固件内 C++ 资源，设备端不解析 CSV/XML/PNG。
 - USB 控制台和 PGOS Studio 支持统一导航、状态查询、吞吐实验和 TCP 19002 屏幕镜像；当前镜像仍是完整 RGB565 帧，脏矩形/关键帧属于后续工作。
 - shadow framebuffer 只在无线镜像连接或 USB 明确请求截图时更新；关闭镜像时不要把它重新放回高频渲染路径。
@@ -77,13 +78,15 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 3. Breakout 三关、挡板与角落碰撞、Top 5、碎片、音效、震动和长期稳定性。
 4. Blackjack 破产补助、牌靴重洗、实体手柄、震动/RGB 反馈和筹码持久化。
 5. Minesweeper 修正版固件烧录后的入口、四档棋盘、首击安全、插旗/chord、暂停、成绩、连续移动、反馈和息屏唤醒。
-6. PGOS Studio 的 keyframe + dirty rectangles、UDP/mDNS 发现、PCF8563 电池保持与 SNTP 回写。
-7. 统一输入扩展到实体按键/编码器，再逐项探索麦克风、ADC、TF/扩展接口和 OTA。
+6. 麦克风的人声清晰度、增益/削波、耳返反馈、连续采集和 WAV 长测。
+7. PGOS Studio 的 keyframe + dirty rectangles、UDP/mDNS 发现、PCF8563 电池保持与 SNTP 回写。
+8. 统一输入扩展到实体按键/编码器，再逐项探索 ADC、TF/扩展接口和 OTA。
 
 ## 7. 通用资产和验证入口
 
 - `tools/playground_console.py`：USB 控制台、命令发送、日志协调。
 - `tools/capture_screen.py`：RGB565 截图、PNG 和 Windows 剪贴板导出。
+- `tools/capture_microphone.py`：USB 麦克风 PCM 帧校验和 mono WAV 导出。
 - `tools/pgos_studio.py` / `tools/pgos_server.py`：无线 Studio 和协议诊断服务器。
 - `tools/tests/`：主机规则、输入、资源转换、协议和截图测试。
 - `docs/knowledge/`：显示、字体、USB、音频、I²C、输入、内存和测试经验。

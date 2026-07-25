@@ -31,7 +31,7 @@ PlatformIO 使用仓库内 `boards/es3n28p_r8n16.json`，因为该板型不是 P
 | 音频功放 EN | 1 | 低电平使能 |
 | I²S MCLK/BCLK/WS | 4/5/7 | 板载 ES8311 |
 | I²S DAC DATA | 8 | ESP32 → ES8311 播放 |
-| I²S ADC DATA | 6 | ES8311 → ESP32 麦克风采集，待单独验证 |
+| I²S ADC DATA | 6 | ES8311 → ESP32 麦克风采集；8 kHz PCM/WAV 导出已通过，语音质量待验收 |
 
 ## 外接 PCF8563 模块
 

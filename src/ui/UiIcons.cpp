@@ -11,6 +11,13 @@ const lv_image_dsc_t* image(UiIcon icon) {
         case UiIcon::Tools: return &ICON_WRENCH;
         case UiIcon::Display: return &ICON_MONITOR;
         case UiIcon::Sound: return &ICON_VOLUME_2;
+        case UiIcon::Mic: return &ICON_MIC;
+        case UiIcon::Activity: return &ICON_ACTIVITY;
+        case UiIcon::Sliders: return &ICON_SLIDERS_HORIZONTAL;
+        case UiIcon::AudioWaveform: return &ICON_AUDIO_WAVEFORM;
+        case UiIcon::Sparkles: return &ICON_SPARKLES;
+        case UiIcon::Headphones: return &ICON_HEADPHONES;
+        case UiIcon::Play: return &ICON_PLAY;
         case UiIcon::Light: return &ICON_LIGHTBULB;
         case UiIcon::Bluetooth: return &ICON_BLUETOOTH;
         case UiIcon::Wifi: return &ICON_WIFI;

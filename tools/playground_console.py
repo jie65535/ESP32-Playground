@@ -46,6 +46,8 @@ VALID_COMMANDS = (
     "page display",
     "page settings",
     "page sound",
+    "page mic",
+    "page microphone",
     "page rgb",
     "page console",
     "page network",
@@ -60,6 +62,19 @@ VALID_COMMANDS = (
     "page 2048",
     "time status",
     "i2c scan",
+    "mic status",
+    "mic gain",
+    "mic denoise on",
+    "mic denoise off",
+    "mic denoise toggle",
+    "mic voice on",
+    "mic voice off",
+    "mic voice toggle",
+    "mic record",
+    "mic monitor on",
+    "mic monitor off",
+    "mic monitor toggle",
+    "mic playback",
     "wifi scan",
     "wifi status",
     "wifi reconnect",
@@ -106,6 +121,7 @@ SHORTCUTS = {
     "j": "page blackjack",
     "m": "page minesweeper",
     "e": "page 2048",
+    "v": "page mic",
     "f": "flag",
     "z": "pause",
     "c": "color_test",
@@ -291,6 +307,9 @@ def normalize_commands(commands: Iterable[str]) -> list[str]:
             "bench upload ",
             "bench download ",
             "time set ",
+            "mic record ",
+            "mic gain ",
+            "mic playback ",
             "platformer maptest ",
         )
         prefix = next((item for item in prefixes if lower_value.startswith(item)), None)
@@ -314,7 +333,7 @@ def print_controls() -> None:
     print()
     print("ESP32 Playground USB console")
     print("  1/0 system   2 display   3 network   4 settings   5 sound   6 console")
-    print("  7 RGB light  8 time")
+    print("  7 RGB light  8 time   V microphone")
     print("  T Tetris   B Breakout   P Platformer   J Blackjack   E 2048")
     print("  Backspace back   C color test   R status   S screenshot + clipboard")
     print("  W Wi-Fi scan/select/password setup (password input is hidden)")

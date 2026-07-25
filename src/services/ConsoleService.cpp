@@ -83,6 +83,8 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.type = AppCommandType::PageDisplaySettings;
     } else if (lower == "page sound") {
         command.type = AppCommandType::PageSound;
+    } else if (lower == "page mic" || lower == "page microphone") {
+        command.type = AppCommandType::PageMicrophone;
     } else if (lower == "page rgb") {
         command.type = AppCommandType::PageRgb;
     } else if (lower == "page controller" || lower == "page gamepad") {
@@ -162,6 +164,75 @@ bool ConsoleService::parseLine(const String& rawLine, AppCommand& command) {
         command.value = line.substring(9);
     } else if (lower == "i2c scan") {
         command.type = AppCommandType::I2cScan;
+    } else if (lower == "mic status") {
+        command.type = AppCommandType::MicStatus;
+    } else if (lower == "mic gain") {
+        command.type = AppCommandType::MicGain;
+    } else if (lower.startsWith("mic gain ")) {
+        String gain = lower.substring(9);
+        gain.trim();
+        if (gain != "low" && gain != "normal" && gain != "high") {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            command.type = AppCommandType::MicGain;
+            command.value = gain;
+        }
+    } else if (lower == "mic denoise on") {
+        command.type = AppCommandType::MicDenoiseOn;
+    } else if (lower == "mic denoise off") {
+        command.type = AppCommandType::MicDenoiseOff;
+    } else if (lower == "mic denoise toggle") {
+        command.type = AppCommandType::MicDenoiseToggle;
+    } else if (lower == "mic voice on") {
+        command.type = AppCommandType::MicVoiceOn;
+    } else if (lower == "mic voice off") {
+        command.type = AppCommandType::MicVoiceOff;
+    } else if (lower == "mic voice toggle") {
+        command.type = AppCommandType::MicVoiceToggle;
+    } else if (lower == "mic record") {
+        command.type = AppCommandType::MicRecord;
+        command.number = 3000;
+    } else if (lower.startsWith("mic record ")) {
+        String argument = line.substring(11);
+        argument.trim();
+        const int separator = argument.indexOf(' ');
+        String duration = argument;
+        String correlationId;
+        if (separator >= 0) {
+            duration = argument.substring(0, separator);
+            correlationId = argument.substring(separator + 1);
+            correlationId.trim();
+        }
+        if (!isUnsignedInteger(duration) ||
+            (!correlationId.isEmpty() &&
+             !isUnsignedInteger(correlationId))) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            command.type = AppCommandType::MicRecord;
+            command.number = duration.toInt();
+            command.value = correlationId;
+        }
+    } else if (lower == "mic monitor on") {
+        command.type = AppCommandType::MicMonitorOn;
+    } else if (lower == "mic monitor off") {
+        command.type = AppCommandType::MicMonitorOff;
+    } else if (lower == "mic monitor toggle") {
+        command.type = AppCommandType::MicMonitorToggle;
+    } else if (lower == "mic playback") {
+        command.type = AppCommandType::MicPlayback;
+        command.number = 3000;
+    } else if (lower.startsWith("mic playback ")) {
+        String argument = line.substring(13);
+        argument.trim();
+        if (!isUnsignedInteger(argument)) {
+            command.type = AppCommandType::Unknown;
+            command.value = line;
+        } else {
+            command.type = AppCommandType::MicPlayback;
+            command.number = argument.toInt();
+        }
     } else if (lower == "gamepad status") {
         command.type = AppCommandType::GamepadStatus;
     } else if (lower == "gamepad rumble") {
@@ -285,8 +356,8 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("Commands: up | down | left | right | ok | flag | pause"));
     output.println(F("          back | home"));
     output.println(F("         page system | page time | page display | page settings"));
-    output.println(F("         page sound | page rgb | page controller | page console"));
-    output.println(F("         page network"));
+    output.println(F("         page sound | page mic | page rgb | page controller"));
+    output.println(F("         page console | page network"));
     output.println(F("         page snake"));
     output.println(F("         page tetris"));
     output.println(F("         page breakout"));
@@ -299,6 +370,11 @@ void ConsoleService::printHelp(Print& output) {
     output.println(F("          color_test | screenshot [request_id] | status | help"));
     output.println(F("Time:     time status | time set YYYY-MM-DD HH:MM:SS"));
     output.println(F("I2C:      i2c scan"));
+    output.println(F("Mic:      mic status | mic gain low|normal|high"));
+    output.println(F("          mic denoise on|off|toggle"));
+    output.println(F("          mic voice on|off|toggle"));
+    output.println(F("          mic record [250-5000 ms]"));
+    output.println(F("          mic monitor on|off|toggle | mic playback [ms]"));
     output.println(F("Gamepad:  gamepad status | gamepad scan | gamepad stop"));
     output.println(F("          gamepad rumble | gamepad disconnect"));
     output.println(F("Wi-Fi:    wifi scan | wifi select <index> | wifi ssid <name>"));

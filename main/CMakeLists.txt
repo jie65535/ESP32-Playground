@@ -3,11 +3,15 @@
 # the same change as newly added standalone game/UI sources to force
 # PlatformIO's CMake reconfiguration and refresh the globbed source list,
 # including the generated Platformer campaign pack, sparse level runtime and
-# tile renderer and the complete Minesweeper app/engine/solver/records/layout.
+# tile renderer, the complete Minesweeper app/engine/solver/records/layout and
+# the Microphone settings app, lightweight denoiser, WebRTC VAD and voice
+# enhancer.
 file(GLOB_RECURSE PGOS_SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB_RECURSE LIBFVAD_SOURCES
+     "${CMAKE_SOURCE_DIR}/src/third_party/libfvad/src/*.c")
 
 idf_component_register(
-    SRCS "main.c" ${PGOS_SOURCES}
+    SRCS "main.c" ${PGOS_SOURCES} ${LIBFVAD_SOURCES}
     INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/src"
     REQUIRES bluepad32 bluepad32_arduino arduino btstack lvgl
              esp_lcd esp_driver_spi esp_lcd_ili9341)

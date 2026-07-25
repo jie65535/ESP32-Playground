@@ -7,7 +7,7 @@
 ## 当前固件
 
 - 使用 LVGL 9.5 和原生 LCD DMA 驱动，提供按键式桌面、设置页、系统工具、亮度/息屏、截图和无线镜像。
-- 已接入 Wi-Fi Station、PGOS Studio、Xbox BLE 手柄、ES8311 音频、板载 WS2812 RGB，以及 PCF8563 RTC。
+- 已接入 Wi-Fi Station、PGOS Studio、Xbox BLE 手柄、ES8311 播放/麦克风、板载 WS2812 RGB，以及 PCF8563 RTC。
 - Games 菜单包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 目前包含 1-1 至 8-4 的 32 关战役。
 - 外设由独立 Service 持有，应用只通过稳定接口访问能力；真实硬件结果和未完成项目以实验记录为准。
 
@@ -37,13 +37,14 @@ pio run -e playground -t upload --upload-port COMx
 pio device monitor --port COMx --baud 115200
 ```
 
-### USB 控制台和截图
+### USB 控制台、截图和麦克风录音
 
 ```powershell
 python -m pip install -r tools/requirements.txt
 python tools/playground_console.py --list
 python tools/playground_console.py --port COM3
 python tools/capture_screen.py --port COM3 --output captures/home.png
+python tools/capture_microphone.py --port COM3 --duration 3000 --output captures/mic-test.wav
 ```
 
 控制台支持方向键、确认、返回、Home、页面直达、状态查询和无损 RGB565 截图；密码等敏感信息不会回显。常用页面示例：
@@ -51,6 +52,9 @@ python tools/capture_screen.py --port COM3 --output captures/home.png
 ```text
 page system
 page network
+page mic
+mic status
+mic denoise on
 page platformer
 page minesweeper
 page 2048
