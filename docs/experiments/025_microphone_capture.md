@@ -18,6 +18,8 @@
 
 麦克风页位于 Settings / 麦克风，提供采集状态、实时电平、输入增益、降噪、人声增强、耳返和最近 3 秒回放。各项使用独立的 Lucide 位图图标；USB WAV 导出仅由上位机命令和 `capture_microphone.py` 触发，不作为设备端操作项。页面只访问 `AudioService` 快照和请求接口，不直接操作 I²S 或 ES8311。
 
+输入增益项遵循方向键语义：右键按 `low → normal → high` 正向循环，左键反向循环，确认键等同于右键；其它二值开关仍允许左右键或确认键切换。
+
 `libfvad` 固定导入自 `dpirch/libfvad` commit `532ab666c20d3cfda38bca63abbb0f152706c369`；SpeexDSP 固定导入自 `xiph/speexdsp` commit `7a158783df74efe7c2d1c6ee8363c1e695c71226`。两者的上游许可证和来源说明随所用源码子集保存在 `src/third_party/`；当前不引入 ESP-SR 或神经网络语音分离模型。
 
 ## USB 协议与工具

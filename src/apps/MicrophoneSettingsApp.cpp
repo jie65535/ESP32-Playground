@@ -55,7 +55,19 @@ void MicrophoneSettingsApp::onCommand(const AppCommand& command,
             selected_ = static_cast<uint8_t>((selected_ + 1U) % ITEM_COUNT);
             break;
         case AppCommandType::Left:
+            if (selected_ == 2U) {
+                context.audio.stepMicrophoneGain(-1);
+            } else {
+                activateSelected(context);
+            }
+            break;
         case AppCommandType::Right:
+            if (selected_ == 2U) {
+                context.audio.stepMicrophoneGain(1);
+            } else {
+                activateSelected(context);
+            }
+            break;
         case AppCommandType::Activate:
             activateSelected(context);
             break;
@@ -268,7 +280,7 @@ void MicrophoneSettingsApp::activateSelected(AppContext& context) {
             context.audio.printStatus(context.console);
             break;
         case 2:
-            context.audio.cycleMicrophoneGain();
+            context.audio.stepMicrophoneGain(1);
             break;
         case 3:
             context.audio.toggleMicrophoneDenoise();

@@ -71,7 +71,7 @@ public:
                                        bool requested);
     MicrophoneGain microphoneGain() const;
     bool setMicrophoneGain(MicrophoneGain gain);
-    void cycleMicrophoneGain();
+    void stepMicrophoneGain(int8_t direction);
     static const char* microphoneGainName(MicrophoneGain gain);
     static bool parseMicrophoneGain(const String& value,
                                     MicrophoneGain& gain);

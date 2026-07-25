@@ -386,11 +386,15 @@ bool AudioService::setMicrophoneGain(MicrophoneGain gain) {
     return true;
 }
 
-void AudioService::cycleMicrophoneGain() {
+void AudioService::stepMicrophoneGain(int8_t direction) {
+    const uint8_t profileCount = static_cast<uint8_t>(
+        sizeof(MICROPHONE_GAIN_PROFILES) /
+        sizeof(MICROPHONE_GAIN_PROFILES[0]));
+    const uint8_t current = static_cast<uint8_t>(microphoneGain());
     const uint8_t next =
-        (static_cast<uint8_t>(microphoneGain()) + 1U) %
-        static_cast<uint8_t>(sizeof(MICROPHONE_GAIN_PROFILES) /
-                             sizeof(MICROPHONE_GAIN_PROFILES[0]));
+        direction < 0 ? static_cast<uint8_t>(
+                            (current + profileCount - 1U) % profileCount)
+                      : static_cast<uint8_t>((current + 1U) % profileCount);
     (void)setMicrophoneGain(static_cast<MicrophoneGain>(next));
 }
 
