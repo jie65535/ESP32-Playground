@@ -71,7 +71,7 @@ class TinyLmAssetTests(unittest.TestCase):
     def test_model_binary_matches_exported_size_when_present(self) -> None:
         if not MODEL_DATA.exists():
             self.skipTest("ignored model.bin is not available in this checkout")
-        self.assertEqual(MODEL_DATA.stat().st_size, 2_947_012)
+        self.assertEqual(MODEL_DATA.stat().st_size, 3_917_660)
         self.assertEqual(MODEL_DATA.read_bytes()[:4], b"1ELP")
 
     def test_partition_layout_keeps_dual_ota_and_model_space(self) -> None:
@@ -86,7 +86,7 @@ class TinyLmAssetTests(unittest.TestCase):
         self.assertEqual(rows["app0"], (0x10000, 0x400000))
         self.assertEqual(rows["app1"], (0x410000, 0x400000))
         self.assertEqual(rows["model"], (0x810000, 0x400000))
-        self.assertGreaterEqual(rows["model"][1], 2_947_012)
+        self.assertGreaterEqual(rows["model"][1], 3_917_660)
         self.assertEqual(rows["spiffs"], (0xC10000, 0x3E0000))
         ordered = sorted((offset, offset + size, name)
                          for name, (offset, size) in rows.items())

@@ -23,7 +23,7 @@
 
 namespace {
 
-constexpr size_t MODEL_BYTES = 2947012;
+constexpr size_t MODEL_BYTES = 3917660;
 constexpr uint16_t EOT_TOKEN = 0;
 constexpr float TEMPERATURE = 0.8F;
 constexpr uint8_t MAX_PROMPT_TOKENS = 8;
@@ -466,7 +466,7 @@ struct TinyLmService::Impl {
         memcpy(config, modelBase + sizeof(magic), sizeof(config));
         if (magic != LLM_MAGIC || config[0] != VOCAB_N ||
             config[1] != 128 || config[2] != 6 || config[3] != 4 ||
-            config[4] != 415 || config[5] != 64 || config[6] != 512 ||
+            config[4] != 512 || config[5] != 96 || config[6] != 512 ||
             config[7] != 128 || llm_load(modelBase, &model) != 0) {
             setError("model header mismatch");
             return false;

@@ -8,7 +8,7 @@
 
 - 使用 LVGL 9.5 和原生 LCD DMA 驱动，提供按键式桌面、设置页、系统工具、亮度/息屏、截图和无线镜像。
 - 已接入 Wi-Fi Station、PGOS Studio、Xbox BLE 手柄、ES8311 播放/麦克风、板载 WS2812 RGB，以及 PCF8563 RTC。
-- System Tools 已接入中文 `TinyLM`：5.69M 参数、2.95 MB INT4 模型在设备本地推理，提供预设故事开头、流式输出、A 重新生成和 B 返回列表。
+- System Tools 已接入中文 `TinyLM`：7.56M 参数、3.92 MB INT4 模型在设备本地推理，提供预设故事开头、流式输出、A 重新生成和 B 返回列表。
 - Games 菜单包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 目前包含 1-1 至 8-4 的 32 关战役。
 - 外设由独立 Service 持有，应用只通过稳定接口访问能力；真实硬件结果和未完成项目以实验记录为准。
 

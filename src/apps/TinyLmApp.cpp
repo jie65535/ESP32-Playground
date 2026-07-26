@@ -97,7 +97,7 @@ void TinyLmApp::onTick(uint32_t nowMs, AppContext& context) {
 
 lv_obj_t* TinyLmApp::onCreateView(AppContext& context) {
     root_ = context.ui.createPageRoot(
-        nullptr, "TinyLM", "5.69M 参数 · INT4 2.95 MB · 本地运行");
+        nullptr, "TinyLM", "7.56M 参数 · INT4 3.92 MB · 本地运行");
 
     for (uint8_t index = 0; index < PRESET_COUNT; ++index) {
         cards_[index] = context.ui.createCard(

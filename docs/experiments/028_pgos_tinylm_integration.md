@@ -1,7 +1,7 @@
 # PGOS 中文 TinyLM 集成与真机验收
 
 > 日期：2026-07-26
-> 状态：集成、分区迁移、烧录、自动化真机冒烟和用户实体交互验收通过；长期稳定性继续观察
+> 状态：集成、分区迁移和实体交互验收通过；7.56M 参数模型已升级、烧录并完成双轮真机冒烟，长期稳定性继续观察
 > 前置：[027_chinese_tinylm_assets_and_model.md](027_chinese_tinylm_assets_and_model.md)
 > 硬件：QD ES3N28P，ESP32-S3 R8N16，16MB Flash，8MB OPI PSRAM
 
@@ -32,15 +32,15 @@ Wi-Fi、音频和系统输入。
 
 | 项目 | 当前值 |
 |---|---:|
-| 配置 | V=8192, D=128, L=6, H=4, F=415, P=64, S=512, G=128 |
-| core 参数 | 1,499,328 |
+| 配置 | V=8192, D=128, L=6, H=4, F=512, P=96, S=512, G=128 |
+| core 参数 | 1,796,576 |
 | tied embedding/head 参数 | 1,048,576 |
-| PLE table 参数 | 3,145,728 |
-| 总参数量 | 5,693,632（5.69M） |
-| `model.bin` | 2,947,012 bytes，SHA-256 `A4C4F8211ABBCFFA689F08D45B5FC5A9EF0E7AA93937F36CA90286A593C09566` |
+| PLE table 参数 | 4,718,592 |
+| 总参数量 | 7,563,744（7.56M） |
+| `model.bin` | 3,917,660 bytes，SHA-256 `7CE7E90D3D738B94FD169B37FBCA7998F169C635D5C4FD9DDD86A4A9CB2CA069` |
 | int8 输出头 + scale | 1,081,344 bytes |
-| KV/scratch/logits | 3,192,692 bytes |
-| 推理期 PSRAM 动态预算 | 4,274,036 bytes，约 4.08MiB |
+| KV/scratch/logits | 3,196,160 bytes |
+| 推理期 PSRAM 动态预算 | 4,277,504 bytes，约 4.08MiB |
 
 `TinyLmService` 启动时只查找、校验并 mmap `model` 分区，不立即分配 4MB PSRAM。
 进入生成页后再展开 int8 输出头并分配 KV/scratch；退出 TinyLM App 后异步释放。
@@ -69,7 +69,7 @@ generation ID 丢弃。
 相较旧 PGOS，两个 app 槽从 6.25MB 收缩为 4MB，并在中间加入 4MB 模型分区；
 SPIFFS 从 3.375MB 调整为 3.875MB 且 offset 改变。因此迁移前必须分别备份 NVS、
 otadata、旧 SPIFFS 和 coredump，不能只上传新应用覆盖旧分区表。模型与 OTA 应用
-镜像分离，日后常规 OTA 不必重复传 2.95MB 模型。
+镜像分离，日后常规 OTA 不必重复传 3.92MB 模型。
 
 ## 软件验证
 
@@ -85,12 +85,12 @@ gcc -O3 src\third_party\esp32_ai\firmware\host_verify\verify.c -lm `
 
 结果：
 
-- 提交前重新构建通过：RAM 118,880 / 327,680 bytes（36.3%）；Flash
-  2,766,241 / 4,194,304 bytes（66.0%）。
+- 升级后重新构建通过：RAM 118,880 / 327,680 bytes（36.3%）；Flash
+  2,766,273 / 4,194,304 bytes（66.0%），`firmware.bin` 为 2,766,672 bytes。
 - 64 项主机测试通过；新增测试锁定字体、8192 词表、64-byte token 解码缓冲、
   model 大小和分区无重叠。
-- C 推理与 PyTorch golden 的 top token 均为 592，max abs diff 0.00001，
-  RMS diff 0.000002，数值验证 PASS。
+- C 推理与 PyTorch golden 的 top token 均为 271，max abs diff 0.00002，
+  RMS diff 0.000003，数值验证 PASS。
 
 ## 资源占用汇总
 
@@ -100,8 +100,8 @@ gcc -O3 src\third_party\esp32_ai\firmware\host_verify\verify.c -lm `
 | 资源 | 当前占用或空闲 | 分区/总量 | 余量与结论 |
 |---|---:|---:|---|
 | 内部 SRAM 静态占用 | 118,880 bytes | 327,680 bytes | 占 36.3%，链接期余量 208,800 bytes（约 203.9KiB） |
-| 单个 OTA App | 提交前 `firmware.bin` 2,766,640 bytes | 4,194,304 bytes | 占约 66.0%，每个槽余量 1,427,664 bytes（约 1.36MiB） |
-| TinyLM 模型 | 2,947,012 bytes | 4,194,304 bytes | 占 70.3%，模型分区余量 1,247,292 bytes（约 1.19MiB） |
+| 单个 OTA App | `firmware.bin` 2,766,672 bytes | 4,194,304 bytes | 占约 66.0%，每个槽余量 1,427,632 bytes（约 1.36MiB） |
+| TinyLM 模型 | 3,917,660 bytes | 4,194,304 bytes | 占 93.4%，模型分区余量 276,644 bytes（约 270.2KiB） |
 | TinyLM 字体 | 190,272 bytes | 编入 App Flash | 3,964 glyph，约 185.8KiB |
 | TinyLM 词表 | 92,755 bytes | 编入 App Flash | offset 表 32,772 bytes，字符串数据 59,983 bytes，合计约 90.6KiB |
 
@@ -112,29 +112,29 @@ gcc -O3 src\third_party\esp32_ai\firmware\host_verify\verify.c -lm `
 
 | 阶段 | 行为 | PSRAM 空闲 | 相对标称 8MiB 的非空闲量 | TinyLM 动态增量 | 结论 |
 |---|---|---:|---:|---:|---|
-| 空闲基线 | 已进入 TinyLM 预设列表，尚未生成 | 7,942,696 bytes（约 7.57MiB） | 445,912 bytes（约 435.5KiB） | 0 | 模型仅 mmap，未申请推理工作区 |
-| 生成中 | 输出 token、更新流式页面 | 3,668,588 bytes（约 3.50MiB） | 4,720,020 bytes（约 4.50MiB） | 4,274,108 bytes（约 4.08MiB） | 峰值与静态预算基本一致，仍有约 3.50MiB 空闲 |
-| 生成完成、仍停留页面 | 输出已停止，页面等待 A/B | 本轮未单独留值 | 本轮未单独留值 | 设计上仍保留推理工作区 | 下一轮长测应补采；当前实现到退出 App 才执行 unload |
-| 退出 App 两秒后 | 返回 System Tools/列表外部 | 7,942,696 bytes（约 7.57MiB） | 445,912 bytes（约 435.5KiB） | 0 | 精确恢复到空闲基线，未观察到泄漏 |
+| 空闲基线 | 已进入 TinyLM 预设列表，尚未生成 | 7,947,296 bytes（约 7.58MiB） | 441,312 bytes（约 431.0KiB） | 0 | 模型仅 mmap，未申请推理工作区 |
+| 生成中 | 输出 token、更新流式页面 | 3,669,732 bytes（约 3.50MiB） | 4,718,876 bytes（约 4.50MiB） | 4,277,564 bytes（约 4.08MiB） | 与 4,277,504-byte 静态预算只差分配器开销，仍有约 3.50MiB 空闲 |
+| 生成完成、仍停留页面 | 输出已停止，页面等待 A/B | 3,669,732 bytes（约 3.50MiB） | 4,718,876 bytes（约 4.50MiB） | 4,277,564 bytes（约 4.08MiB） | 工作区按设计保留，可立即重新生成 |
+| 退出 App 两秒后 | 返回 System Tools | 7,947,296 bytes（约 7.58MiB） | 441,312 bytes（约 431.0KiB） | 0 | 精确恢复到本轮空闲基线，未观察到泄漏 |
 
 上表只把有真机证据的运行时 PSRAM 数值写成实测。内部 SRAM 的
-118,880 / 327,680 bytes 是链接期静态占用，不等于运行时 free heap；本轮没有为
-空闲、生成中和退出后三个阶段分别留存 internal free/minimum heap，因此不补造数值。
-后续做长期资源验收时，应在上述阶段同时采集 internal free heap、internal minimum
-free heap、PSRAM free/minimum free 和两个 TinyLM 任务的 stack high-water mark。
+118,880 / 327,680 bytes 是链接期静态占用，不等于运行时 free heap；本轮状态快照中
+预设页、生成中、第二轮完成和退出后的 free heap 分别为 54,036、53,588、53,288 和
+55,832 bytes，但采样时 BLE 扫描阶段不同，不能把差值全部归因于 TinyLM。后续长测
+仍应补采 internal minimum free heap、PSRAM minimum free 和两个 TinyLM 任务的
+stack high-water mark。
 
-按提交前构建计算，两份 OTA App 二进制加模型的核心 Flash 载荷为 8,480,292 bytes
-（约 8.09MiB）；
-此外仍保留 3.875MiB SPIFFS，以及 NVS、OTA data 和 coredump。TinyLM 的 2.95MB
-INT4 权重直接从 Flash mmap，不会再完整复制到 PSRAM；4.08MiB 动态增量主要由
-1,081,344 bytes 的 int8 输出头与 scale，以及 3,192,692 bytes 的
+按升级后构建计算，两份 OTA App 二进制加模型的核心 Flash 载荷为 9,451,004 bytes
+（约 9.01MiB）；此外仍保留 3.875MiB SPIFFS，以及 NVS、OTA data 和 coredump。
+TinyLM 的 3.92MB INT4 权重直接从 Flash mmap，不会再完整复制到 PSRAM；4.08MiB
+动态增量主要由 1,081,344 bytes 的 int8 输出头与 scale，以及 3,196,160 bytes 的
 KV/scratch/logits 构成。
 
 当前资源结论是：内部 SRAM、App 分区和运行时 PSRAM 都没有贴线，生成过程中仍有
 约 3.50MiB PSRAM 可用，退出后能完整回收。若以后扩大模型，当前首先可见的硬边界
-是模型分区仅余约 1.19MiB；同时应给 Wi-Fi、LVGL、音频和镜像保留至少 1.5--2MiB
-运行时 PSRAM 安全余量。当前 5.69M 模型在容量、5.3--6.0 tok/s 吞吐和系统共存
-之间处于较稳妥的平衡点。
+是模型分区仅余约 270KiB；同时应给 Wi-Fi、LVGL、音频和镜像保留至少 1.5--2MiB
+运行时 PSRAM 安全余量。当前 7.56M 模型仍保留约 3.50MiB 生成中 PSRAM，短测吞吐
+约 5.1--5.2 tok/s；继续扩张前应先比较实际文本收益，而不是把 4MiB 分区完全填满。
 
 ## 烧录与迁移记录
 
@@ -180,7 +180,32 @@ python -m esptool --chip esp32s3 --port COM3 --baud 460800 write-flash `
 SHA-256 `D4D80C238845E2817D8F872CE75123D3E8AA134E1DA04F8937AE61F497F40AE9`。
 烧录后回读分区表，offset/size 与 `partitions_16MB.csv` 完全一致。
 
+### 7.56M 模型原位升级
+
+2026-07-26 在不修改 4MiB 模型分区和 OTA 布局的前提下，将模型从 P64/F415
+升级为 P96/F512。旧 `model.bin` 备份位于：
+
+```text
+artifacts/tinylm-p96-f512-12k/20260726-144050/old-model.bin
+```
+
+旧模型 SHA-256 为
+`A4C4F8211ABBCFFA689F08D45B5FC5A9EF0E7AA93937F36CA90286A593C09566`。
+新模型和本轮固件如下：
+
+| 文件 | 大小 | SHA-256 |
+|---|---:|---|
+| `firmware.bin` | 2,766,672 | `7CD467A27155D6D6B85F439D1B0F57EE1669B9DD71D44ADBF901DA6A69FE4EB3` |
+| `model.bin` | 3,917,660 | `7CE7E90D3D738B94FD169B37FBCA7998F169C635D5C4FD9DDD86A4A9CB2CA069` |
+
+PlatformIO 上传更新 bootloader、分区表、OTA data 和 app0；随后把同一份
+`firmware.bin` 单独写入 `0x410000` 的 app1，避免未来切换 OTA 槽时旧固件因
+F/P header 不匹配而拒绝新模型。新模型写入 `0x810000`。app0、app1 和 model
+三次写入均由 esptool 完成哈希校验，未擦除 NVS 或 SPIFFS。
+
 ## 自动化真机冒烟结果
+
+### 初始 5.69M 模型
 
 PGOS 启动后旧设置仍可用：Wi-Fi 自动连接、RTC/NTP、LCD DMA、音频、RGB、麦克风
 和手柄服务均报告 ready/正常状态。NVS 在启动后因系统服务的正常运行时写入而发生
@@ -204,11 +229,47 @@ PGOS 启动后旧设置仍可用：Wi-Fi 自动连接、RTC/NTP、LCD DMA、音�
 `wifi:m f null` warning，但 Wi-Fi 始终保持连接，TinyLM 和其它服务未受影响；长测时
 继续观察，不把它归因于模型。
 
-设备最终停在 TinyLM 预设列表，PSRAM 已释放。2026-07-26 用户完成本轮实体测试，
+初始验收后设备停在 TinyLM 预设列表，PSRAM 已释放。2026-07-26 用户完成实体测试，
 反馈“交互体验还行”，因此预设列表、流式生成和 A/B 导航的主观交互验收记为通过。
 本轮短时验收不替代连续多轮生成、Wi-Fi/BT 共存和长时间运行稳定性测试，后续仍需
 在日常使用中继续观察。
 
+### P96/F512 7.56M 模型升级
+
+升级后完整重启日志确认实际加载：
+
+```text
+[tinylm] model ready V=8192 D=128 L=6 F=512 P=96 S=512 size=3.92 MB
+```
+
+通过 USB 统一输入再次执行 Desktop → System Tools → TinyLM，并完成两轮连续生成：
+
+- 预设页显示 `7.56M 参数 · INT4 3.92 MB · 本地运行`，中文、滚动和焦点正常。
+- 第一轮在生成中截图时为 69/200 token、5.2 tok/s，最终 EOT 提前结束于 85 token，
+  页面显示约 5.1 tok/s。文本形成完整段落，但出现“小兔子/猴子”等对象漂移。
+- A/OK 重新生成得到不同内容；第二轮 EOT 提前结束于 77 token，日志为
+  `compute=5.09 tok/s`。文本仍能形成完整段落，但局部因果和角色一致性尚不稳定。
+- 两轮均无 UTF-8 半字、空白缺字、模型错误、abort、WDT 或异常复位。
+- 预设页、生成中/完成和退出两秒后的 PSRAM 分别为 7,947,296、3,669,732 和
+  7,947,296 bytes；动态增量 4,277,564 bytes，退出后精确回收。
+- B 第一次返回预设列表，第二次返回 System Tools；重新进入 TinyLM 正常。
+- Wi-Fi 本轮按设备设置处于 off；BLE 手柄扫描/重连日志持续运行，未阻塞生成。
+
+本轮截图保存在本地：
+
+```text
+captures/playground-20260726-145859.png
+captures/playground-20260726-145938.png
+captures/playground-20260726-150046.png
+captures/playground-20260726-150139.png
+captures/playground-20260726-150214.png
+```
+
+设备在双槽同步和重启复核后再次进入 TinyLM 预设列表。短测说明升级模型可以在原
+4MiB 分区和现有约 4.08MiB 推理工作区内稳定运行，端侧速度只比初始模型略低；文本
+局部连贯性有所改善，但两轮样例仍暴露角色、物体和因果关系漂移，不能仅凭 validation
+PPL 把它视为已解决故事一致性。
+
 不做 OTA 时的 Flash 上限、候选训练配置、质量收益和其它应用场景已单独记录在
 [029_tinylm_scaling_and_applications_plan.md](029_tinylm_scaling_and_applications_plan.md)；
-029 目前仅为评估，不代表已经修改分区或训练新模型。
+029 已记录首轮 P96/F512 扩容结果，更大模型和跨领域数据集仍属于后续评估。

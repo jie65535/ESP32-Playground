@@ -59,11 +59,11 @@ PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16
 ## 当前：中文 TinyLM 本地生成
 
 - `src/third_party/esp32_ai/` 内置训练、导出和设备推理源码；TinyStories-Zh-1M 原始 Parquet、训练 bin/checkpoint 和 `model.bin` 保持本地忽略，生成后的 8192-token `vocab.h` 与精简字体进入固件资产。
-- 当前模型为 `V=8192, D=128, L=6, H=4, F=415, P=64, S=512, G=128`，总参数量 5,693,632；导出 INT4 模型 2,947,012 bytes，运行时模型主体从 Flash mmap，输出头与 KV/scratch 按需占用约 4.08 MiB PSRAM。
+- 当前模型为 `V=8192, D=128, L=6, H=4, F=512, P=96, S=512, G=128`，总参数量 7,563,744；导出 INT4 模型 3,917,660 bytes，运行时模型主体从 Flash mmap，输出头与 KV/scratch 按需占用约 4.08 MiB PSRAM。
 - `TinyLmService` 用有界任务/Token 队列隔离推理和 LVGL，退出应用后释放大块 PSRAM；`TinyLmApp` 提供四个预设开头、UTF-8 增量解码、数据集字符覆盖字体、A 重新生成和 B 返回列表。
 - 16MB Flash 已迁移为两个 4MB OTA 槽、4MB `model` 分区、3.875MB SPIFFS 和保留 NVS/coredump；当前固件约 2.77MB，仍保留双 OTA 余量。
-- 构建、64 项主机回归和 C/PyTorch golden 数值对比已通过；自动化真机冒烟确认 5.3--6.0 tok/s、推理中仍空闲约 3.50MiB PSRAM 且退出后完整回收。2026-07-26 用户实体交互验收通过，连续多轮生成、Wi-Fi/BT 共存和长期稳定性继续观察。
-- 若暂时取消 OTA，保留 4MiB App 和 SPIFFS 时可将模型分区扩到 8MiB；参数上限、P192/F512 推荐配置、训练量、质量预期和非故事应用已记录在 `docs/experiments/029_tinylm_scaling_and_applications_plan.md`，当前仅完成评估，尚未执行分区或模型变更。
+- 构建、64 项主机回归和 C/PyTorch golden 数值对比已通过；P96/F512 双轮真机冒烟确认约 5.1--5.2 tok/s、推理中仍空闲约 3.50MiB PSRAM 且退出后完整回收。2026-07-26 用户实体交互验收通过；固定提示词批量评价、Wi-Fi/BT 共存和长期稳定性继续观察。
+- 若暂时取消 OTA，保留 4MiB App 和 SPIFFS 时可将模型分区扩到 8MiB；参数上限、P192/F512 后续候选、训练量、质量预期和非故事应用已记录在 `docs/experiments/029_tinylm_scaling_and_applications_plan.md`。当前只完成不改分区的 P96/F512 升级，尚未执行 8MiB 扩容。
 
 ## 随后：PGOS Studio 媒体与工具能力
 

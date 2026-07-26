@@ -68,7 +68,7 @@ const MenuItemDefinition TOOL_ITEMS[] = {
     {UiIcon::System, "系统监视", nullptr, AppId::SystemInfo},
     {UiIcon::Clock, "时钟", nullptr, AppId::Time},
     {UiIcon::Palette, "颜色实验", nullptr, AppId::DisplayTest},
-    {UiIcon::Sparkles, "TinyLM", "5.69M 参数 · 本地中文故事", AppId::TinyLm},
+    {UiIcon::Sparkles, "TinyLM", "7.56M 参数 · 本地中文故事", AppId::TinyLm},
 };
 
 static_assert(sizeof(HOME_ITEMS) / sizeof(HOME_ITEMS[0]) <=
