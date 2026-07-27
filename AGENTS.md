@@ -2,7 +2,7 @@
 
 > 最后更新：2026-07-26
 > 工作目录：`G:\MCU\ESP32Playground`
-> 当前阶段：PGOS 应用基座、中文 TinyLM、LCD DMA、PGOS Studio、板载 RGB、PCF8563 RTC 和小游戏真机验收
+> 当前阶段：PGOS 应用基座、中文大语言模型、LCD DMA、PGOS Studio、板载 RGB、PCF8563 RTC 和小游戏真机验收
 
 ## 1. 项目定位
 
@@ -54,7 +54,7 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 - Games 包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 的 1-1 至 8-4 数据由主机工具转换为固件内 C++ 资源，设备端不解析 CSV/XML/PNG。
 - USB 控制台和 PGOS Studio 支持统一导航、状态查询、吞吐实验和 TCP 19002 屏幕镜像；当前镜像仍是完整 RGB565 帧，脏矩形/关键帧属于后续工作。
 - shadow framebuffer 只在无线镜像连接或 USB 明确请求截图时更新；关闭镜像时不要把它重新放回高频渲染路径。
-- System Tools 已集成中文 TinyLM：当前 7.56M 参数、3.92MB INT4 模型从独立 Flash 分区 mmap，进入生成页后按需占用约 4.08 MiB PSRAM，页面提供预设开头、流式输出、A 重新生成和 B 返回列表；双轮真机短测约 5.1--5.2 tok/s，退出后 PSRAM 完整回收。
+- System Tools 已集成中文大语言模型：当前 7.56M 参数、3.92MB INT4 模型从独立 Flash 分区 mmap，进入生成页后按需占用约 4.08 MiB PSRAM，页面提供预设开头、流式输出、A 重新生成和 B 返回列表；双轮真机短测约 5.1--5.2 tok/s，退出后 PSRAM 完整回收。
 
 实现细节、资源预算和真机证据以项目路线和实验记录为准，不在本文件复制完整验收报告。
 
@@ -74,7 +74,7 @@ PlaygroundOS（PGOS）是逐步形成的应用基座：系统服务拥有硬件�
 
 优先顺序如下；完成后更新对应实验记录和本节：
 
-1. TinyLM 的实体交互和 P96/F512 双轮冒烟已通过；继续做固定提示词批量质量评价、Wi-Fi/BT 共存和长期稳定性观察，再决定采样优化或 P192 扩容。
+1. 大语言模型的实体交互和 P96/F512 双轮冒烟已通过；继续做固定提示词批量质量评价、Wi-Fi/BT 共存和长期稳定性观察，再决定采样优化或 P192 扩容。
 2. RGB Breathe/Heartbeat 的 10ms 渐变、颜色顺序、白色满亮度和长期稳定性。
 3. Platformer 的 Xbox 手感、碰撞、区域机制、城堡/Bowser、反馈和 32 关长测。
 4. Breakout 三关、挡板与角落碰撞、Top 5、碎片、音效、震动和长期稳定性。

@@ -56,7 +56,7 @@ PCF8563 RTC 基座已加入最小实现：`I2cBusService` 统一拥有 GPIO15/16
 - Minesweeper 使用纯 C++ `MinesweeperEngine` 和逻辑推导求解器生成首击安全且无猜测可解的候选棋盘；App 每 tick 只验证一个候选，提供 18/11/10px 分级棋盘、插旗/chord、暂停、结果动画、音频/震动/RGB 反馈。`MinesweeperProfileService` 以独立 `pgos_mines` schema 保存三档 Top 5、局数、胜率和连胜；标准难度与自定义参数不混用记录。
 - 2048 使用纯 C++ `Game2048Engine` 维护 4×4 方块、单次合并和 2/4 生成概率；`Game2048App` 以固定 motion 记录绘制 145ms 滑动、合并弹性和新块弹出，独立 `Game2048ProfileService` 保存 32 位最佳分/最高方块/统计，并接入音频、震动和 RGB 目标反馈。
 
-## 当前：中文 TinyLM 本地生成
+## 当前：中文大语言模型本地生成
 
 - `src/third_party/esp32_ai/` 内置训练、导出和设备推理源码；TinyStories-Zh-1M 原始 Parquet、训练 bin/checkpoint 和 `model.bin` 保持本地忽略，生成后的 8192-token `vocab.h` 与精简字体进入固件资产。
 - 当前模型为 `V=8192, D=128, L=6, H=4, F=512, P=96, S=512, G=128`，总参数量 7,563,744；导出 INT4 模型 3,917,660 bytes，运行时模型主体从 Flash mmap，输出头与 KV/scratch 按需占用约 4.08 MiB PSRAM。

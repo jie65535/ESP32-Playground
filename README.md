@@ -8,8 +8,8 @@
 
 - 使用 LVGL 9.5 和原生 LCD DMA 驱动，提供按键式桌面、设置页、系统工具、亮度/息屏、截图和无线镜像。
 - 已接入 Wi-Fi Station、PGOS Studio、Xbox BLE 手柄、ES8311 播放/麦克风、板载 WS2812 RGB，以及 PCF8563 RTC。
-- System Tools 已接入中文 `TinyLM`：7.56M 参数、3.92 MB INT4 模型在设备本地推理，提供预设故事开头、流式输出、A 重新生成和 B 返回列表。
-- Games 菜单包含 Snake、Tetris、Breakout、Platformer、Blackjack、Minesweeper 和 2048。Platformer 目前包含 1-1 至 8-4 的 32 关战役。
+- System Tools 已接入中文大语言模型：7.56M 参数、3.92 MB INT4 模型在设备本地推理，提供预设故事开头、流式输出、A 重新生成和 B 返回列表。
+- Games 菜单包含贪吃蛇、俄罗斯方块、打砖块、超级马里奥、二十一点、扫雷和 2048。超级马里奥目前包含 1-1 至 8-4 的 32 关战役。
 - 外设由独立 Service 持有，应用只通过稳定接口访问能力；真实硬件结果和未完成项目以实验记录为准。
 
 ## 硬件基线
@@ -91,16 +91,17 @@ python -m unittest discover -s tools/tests -p "test_*.py"
 
 主机测试覆盖游戏规则、输入策略、资源转换、协议工具和演示数据；真机验收仍需按对应实验记录执行。
 
-TinyLM 的训练源码、词表和可再生资产位于 `src/third_party/esp32_ai/`；约 430 MB 原始 Parquet、训练中间文件和 `model.bin` 仅保存在本地并由嵌套 `.gitignore` 排除。当前模型需单独写入 Flash 的 `model` 分区，不能只上传应用固件。
+大语言模型的训练源码、词表和可再生资产位于 `src/third_party/esp32_ai/`；约 430 MB 原始 Parquet、训练中间文件和 `model.bin` 仅保存在本地并由嵌套 `.gitignore` 排除。当前模型需单独写入 Flash 的 `model` 分区，不能只上传应用固件。
 
 ## 文档入口
 
+- [当前功能清单与界面层级](docs/FEATURES.md)
 - [项目路线与当前进展](docs/PROJECT_PLAN.md)
 - [PGOS 架构与模块边界](docs/ARCHITECTURE.md)
 - [硬件和引脚基线](docs/HARDWARE.md)
 - [Wi-Fi 与局域网方案](docs/WIFI_PLAN.md)
 - [实验记录目录](docs/experiments/)
-- [TinyLM 扩容与应用场景评估](docs/experiments/029_tinylm_scaling_and_applications_plan.md)
+- [大语言模型扩容与应用场景评估](docs/experiments/029_tinylm_scaling_and_applications_plan.md)
 - [可复用经验知识库](docs/knowledge/README.md)
 - [第三方依赖与源码策略](docs/DEPENDENCIES.md)
 - [厂商资料说明](docs/vendor/README.md)

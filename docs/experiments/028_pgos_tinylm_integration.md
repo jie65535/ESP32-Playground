@@ -4,6 +4,8 @@
 > 状态：集成、分区迁移和实体交互验收通过；7.56M 参数模型已升级、烧录并完成双轮真机冒烟，长期稳定性继续观察
 > 前置：[027_chinese_tinylm_assets_and_model.md](027_chinese_tinylm_assets_and_model.md)
 > 硬件：QD ES3N28P，ESP32-S3 R8N16，16MB Flash，8MB OPI PSRAM
+>
+> 2026-07-27：System Tools 菜单中的用户名称由 `TinyLM` 调整为“大语言模型”；内部类名、技术名称和下方历史验收记录保持原样。
 
 ## 目标
 

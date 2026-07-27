@@ -48,7 +48,7 @@ const MenuItemDefinition GAME_ITEMS[] = {
     {UiIcon::Snake, "贪吃蛇", nullptr, AppId::Snake},
     {UiIcon::Tetris, "俄罗斯方块", nullptr, AppId::Tetris},
     {UiIcon::Breakout, "打砖块", nullptr, AppId::Breakout},
-    {UiIcon::Gamepad, "Super Mario", nullptr, AppId::Platformer},
+    {UiIcon::Gamepad, "超级马里奥", nullptr, AppId::Platformer},
     {UiIcon::Blackjack, "二十一点", nullptr, AppId::Blackjack},
     {UiIcon::Minesweeper, "扫雷", nullptr, AppId::Minesweeper},
     {UiIcon::Tetris, "2048", nullptr, AppId::Game2048},
@@ -68,7 +68,7 @@ const MenuItemDefinition TOOL_ITEMS[] = {
     {UiIcon::System, "系统监视", nullptr, AppId::SystemInfo},
     {UiIcon::Clock, "时钟", nullptr, AppId::Time},
     {UiIcon::Palette, "颜色实验", nullptr, AppId::DisplayTest},
-    {UiIcon::Sparkles, "TinyLM", "7.56M 参数 · 本地中文故事", AppId::TinyLm},
+    {UiIcon::Sparkles, "大语言模型", "7.56M 参数 · 本地中文故事", AppId::TinyLm},
 };
 
 static_assert(sizeof(HOME_ITEMS) / sizeof(HOME_ITEMS[0]) <=
