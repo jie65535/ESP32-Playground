@@ -5,6 +5,7 @@
 > 硬件：QD ES3N28P，ESP32-S3 rev 0.2，16MB Flash，8MB OPI PSRAM
 > PGOS 基线：`1a97eb0`
 > 上游：`slvDev/esp32-ai`，提交 `9c4a214`
+> 授权更新（2026-07-27）：上游提交 `7474418` 新增 MIT License；该提交只增加许可证，实验源码基线仍为 `9c4a214`
 
 ## 目标与边界
 
@@ -16,9 +17,11 @@ PLE、注意力、FFN、KV cache 和逐 token 解码。
 也不能复现作者公布 SHA-256 对应模型的文本。实验使用同尺寸、同布局的确定性
 测试权重；生成的 token ID 没有语言意义。
 
-上游仓库没有 LICENSE。验证工程仅保存在被 Git 忽略的
+实验当日上游仓库尚无 LICENSE；作者已于 2026-07-26 在提交 `7474418` 中补充
+MIT License。验证工程仅保存在被 Git 忽略的
 `artifacts/esp32-ai-validation/work/llm_probe/`，构建时直接引用本机上游
-`firmware/common/llm.h`，没有把上游源码复制进 PGOS Git 历史。
+`firmware/common/llm.h`；本次运行时探针当时没有复制上游源码。后续中文模型
+集成已将带本地修改的源码副本纳入 `src/third_party/esp32_ai/`。
 
 ## 验证配置
 

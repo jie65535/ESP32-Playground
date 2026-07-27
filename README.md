@@ -91,7 +91,7 @@ python -m unittest discover -s tools/tests -p "test_*.py"
 
 主机测试覆盖游戏规则、输入策略、资源转换、协议工具和演示数据；真机验收仍需按对应实验记录执行。
 
-大语言模型的训练源码、词表和可再生资产位于 `src/third_party/esp32_ai/`；约 430 MB 原始 Parquet、训练中间文件和 `model.bin` 仅保存在本地并由嵌套 `.gitignore` 排除。当前模型需单独写入 Flash 的 `model` 分区，不能只上传应用固件。
+大语言模型的训练源码、词表和可再生资产位于 `src/third_party/esp32_ai/`；上游来源、本地修改和 MIT 授权边界见该目录的 [`UPSTREAM.md`](src/third_party/esp32_ai/UPSTREAM.md) 与 [`LICENSE`](src/third_party/esp32_ai/LICENSE)。约 430 MB 原始 Parquet、训练中间文件和 `model.bin` 仅保存在本地并由嵌套 `.gitignore` 排除。当前模型需单独写入 Flash 的 `model` 分区，不能只上传应用固件。
 
 ## 文档入口
 
