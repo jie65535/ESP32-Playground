@@ -50,7 +50,7 @@ APP_STYLE = """
 QWidget {
     background: #080b10;
     color: #f5f7fa;
-    font-size: 13px;
+    font-size: 10pt;
 }
 QGroupBox {
     border: 1px solid #202a3a;
@@ -103,8 +103,18 @@ def stamp() -> str:
     return dt.datetime.now().strftime("%H:%M:%S")
 
 
+def parse_ack_line(line: str) -> tuple[int, bool, str] | None:
+    parts = line.split(" ", 3)
+    if len(parts) < 3 or parts[0] != "ACK" or not parts[1].isdigit():
+        return None
+    if parts[2] not in {"OK", "ERROR"}:
+        return None
+    return int(parts[1]), parts[2] == "OK", parts[3] if len(parts) == 4 else ""
+
+
 class PgosStudio(QMainWindow):
     MAX_LOG_BLOCKS = 1500
+    MIRROR_START_TIMEOUT_MS = 15000
 
     def __init__(self, listen_address: str, port: int) -> None:
         super().__init__()
@@ -125,6 +135,8 @@ class PgosStudio(QMainWindow):
         self.last_mirror_image: QImage | None = None
         self.mirror_frame_count = 0
         self.mirror_requested = False
+        self.mirror_pending_request_id: int | None = None
+        self.pending_commands: dict[int, str] = {}
         self.command_buttons: list[QPushButton] = []
         self.latency_button: QPushButton | None = None
         self.benchmark_buttons: list[QPushButton] = []
@@ -149,6 +161,10 @@ class PgosStudio(QMainWindow):
         self.ping_timer.setInterval(10_000)
         self.ping_timer.timeout.connect(self._send_ping)
         self.ping_timer.start()
+        self.mirror_start_timer = QTimer(self)
+        self.mirror_start_timer.setSingleShot(True)
+        self.mirror_start_timer.setInterval(self.MIRROR_START_TIMEOUT_MS)
+        self.mirror_start_timer.timeout.connect(self._mirror_start_timed_out)
 
         self.setWindowTitle("PGOS Studio")
         self.resize(1220, 720)
@@ -166,7 +182,7 @@ class PgosStudio(QMainWindow):
 
         connection_bar = QHBoxLayout()
         title = QLabel("PGOS Studio")
-        title.setStyleSheet("font-size: 22px; font-weight: 700;")
+        title.setStyleSheet("font-size: 16.5pt; font-weight: 700;")
         connection_bar.addWidget(title)
         connection_bar.addStretch(1)
         connection_bar.addWidget(QLabel("监听"))
@@ -283,7 +299,7 @@ class PgosStudio(QMainWindow):
         )
         self.mirror_label.setStyleSheet(
             "background: #05070a; border: 1px solid #202a3a; "
-            "border-radius: 10px; color: #586274; font-size: 16px;"
+            "border-radius: 10px; color: #586274; font-size: 12pt;"
         )
         layout.addWidget(self.mirror_label, 1)
         actions = QHBoxLayout()
@@ -339,10 +355,27 @@ class PgosStudio(QMainWindow):
 
     def toggle_mirror(self) -> None:
         """Ask the device to start/stop its host-owned mirror stream."""
-        requested = not self.mirror_requested
-        if self.send_command("mirror on" if requested else "mirror off"):
-            self.mirror_requested = requested
-            self.mirror_button.setText("停止镜像" if requested else "开始镜像")
+        if self.mirror_requested:
+            request_id = self.send_command("mirror off")
+            if request_id is not None:
+                self.mirror_pending_request_id = request_id
+                self.mirror_button.setText("停止中")
+                self.mirror_button.setEnabled(False)
+                self.mirror_info.setText("正在停止镜像")
+            return
+
+        request_id = self.send_command("mirror on")
+        if request_id is None:
+            return
+        self.mirror_requested = True
+        self.mirror_pending_request_id = request_id
+        self.mirror_frame_count = 0
+        self.mirror_buffer.clear()
+        self.mirror_rate_value.setText("--")
+        self.mirror_button.setText("启动中")
+        self.mirror_button.setEnabled(False)
+        self.mirror_info.setText("等待设备接受镜像请求")
+        self.mirror_start_timer.start()
 
     def measure_latency(self) -> None:
         self._send_ping(force=True)
@@ -425,6 +458,7 @@ class PgosStudio(QMainWindow):
         self._close_socket()
         self._close_bench_socket()
         self._close_mirror_socket()
+        self._reset_mirror_state("等待设备 BulkData 连接")
         self.server.close()
         self.bench_server.close()
         self.mirror_server.close()
@@ -444,6 +478,8 @@ class PgosStudio(QMainWindow):
             if self.socket is not None:
                 self.append_log("新的设备连接替换了旧会话", force=True)
                 self._close_socket()
+            self._close_mirror_socket()
+            self._reset_mirror_state("等待设备发起镜像连接")
             self.socket = incoming
             self.receive_buffer.clear()
             incoming.readyRead.connect(self._read_socket)
@@ -451,8 +487,6 @@ class PgosStudio(QMainWindow):
             peer = f"{incoming.peerAddress().toString()}:{incoming.peerPort()}"
             self.connection_value.setText("已连接")
             self.connection_value.setStyleSheet("color: #68d391; font-weight: 700;")
-            self.mirror_requested = False
-            self.mirror_button.setText("开始镜像")
             self._set_device_controls_enabled(True)
             self.statusBar().showMessage(f"设备已连接：{peer}")
             self.append_log(f"设备连接 {peer}", force=True)
@@ -629,11 +663,15 @@ class PgosStudio(QMainWindow):
             self.mirror_window_bytes = 0
             self.mirror_window_frames = 0
             self.mirror_requested = True
+            self.mirror_pending_request_id = None
             self.mirror_button.setText("停止镜像")
+            self.mirror_button.setEnabled(True)
             incoming.readyRead.connect(self._read_mirror_socket)
             incoming.disconnected.connect(self._mirror_disconnected)
             self.mirror_info.setText("镜像通道已连接，等待帧")
             self.append_log("屏幕 BulkData 通道已连接", force=True)
+            if not self.mirror_start_timer.isActive():
+                self.mirror_start_timer.start()
 
     def _read_socket(self) -> None:
         if self.socket is None:
@@ -698,8 +736,16 @@ class PgosStudio(QMainWindow):
             pixels.tobytes(), width, height, width * 2, QImage.Format.Format_RGB16
         ).copy()
         self.last_mirror_image = image
+        first_frame = self.mirror_frame_count == 0
         self.mirror_frame_count += 1
         self.mirror_window_frames += 1
+        if first_frame:
+            self.mirror_start_timer.stop()
+            self.append_log("镜像首帧已接收", force=True)
+        self.mirror_requested = True
+        self.mirror_pending_request_id = None
+        self.mirror_button.setText("停止镜像")
+        self.mirror_button.setEnabled(True)
         self._refresh_mirror_pixmap()
         elapsed = time.perf_counter() - self.mirror_window_started
         if elapsed >= 0.5:
@@ -748,6 +794,26 @@ class PgosStudio(QMainWindow):
             return
         if line.startswith("ACK "):
             self.append_log(line)
+            ack = parse_ack_line(line)
+            if ack is not None:
+                request_id, ok, message = ack
+                command = self.pending_commands.pop(request_id, None)
+                if command == "mirror on":
+                    self.mirror_pending_request_id = None
+                    if ok:
+                        self.mirror_info.setText("设备已接受，等待镜像通道")
+                    else:
+                        self._fail_mirror_start(
+                            f"设备拒绝镜像：{message or 'unknown'}"
+                        )
+                elif command == "mirror off":
+                    self.mirror_pending_request_id = None
+                    if ok:
+                        self._reset_mirror_state("镜像已停止")
+                    else:
+                        self.mirror_info.setText(
+                            f"停止镜像失败：{message or 'unknown'}"
+                        )
             return
         if line == "PONG":
             if self.ping_started_ns is not None:
@@ -788,19 +854,20 @@ class PgosStudio(QMainWindow):
         if app:
             self.statusBar().showMessage(f"设备在线 · 当前页面：{app}")
 
-    def send_command(self, command: str) -> bool:
+    def send_command(self, command: str) -> int | None:
         if self.socket is None or self.socket.state() != QAbstractSocket.SocketState.ConnectedState:
             self.statusBar().showMessage("没有设备连接")
             self.append_log(f"未发送：{command}（设备未连接）")
-            return False
+            return None
         request_id = self.request_id
         self.request_id += 1
         frame = f"CMD {request_id} {command}\n".encode("utf-8")
         if self.socket.write(frame) < 0:
             self.append_log(f"发送失败：{command}", force=True)
-            return False
+            return None
+        self.pending_commands[request_id] = command
         self.append_log(f"TX #{request_id} {command}")
-        return True
+        return request_id
 
     def _send_ping(self, force: bool = False) -> None:
         if (
@@ -816,15 +883,19 @@ class PgosStudio(QMainWindow):
         sender = self.sender()
         if self.socket is not None and sender is not self.socket:
             return
+        socket = self.socket
+        self.socket = None
+        self.receive_buffer.clear()
+        self.pending_commands.clear()
         self.append_log("设备断开；等待自动重连", force=True)
         self.connection_value.setText("等待重连")
         self.connection_value.setStyleSheet("color: #f6ad55; font-weight: 700;")
         self._set_device_controls_enabled(False)
+        self._close_mirror_socket()
+        self._reset_mirror_state("控制通道断开，等待设备重连")
         self.statusBar().showMessage("设备断开，服务器仍在监听")
-        if self.socket is not None:
-            self.socket.deleteLater()
-        self.socket = None
-        self.receive_buffer.clear()
+        if socket is not None:
+            socket.deleteLater()
 
     def _close_socket(self) -> None:
         if self.socket is None:
@@ -832,6 +903,7 @@ class PgosStudio(QMainWindow):
         socket = self.socket
         self.socket = None
         self.receive_buffer.clear()
+        self.pending_commands.clear()
         try:
             socket.disconnected.disconnect(self._device_disconnected)
         except RuntimeError:
@@ -876,11 +948,15 @@ class PgosStudio(QMainWindow):
         if self.mirror_socket is not None and sender is not self.mirror_socket:
             return
         self.append_log("屏幕 BulkData 通道断开；等待设备重连", force=True)
-        self.mirror_info.setText("镜像通道断开，等待重连")
+        self.mirror_info.setText("镜像通道断开，等待设备重连")
         if self.mirror_socket is not None:
             self.mirror_socket.deleteLater()
         self.mirror_socket = None
         self.mirror_buffer.clear()
+        if self.mirror_requested:
+            self.mirror_start_timer.start()
+        else:
+            self._reset_mirror_state("镜像已停止")
 
     def _close_mirror_socket(self) -> None:
         if self.mirror_socket is None:
@@ -892,9 +968,43 @@ class PgosStudio(QMainWindow):
             socket.disconnected.disconnect(self._mirror_disconnected)
         except RuntimeError:
             pass
+        try:
+            socket.readyRead.disconnect(self._read_mirror_socket)
+        except RuntimeError:
+            pass
         socket.disconnectFromHost()
         socket.close()
         socket.deleteLater()
+
+    def _mirror_start_timed_out(self) -> None:
+        if not self.mirror_requested:
+            return
+        self.append_log("镜像首帧尚未到达，设备仍在重试", force=True)
+        self.mirror_button.setText("停止镜像")
+        self.mirror_button.setEnabled(
+            self.socket is not None
+            and self.socket.state() == QAbstractSocket.SocketState.ConnectedState
+        )
+        self.mirror_info.setText("首帧较慢，设备仍在重试")
+
+    def _fail_mirror_start(self, message: str) -> None:
+        self.append_log(message, force=True)
+        self._close_mirror_socket()
+        self._reset_mirror_state(message)
+
+    def _reset_mirror_state(self, message: str) -> None:
+        self.mirror_start_timer.stop()
+        self.mirror_requested = False
+        self.mirror_pending_request_id = None
+        self.mirror_buffer.clear()
+        self.mirror_button.setText("开始镜像")
+        self.mirror_button.setEnabled(
+            self.socket is not None
+            and self.socket.state() == QAbstractSocket.SocketState.ConnectedState
+            and self.mirror_server.isListening()
+        )
+        self.mirror_rate_value.setText("--")
+        self.mirror_info.setText(message)
 
     def log_view_clear(self) -> None:
         self.log_view.clear()

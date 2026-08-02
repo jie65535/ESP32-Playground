@@ -28,6 +28,7 @@ public:
 
     const char* text() const;
     size_t length() const;
+    void setText(const char* text);
     void clear();
 
 private:

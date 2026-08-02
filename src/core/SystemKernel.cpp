@@ -709,13 +709,13 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
             handled = gamepad_.disconnectController();
             break;
         case AppCommandType::MirrorOn:
-            mirror_.setEnabled(true);
+            handled = mirror_.setEnabled(true);
             break;
         case AppCommandType::MirrorOff:
-            mirror_.setEnabled(false);
+            handled = mirror_.setEnabled(false);
             break;
         case AppCommandType::MirrorToggle:
-            mirror_.toggleEnabled();
+            handled = mirror_.toggleEnabled();
             break;
         case AppCommandType::MirrorStatus:
             mirror_.printStatus(Serial);
@@ -780,7 +780,16 @@ bool SystemKernel::handleCommand(const RoutedCommand& routed) {
     }
     requestRedraw();
     if (routed.source == InputSource::Tcp) {
-        server_.sendAck(routed.requestId, handled, handled ? "accepted" : "unknown");
+        String errorMessage;
+        if (!handled && (command.type == AppCommandType::MirrorOn ||
+                         command.type == AppCommandType::MirrorToggle)) {
+            errorMessage = mirror_.snapshot().lastError;
+        }
+        server_.sendAck(
+            routed.requestId, handled,
+            handled ? "accepted"
+                    : errorMessage.isEmpty() ? "unknown"
+                                             : errorMessage.c_str());
         if (handled && command.type == AppCommandType::Status) {
             server_.sendState(routed.requestId, appManager_.currentName(),
                               wifi_.snapshot());

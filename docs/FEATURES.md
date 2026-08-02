@@ -146,7 +146,7 @@ PGOS 桌面
 | RGB 灯光 | 控制电源；选择常亮/呼吸/彩虹/心跳/闪烁灯效；选择青/紫/玫红/琥珀/绿/蓝/白；调整 5%–100% 亮度和慢/标准/快三档速度。离开页面后灯效继续运行，灯光参数保存在 `pgos_rgb`，电源状态不持久化。[记录](experiments/011_rgb_led.md) |
 | 手柄 | 显示型号、VID/PID、电量、扫描和重连状态；启动或停止 60 秒配对扫描；执行震动测试和立即断开；设置永不/5/15/30 分钟空闲断开。策略和绑定关系保存在 `pgos_gamepad`。[记录](experiments/013_ble_xbox_gamepad.md) |
 | 无线网络 | 开关 Wi-Fi；非阻塞扫描并显示 SSID、RSSI 和开放网络；通过屏幕软键盘输入 WPA/WPA2 密码；保存凭据并重新连接。密码输入即时遮罩。[记录](experiments/019_on_device_wifi_setup.md) |
-| 远程控制 | 显示 PGOS Studio 服务器地址、控制端口和无线控制连接状态。服务器目标的设置、启停、立即连接和清除通过 USB 控制台完成。[记录](experiments/008_pgos_studio_mirror.md) |
+| 远程控制 | 显示并通过屏幕软键盘编辑 PGOS Studio 服务器地址；提供无线控制启停和立即重连，保存后沿用当前控制端口。USB 控制台保留完整设置、状态和清除命令作为维护后备。[记录](experiments/008_pgos_studio_mirror.md) |
 
 ## 系统工具
 

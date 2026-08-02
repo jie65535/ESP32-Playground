@@ -246,6 +246,12 @@ size_t OnScreenKeyboard::length() const {
     return std::strlen(text());
 }
 
+void OnScreenKeyboard::setText(const char* text) {
+    if (textArea_ != nullptr) {
+        lv_textarea_set_text(textArea_, text == nullptr ? "" : text);
+    }
+}
+
 void OnScreenKeyboard::clear() {
     if (textArea_ != nullptr) {
         lv_textarea_set_text(textArea_, "");

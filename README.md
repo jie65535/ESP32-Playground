@@ -74,7 +74,8 @@ python -m pip install -r tools/requirements-studio.txt
 python tools/pgos_studio.py --listen 0.0.0.0 --port 19000
 ```
 
-首次连接可通过 USB 控制台保存上位机地址：
+首次连接可在设备的 Settings -> 远程控制中打开服务器地址键盘，保存电脑 IP
+或主机名并立即连接。USB 控制台继续作为维护后备：
 
 ```text
 server set <电脑IP> 19000

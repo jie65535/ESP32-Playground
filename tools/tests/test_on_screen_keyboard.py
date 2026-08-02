@@ -47,6 +47,10 @@ class OnScreenKeyboardTests(unittest.TestCase):
         self.assertIn("lv_textarea_set_password_show_time(textArea_, 0)", self.source)
         self.assertIn("lv_textarea_set_password_mode(textArea_, password)", self.source)
 
+    def test_existing_text_can_be_loaded_for_editing(self) -> None:
+        self.assertIn("void OnScreenKeyboard::setText", self.source)
+        self.assertIn("lv_textarea_set_text(textArea_", self.source)
+
     def test_keyboard_resets_constructor_bottom_alignment(self) -> None:
         align = self.source.index(
             "lv_obj_set_align(keyboard_, LV_ALIGN_TOP_LEFT)"

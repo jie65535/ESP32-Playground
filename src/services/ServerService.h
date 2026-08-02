@@ -15,6 +15,7 @@ public:
               const RuntimeSnapshot& runtime);
 
     bool setTarget(const String& host, uint32_t port);
+    static bool validHost(const String& host);
     void setEnabled(bool enabled);
     void toggleEnabled();
     void connectNow();

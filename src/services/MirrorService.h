@@ -15,8 +15,8 @@ public:
     void tick(uint32_t nowMs, const WifiSnapshot& wifi,
               const ServerSnapshot& server, DisplayService& display);
 
-    void setEnabled(bool enabled);
-    void toggleEnabled();
+    bool setEnabled(bool enabled);
+    bool toggleEnabled();
     MirrorSnapshot snapshot() const;
     void printStatus(Print& output) const;
 
@@ -25,6 +25,7 @@ private:
     static constexpr uint32_t MAX_RETRY_DELAY_MS = 30000;
     static constexpr uint32_t CONNECT_TIMEOUT_MS = 100;
     static constexpr uint32_t FRAME_INTERVAL_MS = 200;
+    static constexpr uint32_t SEND_STALL_TIMEOUT_MS = 3000;
     static constexpr size_t HEADER_BYTES = 22;
     static constexpr size_t CHUNK_BYTES = 8192;
     static constexpr uint32_t FRAME_BYTES = 320U * 240U * 2U;
@@ -46,6 +47,8 @@ private:
     uint32_t nextFrameMs_ = 0;
     uint32_t frameId_ = 0;
     uint32_t frameCount_ = 0;
+    uint32_t sendStallCount_ = 0;
+    uint32_t lastProgressMs_ = 0;
     uint8_t backoffStep_ = 0;
     SendStage stage_ = SendStage::Idle;
     uint8_t header_[HEADER_BYTES] = {};

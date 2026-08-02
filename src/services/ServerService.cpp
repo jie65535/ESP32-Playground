@@ -1,5 +1,15 @@
 #include "services/ServerService.h"
 
+namespace {
+
+bool asciiAlphaNumeric(char value) {
+    return (value >= 'a' && value <= 'z') ||
+           (value >= 'A' && value <= 'Z') ||
+           (value >= '0' && value <= '9');
+}
+
+}  // namespace
+
 void ServerService::begin(Print& log) {
     log_ = &log;
     receiveBuffer_.reserve(256);
@@ -64,11 +74,13 @@ void ServerService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
 }
 
 bool ServerService::setTarget(const String& host, uint32_t port) {
-    if (host.isEmpty() || host.length() > 63 || port == 0 || port > 65535) {
+    String normalizedHost = host;
+    normalizedHost.trim();
+    if (!validHost(normalizedHost) || port == 0 || port > 65535) {
         log_->println(F("[server] invalid host or port"));
         return false;
     }
-    host_ = host;
+    host_ = normalizedHost;
     port_ = static_cast<uint16_t>(port);
     enabled_ = true;
     if (preferencesReady_) {
@@ -85,6 +97,34 @@ bool ServerService::setTarget(const String& host, uint32_t port) {
     log_->print(':');
     log_->println(port_);
     return true;
+}
+
+bool ServerService::validHost(const String& host) {
+    if (host.isEmpty() || host.length() > 63U) {
+        return false;
+    }
+
+    bool labelStart = true;
+    char previous = '\0';
+    for (size_t index = 0; index < host.length(); ++index) {
+        const char value = host[index];
+        if (asciiAlphaNumeric(value)) {
+            labelStart = false;
+        } else if (value == '-') {
+            if (labelStart) {
+                return false;
+            }
+        } else if (value == '.') {
+            if (labelStart || previous == '-') {
+                return false;
+            }
+            labelStart = true;
+        } else {
+            return false;
+        }
+        previous = value;
+    }
+    return !labelStart && previous != '-';
 }
 
 void ServerService::setEnabled(bool enabled) {

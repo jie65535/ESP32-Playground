@@ -284,6 +284,10 @@ struct MirrorSnapshot {
     bool connected = false;
     uint16_t port = 19002;
     uint32_t frameCount = 0;
+    uint32_t frameBytesSent = 0;
+    uint32_t sendStallCount = 0;
+    uint32_t internalFreeBytes = 0;
+    uint32_t internalLargestBlock = 0;
     String host;
     String lastError;
 };

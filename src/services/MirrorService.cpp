@@ -3,6 +3,8 @@
 #include "services/DisplayService.h"
 
 #include <esp_heap_caps.h>
+#include <errno.h>
+#include <lwip/sockets.h>
 
 namespace {
 
@@ -63,6 +65,7 @@ void MirrorService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
         lastError_ = "";
         stage_ = SendStage::Idle;
         nextFrameMs_ = nowMs;
+        lastProgressMs_ = nowMs;
         if (log_ != nullptr) {
             log_->print(F("[mirror] connected "));
             log_->print(host_);
@@ -84,27 +87,45 @@ void MirrorService::tick(uint32_t nowMs, const WifiSnapshot& wifi,
             return;
         }
     }
-    sendSome(nowMs);
+    if (!sendSome(nowMs)) {
+        scheduleRetry(nowMs, "send_failed");
+        return;
+    }
+    if (stage_ != SendStage::Idle &&
+        nowMs - lastProgressMs_ >= SEND_STALL_TIMEOUT_MS) {
+        sendStallCount_++;
+        scheduleRetry(nowMs, "send_stalled");
+    }
 }
 
-void MirrorService::setEnabled(bool enabled) {
-    if (enabled_ == enabled) {
-        return;
+bool MirrorService::setEnabled(bool enabled) {
+    if (!enabled && !enabled_) {
+        return true;
+    }
+    if (enabled && enabled_ && connected_) {
+        return true;
+    }
+    if (enabled && frameBuffer_ == nullptr) {
+        lastError_ = "frame_buffer_unavailable";
+        return false;
     }
     enabled_ = enabled;
     if (!enabled_) {
         closeClient();
     } else {
+        lastError_ = "";
+        backoffStep_ = 0;
         nextAttemptMs_ = millis();
     }
     if (log_ != nullptr) {
         log_->print(F("[mirror] "));
         log_->println(enabled_ ? F("on") : F("off"));
     }
+    return true;
 }
 
-void MirrorService::toggleEnabled() {
-    setEnabled(!enabled_);
+bool MirrorService::toggleEnabled() {
+    return setEnabled(!enabled_);
 }
 
 MirrorSnapshot MirrorService::snapshot() const {
@@ -113,6 +134,13 @@ MirrorSnapshot MirrorService::snapshot() const {
     value.connected = connected_;
     value.port = port_;
     value.frameCount = frameCount_;
+    value.frameBytesSent = static_cast<uint32_t>(payloadOffset_);
+    value.sendStallCount = sendStallCount_;
+    value.internalFreeBytes = static_cast<uint32_t>(heap_caps_get_free_size(
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    value.internalLargestBlock = static_cast<uint32_t>(
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL |
+                                         MALLOC_CAP_8BIT));
     value.host = host_;
     value.lastError = lastError_;
     return value;
@@ -130,6 +158,14 @@ void MirrorService::printStatus(Print& output) const {
     output.print(value.port);
     output.print(F(" frames="));
     output.print(value.frameCount);
+    output.print(F(" frame_bytes="));
+    output.print(value.frameBytesSent);
+    output.print(F(" stalls="));
+    output.print(value.sendStallCount);
+    output.print(F(" internal="));
+    output.print(value.internalFreeBytes);
+    output.print('/');
+    output.print(value.internalLargestBlock);
     if (!value.lastError.isEmpty()) {
         output.print(F(" error="));
         output.print(value.lastError);
@@ -178,46 +214,56 @@ bool MirrorService::prepareFrame(uint32_t nowMs, DisplayService& display) {
     stage_ = SendStage::Header;
     headerOffset_ = 0;
     payloadOffset_ = 0;
+    lastProgressMs_ = nowMs;
     return true;
 }
 
 bool MirrorService::sendSome(uint32_t nowMs) {
     size_t budget = CHUNK_BYTES;
     while (budget > 0 && client_.connected()) {
+        const uint8_t* data = nullptr;
+        size_t count = 0;
         if (stage_ == SendStage::Header) {
             const size_t remaining = HEADER_BYTES - headerOffset_;
-            const size_t count = min(remaining, budget);
-            const size_t written = client_.write(header_ + headerOffset_, count);
-            if (written == 0) {
-                return false;
-            }
-            headerOffset_ += written;
-            budget -= written;
-            if (headerOffset_ == HEADER_BYTES) {
-                stage_ = SendStage::Payload;
-            }
-            continue;
-        }
-
-        if (stage_ != SendStage::Payload) {
-            return true;
-        }
-
-        if (payloadOffset_ == FRAME_BYTES) {
+            count = min(remaining, budget);
+            data = header_ + headerOffset_;
+        } else if (stage_ == SendStage::Payload &&
+                   payloadOffset_ < FRAME_BYTES) {
+            const size_t remaining = FRAME_BYTES - payloadOffset_;
+            count = min(remaining, budget);
+            data = frameBuffer_ + payloadOffset_;
+        } else if (stage_ == SendStage::Payload) {
             stage_ = SendStage::Idle;
             frameCount_++;
             nextFrameMs_ = nowMs + FRAME_INTERVAL_MS;
             return true;
+        } else {
+            return true;
         }
 
-        const size_t remaining = FRAME_BYTES - payloadOffset_;
-        const size_t count = min(remaining, budget);
-        const size_t written = client_.write(frameBuffer_ + payloadOffset_, count);
-        if (written == 0) {
+        const int written = send(client_.fd(), data, count, MSG_DONTWAIT);
+        if (written < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOMEM ||
+                errno == ENOBUFS) {
+                return true;
+            }
             return false;
         }
-        payloadOffset_ += written;
-        budget -= written;
+        if (written == 0) {
+            return true;
+        }
+
+        const size_t sent = static_cast<size_t>(written);
+        if (stage_ == SendStage::Header) {
+            headerOffset_ += sent;
+            if (headerOffset_ == HEADER_BYTES) {
+                stage_ = SendStage::Payload;
+            }
+        } else {
+            payloadOffset_ += sent;
+        }
+        budget -= sent;
+        lastProgressMs_ = nowMs;
     }
     return true;
 }
