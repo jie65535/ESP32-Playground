@@ -28,7 +28,7 @@ index 175d0e0..5892f4c 100644
           "platform/uni_platform_mightymiggy.c"
           "platform/uni_platform_nina.c"
           "platform/uni_platform_unijoysticle.c"
-@@ -146,12 +148,14 @@ endif()
+@@ -146,12 +148,5 @@ endif()
  if(IDF_TARGET)
      set(requires "nvs_flash" "btstack" "app_update" "esp_timer")
  
@@ -38,15 +38,7 @@ index 175d0e0..5892f4c 100644
 -    else()
 -        # Use legacy components when compiled using ESP-IDF v4.4
 -        list(APPEND requires "cmd_nvs_4.4" "cmd_system_4.4")
-+    if(CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE)
-+        if("${IDF_VERSION_MAJOR}" GREATER_EQUAL 5)
-+            # The optional Bluepad32 REPL is disabled by PGOS. Only add its
-+            # legacy command components when that console is explicitly used.
-+            list(APPEND requires "cmd_nvs" "cmd_system")
-+        else()
-+            list(APPEND requires "cmd_nvs_4.4" "cmd_system_4.4")
-+        endif()
-     endif()
+-    endif()
  
      idf_component_register(SRCS "${srcs}"
 diff --git a/arch/uni_console_esp32.c b/arch/uni_console_esp32.c
