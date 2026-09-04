@@ -12,7 +12,7 @@
 - I²S 为 8 kHz、16-bit、双声道总线；采集端从有效声道归一为 mono PCM16。
 - 音频任务只在麦克风页前台、显式耳返或 USB 抓取期间读取 RX、计算 RMS/Peak/Level，并把最近 6 秒、约 96 KB PCM 放在 PSRAM 环形缓冲；离开页面会关闭耳返并停止 RX/DSP/环形缓冲更新。I²S 播放链和 codec 仍保持初始化，ADC 寄存器级断电需另做真机单变量实验。
 - 降噪在写入环形缓冲前执行：约 100 Hz Q15 高通去直流/低频，再由 SpeexDSP 以 8 kHz / 20 ms 固定点频域预处理抑制 `-22 dB` 背景。开关保存在 `pgos_audio/mic_denoise`，沿用 750 ms 合并写；关闭时完全旁路。Speex 工作区在服务启动阶段一次性分配到 PSRAM，采集空闲时保留状态但不执行 FFT。
-- 人声增强位于频域降噪之后：BSD-3-Clause `libfvad`（WebRTC VAD）以 8 kHz / 20 ms 帧、mode 3 判断语音；只有连续 3 帧（60 ms）命中且降噪后帧 RMS 不低于 650 才打开，并增加 6 帧（120 ms）退出 hangover。随后 AGC 把语音目标 RMS 拉到 3000，最大 4 倍（约 +12 dB），峰值限制为 30000。开关保存在 `pgos_audio/mic_voice` 并默认开启；`mic voice on` 会自动开启降噪，VAD 未就绪时不放大。VAD 对象也在启动期分配，页面切换和本机回放只重置状态。它仍不是声源分离，不能从单麦克风混合信号中无损剥离音乐或另一段人声。
+- 人声增强位于频域降噪之后：BSD-3-Clause [`libfvad`](https://github.com/dpirch/libfvad)（WebRTC VAD）以 8 kHz / 20 ms 帧、mode 3 判断语音；只有连续 3 帧（60 ms）命中且降噪后帧 RMS 不低于 650 才打开，并增加 6 帧（120 ms）退出 hangover。随后 AGC 把语音目标 RMS 拉到 3000，最大 4 倍（约 +12 dB），峰值限制为 30000。开关保存在 `pgos_audio/mic_voice` 并默认开启；`mic voice on` 会自动开启降噪，VAD 未就绪时不放大。VAD 对象也在启动期分配，页面切换和本机回放只重置状态。它仍不是声源分离，不能从单麦克风混合信号中无损剥离音乐或另一段人声。
 - 缓存回放和耳返复用现有 DAC；耳返默认关闭并衰减到 35%，避免启动即形成反馈。
 - USB 最长导出最近 5 秒；导出前复制到最多约 80 KB 的临时缓冲，避免慢速 CDC 发送期间被实时写指针覆盖。
 
@@ -20,7 +20,7 @@
 
 输入增益项遵循方向键语义：右键按 `low → normal → high` 正向循环，左键反向循环，确认键等同于右键；其它二值开关仍允许左右键或确认键切换。
 
-`libfvad` 固定导入自 `dpirch/libfvad` commit `532ab666c20d3cfda38bca63abbb0f152706c369`；SpeexDSP 固定导入自 `xiph/speexdsp` commit `7a158783df74efe7c2d1c6ee8363c1e695c71226`。两者的上游许可证和来源说明随所用源码子集保存在 `src/third_party/`；当前不引入 ESP-SR 或神经网络语音分离模型。
+`libfvad` 固定导入自 [`dpirch/libfvad`](https://github.com/dpirch/libfvad) commit `532ab666c20d3cfda38bca63abbb0f152706c369`；SpeexDSP 固定导入自 [`xiph/speexdsp`](https://github.com/xiph/speexdsp) commit `7a158783df74efe7c2d1c6ee8363c1e695c71226`。两者的上游许可证和来源说明随所用源码子集保存在 `src/third_party/`；当前不引入 ESP-SR 或神经网络语音分离模型。
 
 ## USB 协议与工具
 
@@ -88,10 +88,8 @@ python tools/capture_microphone.py --port COM3 --duration 3000 --output captures
 
 证据：
 
-- [麦克风页面首屏](../../captures/microphone-page.png)
-- [麦克风页面底部](../../captures/microphone-page-bottom.png)
-- [降噪控件（旧版截图）](../../captures/microphone-denoise-control.png)
-- [WebRTC VAD 人声增强控件](../../captures/microphone-vad-control.png)
+- [麦克风页面](../images/audio-microphone.png)
+- 页面底部、降噪控件和 WebRTC VAD 控件的原始截图保留在本地 `captures/`，未纳入公共仓库。
 - `captures/mic-test.wav`（本地真机录音，是否纳入 Git 由后续资产策略决定）
 - `captures/mic-normal.wav`、`captures/mic-high-settled.wav`（可调增益对比录音）
 - `captures/mic-music-denoise-off.wav`、`captures/mic-music-denoise-on.wav`（低音量背景音乐 A/B）

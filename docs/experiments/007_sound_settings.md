@@ -2,7 +2,7 @@
 
 ## 目标
 
-复用已在 BatPanel 同型号板上验证的 ES8311/I²S 方向，在 PGOS 中增加一个可降级的声音设置应用。第一版不做音乐播放器，只验证音量、短交互反馈音和人工试听。
+基于同型号开发板上已经确认的 ES8311/I²S 连接方向，在 PGOS 中增加一个可降级的声音设置应用。第一版不做音乐播放器，只验证音量、短交互反馈音和人工试听。
 
 ## 硬件与实现
 
@@ -48,9 +48,8 @@ ES8311 数据手册进一步确认，DAC 音量寄存器 `0x32` 以 `0.5 dB/step
 
 截图：
 
-- [Sound 设置页](../../captures/pgos_sound_settings.png)
-- [焦点居中的 Sound 列表](../../captures/pgos_sound_title_scroll.png)
-- [滚动桌面与 Wi-Fi 波纹状态图标](../../captures/pgos_ui_scroll_wifi_wave.png)
+- [麦克风工具页面](../images/audio-microphone.png)
+- Sound 设置页和其它早期 UI 截图保留在本地 `captures/`，未纳入公共仓库。
 
 ## 后续边界
 

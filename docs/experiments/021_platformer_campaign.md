@@ -5,8 +5,9 @@
 
 ## 目标
 
-在 320×240、16MB Flash、8MB PSRAM 的 PGOS 约束内，学习本地 C++ 参考工程
-`G:\Temp\Super-Mario-Bros` 的地图组织和游戏状态，实现从 1-1 到 8-4 的完整可推进战役。
+在 320×240、16MB Flash、8MB PSRAM 的 PGOS 约束内，学习
+[Super-Mario-Bros](https://github.com/Gold872/Super-Mario-Bros) 粉丝工程的地图
+组织和游戏状态，实现从 1-1 到 8-4 的完整可推进战役。
 参考工程只作为主机端输入和行为依据；设备不加载其 SDL2 运行时、PNG、XML 或 CSV。
 
 ## 离线数据管线

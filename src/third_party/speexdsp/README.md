@@ -1,7 +1,7 @@
 # SpeexDSP subset
 
 This directory vendors the fixed-point preprocessing and MDF echo-canceller
-dependencies from `xiph/speexdsp` commit
+dependencies from [xiph/speexdsp](https://github.com/xiph/speexdsp) commit
 `7a158783df74efe7c2d1c6ee8363c1e695c71226` (SpeexDSP 1.2.1 lineage).
 
 Only the BSD-licensed sources needed by the microphone spectral denoiser and

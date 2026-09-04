@@ -12,8 +12,9 @@
 
 ## 当前实现
 
-- 纯 C++ `PlatformerEngine` 不依赖 Arduino、LVGL 或 NVS，使用 `G:\Temp\Mario-Level-1`
-  的原版第一关坐标和测量碰撞矩形。
+- 纯 C++ `PlatformerEngine` 不依赖 Arduino、LVGL 或 NVS，使用
+  [Mario-Level-1](https://github.com/justinmeister/Mario-Level-1) 参考工程的原版
+  第一关坐标和测量碰撞矩形。
 - 关卡已经从引擎内硬编码改为 `PlatformerLevelDefinition`：当前对齐该工程的
   3392×224 背景条带、四段地面、6 个管道、楼梯/城堡碰撞矩形，以及 31 个普通砖和
   12 个问号箱坐标。

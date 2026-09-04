@@ -23,8 +23,15 @@ docs/datasheets/*
 # Original BDF files are kept locally for regeneration; generated subsets are tracked.
 tools/vendor-fonts/*
 
-# Local Wi-Fi credentials and captures.
+# Local credentials and captures. Never commit real network settings.
 include/secrets.local.h
+.env
+.env.*
+*.local
+*.secret
+*.pem
+*.key
+*.p12
 captures/
 logs/
 artifacts/

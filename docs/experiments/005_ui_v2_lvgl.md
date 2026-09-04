@@ -7,7 +7,7 @@
 ## 固件实现
 
 - 环境：`playground`
-- 图形库：`lvgl @ 9.5.0`
+- 图形库：[`lvgl @ 9.5.0`](https://github.com/lvgl/lvgl)
 - 显示：LVGL 9 原生 `lv_display_create` / `lv_display_set_buffers`，40 行 RGB565 局部缓冲
 - 内存：显示服务在 PSRAM 中维护 320×240 RGB565 shadow framebuffer（153600 bytes），用于截图和调试
 - UI 运行时：`src/ui/UiRuntime.*`
@@ -64,10 +64,8 @@ python tools/capture_screen.py --port COM3 --output captures/pgos_ui_v2_final.pn
 
 截图：
 
-- [UI v2 桌面](../../captures/pgos_ui_v2_final.png)
-- [UI v2 网络页](../../captures/pgos_ui_v2_network_final.png)
-- [UI v2 Wi-Fi 扫描中](../../captures/pgos_ui_v2_wifi_scanning.png)
-- [UI v2 Wi-Fi 列表](../../captures/pgos_ui_v2_wifi_selection.png)
+- [PGOS 桌面](../images/pgos-home.png)
+- 网络页、Wi-Fi 扫描和列表截图保留在本地 `captures/`，未纳入公共仓库。
 
 ## 经验和边界
 

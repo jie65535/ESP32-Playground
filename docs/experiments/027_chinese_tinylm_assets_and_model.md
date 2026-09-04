@@ -6,7 +6,7 @@
 > 硬件：QD ES3N28P，ESP32-S3 rev 0.2，16MB Flash，8MB OPI PSRAM
 > 训练机：RTX 3080 12GB
 > PGOS 基线：`1a97eb0`
-> 上游：`slvDev/esp32-ai`，提交 `9c4a214`；当前工作副本位于 `src/third_party/esp32_ai/`
+> 上游：[`slvDev/esp32-ai`](https://github.com/slvDev/esp32-ai)，提交 `9c4a214`；当前工作副本位于 `src/third_party/esp32_ai/`
 > 授权更新（2026-07-27）：上游提交 `7474418` 新增 MIT License；项目副本已保留许可证和来源说明
 
 ## 目标
@@ -29,7 +29,7 @@
 
 ### 1.2 Tokenizer
 
-调研阶段推荐 `flyingfishinwater/tinystories_zh` 的 SentencePiece tokenizer（V=3000）。
+调研阶段曾查看 [flyingfishinwater/tinystories_zh](https://huggingface.co/flyingfishinwater/tinystories_zh) 的 SentencePiece tokenizer（V=3000）。
 **实际选用 ByteLevel BPE（V=8192）**，原因：
 
 - 上游 `esp32-ai` 的 `gen_assets.py` 和推理代码已经实现了完整的 ByteLevel BPE
@@ -155,7 +155,7 @@ _BYTE_DEC = _build_byte_decoder()
 ## 四、模型训练
 
 ```powershell
-cd G:\MCU\ESP32Playground\src\third_party\esp32_ai
+cd src\third_party\esp32_ai
 python src\train.py --arm ple --data-suffix _zh --vocab 8192
 ```
 
@@ -182,7 +182,7 @@ ple-s0 step 3999 ... ple-s0 DONE  core=1,499,328  table=3,145,728  val=2.5911  p
 **模型导出**（`src/export.py`）：
 
 ```
-G:\MCU\ESP32Playground\src\third_party\esp32_ai\firmware\model\model.bin
+src\third_party\esp32_ai\firmware\model\model.bin
 大小：2,947,012 bytes（2.95 MB）
 tensors：65
 magic：0x504C4531
@@ -196,7 +196,7 @@ magic：0x504C4531
 **词表生成**（`src/gen_assets_zh.py`）：
 
 ```
-G:\MCU\ESP32Playground\src\third_party\esp32_ai\firmware\esp32_llm\vocab.h
+src\third_party\esp32_ai\firmware\esp32_llm\vocab.h
 词表大小：8192 tokens
 文件大小：300,011 bytes（约 293 KiB）
 ```
@@ -267,7 +267,7 @@ C:/.../esp_lcd/rgb/esp_lcd_panel_rgb.c:700:1:
 修复：在框架文件对应函数前插入 pragma，仅对该函数降低优化：
 
 ```c
-// 文件：C:/Users/Admin/.platformio/packages/framework-espidf/
+// 文件：<PlatformIO package path>/framework-espidf/
 //       components/esp_lcd/rgb/esp_lcd_panel_rgb.c
 #pragma GCC optimize("O1")  // workaround: GCC ICE with COPY_PIXEL_CODE_BLOCK
 static esp_err_t rgb_panel_draw_bitmap(...)
@@ -292,7 +292,7 @@ static esp_err_t rgb_panel_draw_bitmap(...)
 
 ```powershell
 python -m esptool --port COM3 --baud 460800 write-flash 0x110000 `
-    G:\MCU\ESP32Playground\src\third_party\esp32_ai\firmware\model\model.bin
+    src\third_party\esp32_ai\firmware\model\model.bin
 ```
 
 ```

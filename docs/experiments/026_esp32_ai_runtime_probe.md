@@ -4,7 +4,7 @@
 > 状态：完整随机权重推理链真机通过；语言质量与作者原始模型性能未验证
 > 硬件：QD ES3N28P，ESP32-S3 rev 0.2，16MB Flash，8MB OPI PSRAM
 > PGOS 基线：`1a97eb0`
-> 上游：`slvDev/esp32-ai`，提交 `9c4a214`
+> 上游：[`slvDev/esp32-ai`](https://github.com/slvDev/esp32-ai)，提交 `9c4a214`
 > 授权更新（2026-07-27）：上游提交 `7474418` 新增 MIT License；该提交只增加许可证，实验源码基线仍为 `9c4a214`
 
 ## 目标与边界

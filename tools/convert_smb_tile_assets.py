@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image
 
 
-DEFAULT_SOURCE = Path(r"G:\Temp\Super-Mario-Bros\res")
+DEFAULT_SOURCE = Path("reference/Super-Mario-Bros/res")
 DEFAULT_OUTPUT = Path("src/games/PlatformerTileAssets.generated.cpp")
 TRANSPARENT = (147, 187, 236, 255)
 

@@ -1,36 +1,72 @@
-# ESP32 Playground
+# ESP32 Playground / PlaygroundOS
 
-面向 QD 电子 ES3N28P（ESP32-S3 R8N16）开发板的个人硬件实验项目。
+English | [简体中文](README.zh-CN.md)
 
-项目以小步、可复现的实验方式探索显示、输入、USB、RGB、音频、I²C、Wi-Fi、BLE 和局域网通信。随着实验积累，固件逐步收敛为 PlaygroundOS（PGOS）：由系统服务、前台应用和统一输入/连接协议组成的轻量设备基座。
+ESP32 Playground is a personal hardware laboratory for the QD Electronics
+ES3N28P board built around an ESP32-S3 R8N16. Small experiments with display,
+input, USB, GPIO, RGB, audio, I2C, Wi-Fi, BLE, and LAN communication have
+gradually become PlaygroundOS (PGOS), a lightweight device base with system
+services, foreground applications, and one consistent input protocol.
 
-## 当前固件
+> This repository is a development snapshot of a personal experiment project,
+> not production firmware. Feature status follows the source code and the
+> records in [`docs/experiments/`](docs/experiments/); hardware results are not
+> a guarantee for other boards.
 
-- 使用 LVGL 9.5 和原生 LCD DMA 驱动，提供按键式桌面、设置页、系统工具、亮度/息屏、截图和无线镜像。
-- 已接入 Wi-Fi Station、PGOS Studio、Xbox BLE 手柄、ES8311 播放/麦克风、板载 WS2812 RGB，以及 PCF8563 RTC。
-- System Tools 已接入中文大语言模型：7.56M 参数、3.92 MB INT4 模型在设备本地推理，提供预设故事开头、流式输出、A 重新生成和 B 返回列表。
-- Games 菜单包含贪吃蛇、俄罗斯方块、打砖块、超级马里奥、二十一点、扫雷和 2048。超级马里奥目前包含 1-1 至 8-4 的 32 关战役。
-- 外设由独立 Service 持有，应用只通过稳定接口访问能力；真实硬件结果和未完成项目以实验记录为准。
+## Features
 
-## 硬件基线
+| Area | Included |
+| --- | --- |
+| PGOS Shell | LVGL 9.5 desktop, hierarchical menus, status bar, brightness/display timeout, Back and Home navigation |
+| Display | ILI9341V, SPI2 at 40 MHz, DMA transfers, RGB565 screenshots, and wireless mirroring |
+| Input | Board input, USB CDC console, Xbox BLE gamepads, and bounded event queues |
+| Audio | ES8311 playback, 8 kHz mono microphone capture, denoising, VAD, and WAV export |
+| Connectivity | 2.4 GHz Wi-Fi station mode, SNTP/PCF8563 RTC, and PGOS Studio TCP channels |
+| Games | Snake, Tetris, Breakout, Blackjack, Minesweeper, 2048, and Platformer |
+| On-device AI | 7.56M-parameter Chinese TinyLM; the model is mapped from a dedicated flash partition and uses PSRAM on demand |
 
-| 项目 | 当前配置 |
-|---|---|
-| 主控 | ESP32-S3 R8N16 |
-| Flash / PSRAM | 16MB QIO / 8MB OPI |
-| 屏幕 | ILI9341V，固件使用 320×240 横屏 |
-| USB | 原生 USB CDC，GPIO19/20 |
-| LCD | CS 10、MOSI 11、SCK 12、MISO 13、DC 46、背光 45 |
-| RGB | WS2812，GPIO42 |
-| 音频 / I²C | ES8311；共享 GPIO15/16 I²C 总线 |
+## Screenshots
 
-完整引脚、电气边界和可实验扩展脚见[硬件基线](docs/HARDWARE.md)。
+These selected captures come from the development board and show the system
+shell, games, on-device model UI, and audio tools. The complete capture archive
+remains local and is intentionally excluded from Git.
 
-## 快速开始
+| PGOS Shell | 2048 |
+| --- | --- |
+| ![PGOS Shell](docs/images/pgos-home.png) | ![2048](docs/images/game-2048.png) |
 
-需要 PlatformIO、Python 和一块已连接 USB 的开发板。
+| TinyLM presets | Microphone tool |
+| --- | --- |
+| ![TinyLM presets](docs/images/tinylm-presets.png) | ![Microphone tool](docs/images/audio-microphone.png) |
 
-### 构建、烧录和串口监视
+| Breakout |
+| --- |
+| ![Breakout](docs/images/game-breakout.png) |
+
+## Hardware
+
+| Function | Configuration |
+| --- | --- |
+| MCU | ESP32-S3 R8N16, 16 MB QIO flash, 8 MB OPI PSRAM |
+| LCD | ILI9341V, firmware landscape 320x240; CS 10, MOSI 11, SCK 12, MISO 13, DC 46, backlight 45 |
+| USB | Native USB CDC on GPIO19/20 |
+| RGB | WS2812 on GPIO42 |
+| Audio | ES8311; I2C GPIO15/16; I2S MCLK/BCLK/WS/DAC GPIO4/5/7/8; amplifier enable GPIO1 |
+| RTC | PCF8563 at 7-bit address `0x51`, sharing the I2C bus with ES8311 |
+
+See the [hardware baseline](docs/HARDWARE.md) for wiring, electrical limits,
+and reserved pins. Confirm 3.3 V compatibility, common ground, and power
+safety before connecting external modules or speakers.
+
+## Quick start
+
+### Requirements
+
+- [PlatformIO](https://platformio.org/) CLI
+- Python 3.10 or newer
+- An ES3N28P R8N16 board and a data-capable USB cable
+
+### Build, flash, and monitor
 
 ```powershell
 pio run -e playground
@@ -38,85 +74,95 @@ pio run -e playground -t upload --upload-port COMx
 pio device monitor --port COMx --baud 115200
 ```
 
-### USB 控制台、截图和麦克风录音
+PlatformIO restores build dependencies from `platformio.ini` and
+`main/idf_component.yml`. Component snapshots, locked revisions, and the
+parts that are not yet fully reproducible offline are described in
+[`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
+
+### Host tools
 
 ```powershell
 python -m pip install -r tools/requirements.txt
 python tools/playground_console.py --list
-python tools/playground_console.py --port COM3
-python tools/capture_screen.py --port COM3 --output captures/home.png
-python tools/capture_microphone.py --port COM3 --duration 3000 --output captures/mic-test.wav
+python tools/playground_console.py --port COMx
+python tools/capture_screen.py --port COMx --output captures/home.png
+python tools/capture_microphone.py --port COMx --duration 3000 --output captures/mic-test.wav
 ```
 
-控制台支持方向键、确认、返回、Home、页面直达、状态查询和无损 RGB565 截图；密码等敏感信息不会回显。常用页面示例：
-
-```text
-page system
-page network
-page mic
-mic status
-mic denoise on
-page platformer
-page minesweeper
-page 2048
-time status
-gamepad status
-```
-
-完整命令和按键映射见[USB 控制台经验](docs/knowledge/04_USB_CDC_CONSOLE_AND_SCREENSHOT.md)。
+The USB console supports navigation, direct page access, status queries,
+RGB565 screenshots, and microphone recording. Wi-Fi SSIDs, passwords, and
+server addresses are configured at runtime through the device UI or console;
+they must not be written into source files. `include/secrets.example.h`
+contains placeholders only.
 
 ### PGOS Studio
-
-PGOS Studio 是用于无线遥控、状态查看、吞吐测试和屏幕镜像的轻量上位机。
 
 ```powershell
 python -m pip install -r tools/requirements-studio.txt
 python tools/pgos_studio.py --listen 0.0.0.0 --port 19000
 ```
 
-首次连接可在设备的 Settings -> 远程控制中打开服务器地址键盘，保存电脑 IP
-或主机名并立即连接。USB 控制台继续作为维护后备：
+Studio uses TCP port 19000 for control, 19001 for throughput tests, and 19002
+for screen mirroring. The current control channels have no TLS or
+authentication and should only be used on a trusted home LAN. See
+[`SECURITY.md`](SECURITY.md).
 
-```text
-server set <电脑IP> 19000
-server status
-```
-
-控制、吞吐和镜像默认分别使用 TCP 19000、19001、19002。协议和当前限制见[PGOS Studio 实验记录](docs/experiments/008_pgos_studio_mirror.md)。
-
-## 主机测试
+## Tests
 
 ```powershell
 python -m unittest discover -s tools/tests -p "test_*.py"
+pio run -e playground
 ```
 
-主机测试覆盖游戏规则、输入策略、资源转换、协议工具和演示数据；真机验收仍需按对应实验记录执行。
+Host tests cover game rules, input policy, resource conversion, protocol
+tools, and demo data. Passing host tests does not replace real-device checks
+for the display, gamepad, audio, wireless coexistence, or long-term stability;
+keep evidence in the corresponding experiment record.
 
-大语言模型的训练源码、词表和可再生资产位于 `src/third_party/esp32_ai/`；上游来源、本地修改和 MIT 授权边界见该目录的 [`UPSTREAM.md`](src/third_party/esp32_ai/UPSTREAM.md) 与 [`LICENSE`](src/third_party/esp32_ai/LICENSE)。约 430 MB 原始 Parquet、训练中间文件和 `model.bin` 仅保存在本地并由嵌套 `.gitignore` 排除。当前模型需单独写入 Flash 的 `model` 分区，不能只上传应用固件。
-
-## 文档入口
-
-- [当前功能清单与界面层级](docs/FEATURES.md)
-- [项目路线与当前进展](docs/PROJECT_PLAN.md)
-- [PGOS 架构与模块边界](docs/ARCHITECTURE.md)
-- [硬件和引脚基线](docs/HARDWARE.md)
-- [Wi-Fi 与局域网方案](docs/WIFI_PLAN.md)
-- [实验记录目录](docs/experiments/)
-- [大语言模型扩容与应用场景评估](docs/experiments/029_tinylm_scaling_and_applications_plan.md)
-- [可复用经验知识库](docs/knowledge/README.md)
-- [第三方依赖与源码策略](docs/DEPENDENCIES.md)
-- [厂商资料说明](docs/vendor/README.md)
-- [项目交接与开发规则](AGENTS.md)
-
-## 目录概览
+## Repository layout
 
 ```text
-main/       固件入口和 PGOS 实现
-include/    公共头文件与资源接口
-boards/     PlatformIO 自定义板卡定义
-tools/      控制台、Studio、资源转换和主机测试
-docs/       硬件基线、架构、路线和实验记录
-captures/   屏幕截图与验收素材
+main/       Firmware entry point and ESP-IDF orchestration
+src/        PGOS apps, services, games, UI, and fixed third-party source
+include/    Public headers and example configuration
+boards/     Custom PlatformIO board definitions
+tools/      Console, Studio, asset conversion, and host tests
+docs/       Hardware baseline, architecture, roadmap, and experiments
+licenses/   Font and icon license texts
 ```
 
-Wi-Fi 凭据只保存在设备 NVS，不提交 Git。`docs/vendor` 是厂商参考资料，原始文件不应由实验代码修改；新增功能应先完成构建、主机测试和真机记录，再更新项目状态。
+Start with:
+
+- [Feature list](docs/FEATURES.md)
+- [Project plan](docs/PROJECT_PLAN.md)
+- [PGOS architecture](docs/ARCHITECTURE.md)
+- [Wi-Fi and LAN plan](docs/WIFI_PLAN.md)
+- [Experiment index](docs/experiments/)
+- [Reusable knowledge base](docs/knowledge/README.md)
+- [Dependency policy](docs/DEPENDENCIES.md)
+- [Third-party notices and source index](THIRD_PARTY_NOTICES.md)
+
+## Distribution boundaries
+
+- The Chinese TinyLM training/export sources are in `src/third_party/esp32_ai/`
+  and follow that directory's MIT notice. Roughly 430 MB of raw data,
+  checkpoints, intermediate files, and `model.bin` are not in this repository;
+  dataset, vocabulary, and model rights must be reviewed separately.
+- `src/games/Platformer*` contains level data and pixel resources converted from
+  third-party SMB fan projects and uses Mario/Nintendo-related names. These
+  files are not automatically covered by the root MIT grant. Redistribution of
+  source, firmware, or binaries requires permission or replacement with clearly
+  licensed original assets.
+- Fonts, icons, VAD, SpeexDSP, and build-time components retain their original
+  licenses. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the full
+  scope and direct source links.
+- `docs/vendor/` records board-vendor reference material. Do not upload vendor
+  EXEs, APKs, flashing tools, or large source packages to a public repository.
+
+## License
+
+Original PlaygroundOS code and documentation, unless a file or directory says
+otherwise, are released under the [MIT License](LICENSE). The MIT License does
+not cover third-party source, fonts, models/data, vendor material, or the SMB
+derived resources. Preserve the applicable copyright and license notices when
+redistributing. Project author: [@jie65535](https://github.com/jie65535).

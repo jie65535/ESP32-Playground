@@ -5,7 +5,7 @@
 
 ## 目标与事实来源
 
-以本地参考工程 `G:\Temp\Super-Mario-Bros` 的提交
+以 [Super-Mario-Bros](https://github.com/Gold872/Super-Mario-Bros) 参考工程的提交
 `609c5af217abf6eb55d3eb594df4db76cfb0c90c` 为玩法逻辑唯一事实来源。参考
 工程采用 MIT License，Copyright (c) 2022 Gold87。PGOS 不照搬 SDL2/ECS
 架构，但玩家可观察到的规则、状态顺序、数值和事件时点应与该提交一致。

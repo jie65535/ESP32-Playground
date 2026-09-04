@@ -1,7 +1,7 @@
 # ESP32 Playground 新对话交接说明
 
 > 最后更新：2026-07-26
-> 工作目录：`G:\MCU\ESP32Playground`
+> 工作目录：项目根目录
 > 当前阶段：PGOS 应用基座、中文大语言模型、LCD DMA、PGOS Studio、板载 RGB、PCF8563 RTC 和小游戏真机验收
 
 ## 1. 项目定位

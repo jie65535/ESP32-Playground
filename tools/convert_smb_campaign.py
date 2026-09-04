@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_SOURCE = Path(r"G:\Temp\Super-Mario-Bros\res\data")
+DEFAULT_SOURCE = Path("reference/Super-Mario-Bros/res/data")
 DEFAULT_OUTPUT = Path("src/games/PlatformerCampaignData.generated.cpp")
 EMPTY_TILE = 0xFFFF
 LAYERS = (

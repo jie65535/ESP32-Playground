@@ -3,7 +3,7 @@
 > 日期：2026-07-26
 > 状态：首轮 P96/F512 7.56M 模型已训练、导出、烧录并完成双轮真机冒烟；更大模型、分区扩容和跨领域数据仍待后续实验
 > 前置：[027_chinese_tinylm_assets_and_model.md](027_chinese_tinylm_assets_and_model.md)、[028_pgos_tinylm_integration.md](028_pgos_tinylm_integration.md)
-> 训练环境：`C:\Users\Admin\AppData\Local\Programs\Python\Python310\python.exe`，PyTorch 2.13.0+cu130，RTX 3080
+> 训练环境：Python 3.10、PyTorch 2.13.0+cu130，RTX 3080
 
 ## 目标与结论
 
@@ -187,8 +187,8 @@ P96/F512 已完成 12,000 steps，validation 到末段仍在缓慢下降。下�
 推荐平衡配置的从头训练命令：
 
 ```powershell
-cd G:\MCU\ESP32Playground\src\third_party\esp32_ai
-& "C:\Users\Admin\AppData\Local\Programs\Python\Python310\python.exe" `
+cd src\third_party\esp32_ai
+python `
   src\train.py `
   --arm ple `
   --data-suffix _zh `

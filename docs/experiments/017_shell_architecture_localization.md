@@ -34,7 +34,7 @@
 
 ## 图标资产
 
-- 来源：`lucide-static 0.468.0`，ISC License。
+- 来源：[`lucide-static 0.468.0`](https://github.com/lucide-icons/lucide)，ISC License。
 - 生成：`python tools/generate_ui_icons.py`。
 - 固件格式：15 个 24×24 A8 遮罩，由 LVGL 按焦点状态动态着色。
 - 不引入 SVG 解析器、完整图标字体或运行时堆分配。

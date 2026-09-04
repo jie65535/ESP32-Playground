@@ -53,8 +53,8 @@ python tools/playground_console.py --port COM3 --command "page settings"
 
 截图：
 
-- [Display Settings](../../captures/pgos_display_settings.png)
-- [包含四个应用的 Launcher](../../captures/pgos_launcher_four_apps.png)
+- [PGOS 桌面](../images/pgos-home.png)
+- Display Settings 和 Launcher 原始截图保留在本地 `captures/`，未纳入公共仓库。
 
 ## 边界
 

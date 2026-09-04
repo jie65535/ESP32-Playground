@@ -45,8 +45,8 @@ pio run -e playground
 
 ## 首次真实密码连接与重启问题（2026-07-20）
 
-- 设备端扫描、SSID 选择、密码遮罩输入和凭据保存均完成，Wi-Fi 能成功关联
-  `ChinaNet-3wr6`，部分启动中 DHCP 已取得 `192.168.1.6`。
+- 设备端扫描、SSID 选择、密码遮罩输入和凭据保存均完成，Wi-Fi 能成功关联测试网络，
+  部分启动中 DHCP 已取得 `192.168.1.6`。
 - 随后 FreeRTOS 明确报告 `A stack overflow in task sys_evt has been detected`，
   设备进入重启循环。故障点是 ESP-IDF 默认系统事件循环，不是密码校验失败，
   PGOS 也没有在 Wi-Fi 事件回调中执行 SNTP、Server 或 LVGL 工作；这些路径仍由
