@@ -84,8 +84,17 @@ def remove_tree(path: Path, force: bool) -> None:
     shutil.rmtree(path)
 
 
-def apply_patch(component: Path, patch_name: str) -> None:
-    run("git", "apply", str(PATCHES / patch_name), cwd=component)
+def apply_patch(repo: Path, patch_name: str, directory: str | None = None) -> None:
+    args = ["git", "apply"]
+    if directory is not None:
+        args.append(f"--directory={directory}")
+    args.append(str(PATCHES / patch_name))
+    run(*args, cwd=repo)
+
+
+def require_absent(path: Path, text: str) -> None:
+    if text in path.read_text(encoding="utf-8"):
+        raise RuntimeError(f"Compatibility patch left unexpected text in {path}: {text}")
 
 
 def restore(force: bool, components: Path) -> None:
@@ -105,9 +114,9 @@ def restore(force: bool, components: Path) -> None:
             revisions["arduino"],
             temp / "arduino",
         )
+        apply_patch(arduino_repo, "arduino.patch")
         remove_tree(components / "arduino", force)
         copy_tree(arduino_repo, components / "arduino")
-        apply_patch(components / "arduino", "arduino.patch")
         shutil.copy2(
             ROOT / "dependencies" / "compat" / "arduino" / "idf_component.yml",
             components / "arduino" / "idf_component.yml",
@@ -145,13 +154,17 @@ def restore(force: bool, components: Path) -> None:
                 f"Expected BTstack {revisions['btstack']}, got {actual_btstack}"
             )
 
-        remove_tree(components / "bluepad32", force)
-        copy_tree(
-            bluepad_repo / "src" / "components" / "bluepad32",
-            components / "bluepad32",
+        bluepad_component = bluepad_repo / "src" / "components" / "bluepad32"
+        apply_patch(
+            bluepad_repo,
+            "bluepad32.patch",
+            directory="src/components/bluepad32",
         )
-        apply_patch(components / "bluepad32", "bluepad32.patch")
+        require_absent(bluepad_component / "CMakeLists.txt", 'requires "cmd_nvs"')
+        remove_tree(components / "bluepad32", force)
+        copy_tree(bluepad_component, components / "bluepad32")
 
+        apply_patch(btstack_repo, "btstack.patch")
         btstack_destination = components / "btstack"
         remove_tree(btstack_destination, force)
         btstack_destination.mkdir(parents=True)
@@ -184,8 +197,6 @@ def restore(force: bool, components: Path) -> None:
                 btstack_repo / "platform" / "embedded" / filename,
                 embedded_destination / filename,
             )
-        apply_patch(btstack_destination, "btstack.patch")
-
         # The adapter is a small PGOS-specific IDF component assembled from
         # bluepad32-arduino.  Keep it tracked instead of cloning a whole repo.
         remove_tree(components / "bluepad32_arduino", force)
