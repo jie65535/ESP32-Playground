@@ -28,7 +28,7 @@ the file or directory that contains the snapshot.
 | [`xiph/speexdsp`](https://github.com/xiph/speexdsp) | `7a158783df74efe7c2d1c6ee8363c1e695c71226` | Fixed-point preprocessing and KISS FFT subset in `src/third_party/speexdsp/`; the ESP32 adapter allocates its workspace in PSRAM. |
 | [`espressif/arduino-esp32`](https://github.com/espressif/arduino-esp32) | `3.3.9` / `5b5114c832dfe309f3e73879d2ac8922c8276559` | Build component restored from the lock file. |
 | [`ricardoquesada/bluepad32`](https://github.com/ricardoquesada/bluepad32) | `4.2.0` / `6efa7123fe8badf5a40ad1205743a80b31c00ea4` | Bluetooth gamepad component with ESP32-S3 driver selection changes. |
-| [`ricardoquesada/bluepad32-arduino`](https://github.com/ricardoquesada/bluepad32-arduino) | `1.3.5` / `2e8a0e6e2281698553bf199d135ae55c8b13f14d` | Arduino adapter built as an IDF component. |
+| [`ricardoquesada/esp-idf-arduino-bluepad32-template`](https://github.com/ricardoquesada/esp-idf-arduino-bluepad32-template) | `d07a9385f46f7215f51fc3eb5e40c5a484cfe102` | Source of the Arduino adapter built as a locally patched IDF component. |
 | [`lvgl/lvgl`](https://github.com/lvgl/lvgl) | `v9.5.0` / `85aa60d18b3d5e5588d7b247abf90198f07c8a63` | UI framework source snapshot restored by the build setup. |
 | [`Espressif esp_lcd_ili9341`](https://components.espressif.com/components/espressif/esp_lcd_ili9341) | `2.0.2` | Official ILI9341 panel driver restored by ESP-IDF Component Manager. |
 | [`pioarduino/platform-espressif32`](https://github.com/pioarduino/platform-espressif32) | release `55.03.39` | PlatformIO platform package selected in `platformio.ini`. |

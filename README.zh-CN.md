@@ -68,8 +68,9 @@ pio run -e playground -t upload --upload-port COMx
 pio device monitor --port COMx --baud 115200
 ```
 
-PlatformIO 会按 `platformio.ini` 和 `main/idf_component.yml` 恢复构建依赖。组件快照、
-锁定提交和当前无法完全离线复现的部分见[依赖说明](docs/DEPENDENCIES.md)。
+PlatformIO 会按 `main/idf_component.yml` 恢复官方 LCD 依赖。干净克隆后的第一次构建前，
+请先运行 `python tools/bootstrap_components.py` 恢复锁定的本地组件；组件快照、锁定提交和
+当前无法完全离线复现的部分见[依赖说明](docs/DEPENDENCIES.md)。
 
 ### 主机工具
 

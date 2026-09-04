@@ -50,8 +50,6 @@ Require-Text (Join-Path $root 'components/arduino/cores/esp32/esp_arduino_versio
 Require-Text (Join-Path $root 'components/bluepad32/include/uni_version.h') 'UNI_VERSION_MAJOR\s+4[\s\S]*UNI_VERSION_MINOR\s+2[\s\S]*UNI_VERSION_PATCH\s+0' 'Bluepad32 4.2.0'
 Require-Text (Join-Path $root 'components/lvgl/lv_version.h') 'LVGL_VERSION_MAJOR\s+9[\s\S]*LVGL_VERSION_MINOR\s+5[\s\S]*LVGL_VERSION_PATCH\s+0' 'LVGL 9.5.0'
 
-$warnings.Add('Legacy local components still require their documented compatibility snapshot; patch extraction is intentionally a separate migration step.')
-
 Write-Output ("Verified components: " + ($checks -join ', '))
 foreach ($warning in $warnings) {
     Write-Warning $warning

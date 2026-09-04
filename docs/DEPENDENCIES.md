@@ -49,7 +49,9 @@ MIT，重新分发前必须取得授权或替换为明确许可的原创资源�
 
 `main/idf_component.yml` 声明官方 ILI9341 驱动 `espressif/esp_lcd_ili9341 == 2.0.2`；根目录 `dependencies.lock` 锁定该组件及其 `cmake_utilities` 传递依赖。第一次构建时，组件管理器把源码恢复到被忽略的 `managed_components/`。
 
-`dependencies/components.lock.json` 记录其余本地组件的上游仓库、tag/commit、当前用途和迁移状态。当前 Arduino、Bluepad32、Bluepad32 Arduino adapter、BTstack 和 LVGL 仍然是为这个 PlatformIO/ESP-IDF 混合构建准备的兼容快照；它们的 CMake/Kconfig 差异尚未全部提取为独立 patch，因此暂不宣称“干净克隆后只靠锁文件即可复原”。
+`dependencies/components.lock.json` 记录其余本地组件的上游仓库、tag/commit、当前用途和恢复状态。Arduino、Bluepad32、BTstack 和 LVGL 的大型源码树不进入 Git；本地差异保存在 `dependencies/patches/`，小型 IDF manifest 和 Bluepad32 Arduino adapter 保存在 `dependencies/compat/`。
+
+干净克隆后先运行 `python tools/bootstrap_components.py`，它会按锁文件恢复 Arduino、LVGL、Bluepad32 和 BTstack，并应用 `dependencies/patches/` 中的本地兼容补丁；Bluepad32 Arduino adapter 从 `dependencies/compat/` 复制。CI 在 PlatformIO 构建前执行同一个脚本。已有本地组件目录时脚本默认拒绝覆盖，确认需要重新恢复时再加 `--force`。
 
 可以用 `powershell -ExecutionPolicy Bypass -File tools/verify_components.ps1` 检查当前工作区的版本标记；在缺少官方 managed component 的新工作区使用 `-RestoreManaged`，脚本会让 PlatformIO 按 `main/idf_component.yml` 恢复它。
 

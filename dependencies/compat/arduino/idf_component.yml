@@ -1,0 +1,10 @@
+description: "Arduino core for ESP32 pinned by ESP32 Playground"
+url: "https://github.com/espressif/arduino-esp32"
+license: "LGPL-2.1"
+version: "3.3.9-pgos.1"
+
+# PGOS uses Arduino as a local ESP-IDF component with selective compilation.
+# The upstream manifest declares optional dependencies for every bundled
+# Arduino library. They are intentionally omitted unless PGOS enables them.
+dependencies:
+  idf: ">=5.3,<6.1"

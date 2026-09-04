@@ -1,46 +1,46 @@
 {
   "schema": 1,
-  "policy": "Third-party source trees are generated locally; only this lock and explicit patches belong in the project repository.",
+  "policy": "Large third-party source trees are restored locally; this lock, explicit patches, and small compatibility components belong in the project repository.",
   "components": [
     {
       "name": "arduino",
       "source": "https://github.com/espressif/arduino-esp32.git",
       "ref": "3.3.9",
       "commit": "5b5114c832dfe309f3e73879d2ac8922c8276559",
-      "status": "local-compatibility-snapshot",
-      "notes": "The project currently uses a minimal IDF component manifest and selective compilation. Convert the local CMake delta into an explicit patch before a clean bootstrap is required."
+      "status": "restored-with-patch",
+      "notes": "The bootstrap applies dependencies/patches/arduino.patch and installs the minimal tracked IDF manifest from dependencies/compat/arduino."
     },
     {
       "name": "bluepad32",
       "source": "https://github.com/ricardoquesada/bluepad32.git",
       "ref": "4.2.0",
       "commit": "6efa7123fe8badf5a40ad1205743a80b31c00ea4",
-      "status": "local-compatibility-snapshot",
-      "notes": "The component is the src/components/bluepad32 subtree with ESP32-S3 driver selection changes."
+      "status": "restored-with-patch",
+      "notes": "The component is restored from src/components/bluepad32 and patched for ESP32-S3, the disabled Bluepad32 REPL, and the locked BTstack API."
     },
     {
       "name": "bluepad32_arduino",
-      "source": "https://github.com/ricardoquesada/bluepad32-arduino.git",
-      "ref": "1.3.5",
-      "commit": "2e8a0e6e2281698553bf199d135ae55c8b13f14d",
-      "status": "local-compatibility-snapshot",
-      "notes": "The Arduino adapter is compiled as an IDF component in this project."
+      "source": "https://github.com/ricardoquesada/esp-idf-arduino-bluepad32-template.git",
+      "ref": "main",
+      "commit": "d07a9385f46f7215f51fc3eb5e40c5a484cfe102",
+      "status": "tracked-compatibility-component",
+      "notes": "The small Arduino adapter is tracked under dependencies/compat and makes the upstream template console integration optional for PGOS."
     },
     {
       "name": "btstack",
-      "source": "https://github.com/ricardoquesada/bluepad32.git",
+      "source": "https://github.com/bluekitchen/btstack.git",
       "ref": "bluepad32-4.2.0/external/btstack",
       "commit": "5d4d8cc7b1d35a90bbd6d5ffd2d3050b2bfc861c",
-      "status": "transitive-source-snapshot",
-      "notes": "BTstack is the revision used by Bluepad32 4.2.0, not an independently selected floating branch."
+      "status": "restored-transitive-source-with-patch",
+      "notes": "BTstack is the revision used by Bluepad32 4.2.0. The bootstrap assembles its ESP32 component subset and applies the two documented pairing/security patches."
     },
     {
       "name": "lvgl",
       "source": "https://github.com/lvgl/lvgl.git",
       "ref": "v9.5.0",
       "commit": "85aa60d18b3d5e5588d7b247abf90198f07c8a63",
-      "status": "local-compatibility-snapshot",
-      "notes": "The current local tree is source-only and excludes upstream demos/assets from the build."
+      "status": "restored-from-lock",
+      "notes": "The bootstrap restores the exact upstream revision; demos and examples remain disabled by sdkconfig."
     },
     {
       "name": "esp_lcd_ili9341",

@@ -1,0 +1,122 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 175d0e0..5892f4c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -64,12 +64,12 @@ if(IDF_TARGET)
+     # This files call ESP-IDF functions and should be ported/converted
+     # so that can be called from other targets like Pico W
+     list(APPEND srcs
+-         "arch/uni_console_esp32.c"
+          "arch/uni_system_esp32.c"
+          "arch/uni_log_esp32.c"
+-         "arch/uni_property_esp32.c"
+-         "uni_gpio.c"
+-         "uni_mouse_quadrature.c")
++         "arch/uni_property_esp32.c")
++    # Keep one source path for both CMake and PlatformIO's component scanner;
++    # the source itself becomes a stub when the optional REPL is disabled.
++    list(APPEND srcs "arch/uni_console_esp32.c")
+ elseif(PICO_SDK_VERSION_STRING)
+     list(APPEND srcs
+          "arch/uni_console_pico.c"
+@@ -90,6 +90,8 @@ if(CONFIG_IDF_TARGET_ESP32)
+     # Files that are only meant to be compiled on ESP32 (original)
+     list(APPEND srcs
+         # Place here files that are ESP32-only
++         "uni_gpio.c"
++         "uni_mouse_quadrature.c"
+          "platform/uni_platform_mightymiggy.c"
+          "platform/uni_platform_nina.c"
+          "platform/uni_platform_unijoysticle.c"
+@@ -146,12 +148,14 @@ endif()
+ if(IDF_TARGET)
+     set(requires "nvs_flash" "btstack" "app_update" "esp_timer")
+ 
+-    if("${IDF_VERSION_MAJOR}" GREATER_EQUAL 5)
+-        # When using ESP-IDF v5+, use "normal" components
+-        list(APPEND requires "cmd_nvs" "cmd_system")
+-    else()
+-        # Use legacy components when compiled using ESP-IDF v4.4
+-        list(APPEND requires "cmd_nvs_4.4" "cmd_system_4.4")
++    if(CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE)
++        if("${IDF_VERSION_MAJOR}" GREATER_EQUAL 5)
++            # The optional Bluepad32 REPL is disabled by PGOS. Only add its
++            # legacy command components when that console is explicitly used.
++            list(APPEND requires "cmd_nvs" "cmd_system")
++        else()
++            list(APPEND requires "cmd_nvs_4.4" "cmd_system_4.4")
++        endif()
+     endif()
+ 
+     idf_component_register(SRCS "${srcs}"
+diff --git a/arch/uni_console_esp32.c b/arch/uni_console_esp32.c
+index 6ffa6f4..ed74794 100644
+--- a/arch/uni_console_esp32.c
++++ b/arch/uni_console_esp32.c
+@@ -2,17 +2,27 @@
+ // Copyright 2023 Ricardo Quesada
+ // http://retro.moe/unijoysticle2
+ 
++#include "sdkconfig.h"
++
++#if !CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE
++
++#include "uni_console.h"
++
++void uni_console_init(void) {}
++
++#else
++
+ #include "uni_console.h"
+ 
+ #include <argtable3/argtable3.h>
++#if CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE
+ #include <cmd_system.h>
++#endif
+ #include <esp_console.h>
+ #include <esp_log.h>
+ #include <freertos/FreeRTOS.h>
+ #include <freertos/task.h>
+ 
+-#include "sdkconfig.h"
+-
+ #include "bt/uni_bt.h"
+ #include "bt/uni_bt_allowlist.h"
+ #include "bt/uni_bt_le.h"
+@@ -587,3 +597,5 @@ void uni_console_init(void) {
+     // vTaskDelete(NULL);
+ #endif  // CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE
+ }
++
++#endif  // CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE
+diff --git a/bt/uni_bt_le.c b/bt/uni_bt_le.c
+index dee7c00..4efdb1a 100644
+--- a/bt/uni_bt_le.c
++++ b/bt/uni_bt_le.c
+@@ -334,11 +334,13 @@ static void uni_hids_client_packet_handler(uint8_t packet_type, uint16_t channel
+                 logi("Reports enabled\n");
+             }
+             break;
++#if 0  // Does not compile on Pico SDK 1.5.1. Enable it only if needed.
+         case GATTSERVICE_SUBEVENT_HID_REPORT_WRITTEN:
+             // Called when a client a hid report was written.
+             // E.g.: "set rumble" was sent to the gamepad.
+             // TODO: Inform the device that it is ready to write another hid report?
+             break;
++#endif
+         default:
+             logi("Unsupported gatt client event: 0x%02x\n", hci_event_gattservice_meta_get_subevent_code(packet));
+             break;
+diff --git a/uni_hid_device.c b/uni_hid_device.c
+index 67841e8..add0933 100644
+--- a/uni_hid_device.c
++++ b/uni_hid_device.c
+@@ -963,8 +963,6 @@ static void process_misc_button_home(uni_hid_device_t* d) {
+ 
+     // Update "wait" flag.
+     d->misc_button_wait_release |= MISC_BUTTON_START;
+-
+-    uni_hid_device_dump_all();
+ }
+ 
+ static void device_connection_timeout(btstack_timer_source_t* ts) {

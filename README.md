@@ -74,9 +74,10 @@ pio run -e playground -t upload --upload-port COMx
 pio device monitor --port COMx --baud 115200
 ```
 
-PlatformIO restores build dependencies from `platformio.ini` and
-`main/idf_component.yml`. Component snapshots, locked revisions, and the
-parts that are not yet fully reproducible offline are described in
+PlatformIO restores the managed LCD dependency from `main/idf_component.yml`.
+Before the first build in a clean clone, restore the pinned local components
+with `python tools/bootstrap_components.py`. Component snapshots, locked
+revisions, and the parts that are not yet fully reproducible offline are described in
 [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 
 ### Host tools
